@@ -19,6 +19,7 @@ import {
 import { buildSeedState } from "./data/seed";
 import { loadStoredFont } from "./utils/fonts";
 import { fmtClock, nextOccurrence, todayIso } from "./utils/core";
+import { loadStateFromIDB, saveStateToIDB, loadErasuredFlag, saveErasedFlag, migrateToIDB } from "./utils/idb";
 
 const LS_KEY = "lifelog.state.v1";
 /** When set, a missing state file boots into a blank app instead of demo data. */
@@ -150,13 +151,36 @@ export function AppProvider({ children }: { children: ReactNode }) {
     (async () => {
       const key = await getDeviceKey();
       let next: State | null = null;
+      
+      // Try migrating from localStorage to IndexedDB (one-time)
       try {
-        const raw = localStorage.getItem(LS_KEY);
-        if (raw) next = mergeState(await decryptEnvelope<State>(key, raw));
+        await migrateToIDB();
+      } catch {
+        // Migration failed, continue with normal loading
+      }
+      
+      // First try IndexedDB
+      try {
+        next = await loadStateFromIDB();
       } catch {
         next = null;
       }
-      if (!next) next = localStorage.getItem(ERASED_KEY) ? emptyState() : mergeState(await buildSeedState());
+      
+      // Fallback to localStorage if IDB failed
+      if (!next) {
+        try {
+          const raw = localStorage.getItem(LS_KEY);
+          if (raw) next = mergeState(await decryptEnvelope<State>(key, raw));
+        } catch {
+          next = null;
+        }
+      }
+      
+      if (!next) {
+        const erased = await loadErasuredFlag();
+        next = erased ? emptyState() : mergeState(await buildSeedState());
+      }
+      
       if (!cancelled) {
         if (!hasCrypto && !warnedCrypto.current) {
           warnedCrypto.current = true;
@@ -176,10 +200,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!state) return;
     const t = setTimeout(async () => {
       try {
-        const key = await getDeviceKey();
-        localStorage.setItem(LS_KEY, await encryptEnvelope(key, state));
+        // Try IndexedDB first, fallback to localStorage
+        await saveStateToIDB(state);
       } catch {
-        /* storage full / private mode — keep working in memory */
+        // IDB failed, use localStorage as fallback
+        try {
+          const key = await getDeviceKey();
+          localStorage.setItem(LS_KEY, await encryptEnvelope(key, state));
+        } catch {
+          /* storage full / private mode — keep working in memory */
+        }
       }
     }, 400);
     return () => clearTimeout(t);

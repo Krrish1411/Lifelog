@@ -184,6 +184,43 @@ input[type="range"].energy::-moz-range-thumb {
 }
 
 /* ---------- Motion ---------- */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+[data-reduce-motion="true"] *, [data-reduce-motion="true"] *::before, [data-reduce-motion="true"] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+}
+
+/* ---------- Transparency reduction ---------- */
+[data-reduce-transparency="true"] .glass-card,
+[data-reduce-transparency="true"] .card,
+[data-reduce-transparency="true"] .engine-panel {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+[data-reduce-transparency="true"] .ambient,
+[data-reduce-transparency="true"] .liquid-field {
+  opacity: 0.3 !important;
+}
+
+/* ---------- High contrast mode ---------- */
+[data-high-contrast="true"] {
+  --line: color-mix(in srgb, var(--text) 40%, transparent);
+}
+
+[data-high-contrast="true"] .card,
+[data-high-contrast="true"] .inp,
+[data-high-contrast="true"] .chip {
+  border-width: 2px;
+}
+
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
   to { opacity: 1; transform: translateY(0); }

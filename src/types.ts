@@ -160,6 +160,10 @@ export interface Settings {
   notifyEnabled: boolean;
   reportWidgets: Record<string, boolean>;
   shortcuts: Record<string, string>; // action → key (lowercase; "space" for spacebar)
+  /* Accessibility */
+  reduceMotion: boolean;
+  reduceTransparency: boolean;
+  highContrast: boolean;
 }
 
 export const SHORTCUT_ACTIONS: { action: string; label: string }[] = [
@@ -251,6 +255,9 @@ export const DEFAULT_SETTINGS: Settings = {
     analytics: true,
   },
   shortcuts: { ...DEFAULT_SHORTCUTS },
+  reduceMotion: false,
+  reduceTransparency: false,
+  highContrast: false,
 };
 
 export const STATE_VERSION = 1;

@@ -8,6 +8,7 @@ import { ERASED_KEY, useApp } from "../store";
 import { decryptBackup, decryptEnvelope, encryptBackup, getDeviceKey } from "../utils/crypto";
 import { contrast, download, ensureContrast, normalizeHex, todayIso } from "../utils/core";
 import { CUSTOM_FONT_FAMILY, readFileAsDataUrl, saveCustomFont } from "../utils/fonts";
+import { clearIDB, saveErasedFlag } from "../utils/idb";
 import { Btn, ColorPicker, Labeled, Modal, Seg, TextInput, Toggle, cn } from "../components/ui";
 
 const LS_KEY = "lifelog.state.v1";
@@ -155,7 +156,11 @@ export function SettingsView() {
       confirmLabel: "Erase everything", danger: true, requireText: "DELETE",
     });
     if (!ok) return;
-    localStorage.setItem(ERASED_KEY, "1"); // boot into a blank app, never reseed
+    // Set erased flag in both IDB and localStorage for compatibility
+    await saveErasedFlag();
+    // Clear IndexedDB
+    await clearIDB();
+    // Clear localStorage as well
     localStorage.removeItem(LS_KEY);
     window.location.reload();
   };
@@ -312,6 +317,19 @@ export function SettingsView() {
                 </label>
               </div>
             </Labeled>
+          </div>
+        ))}
+
+        {section("Accessibility", "Make LifeLog comfortable for everyone — motion, transparency and contrast controls.", (
+          <div className="flex flex-col gap-3">
+            <Toggle checked={s.reduceMotion} onChange={(v) => patch({ reduceMotion: v })} label="Reduce motion" />
+            <span className="text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>Minimizes animations and transitions throughout the app.</span>
+            
+            <Toggle checked={s.reduceTransparency} onChange={(v) => patch({ reduceTransparency: v })} label="Reduce transparency" />
+            <span className="text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>Removes blur effects and makes panels more opaque.</span>
+            
+            <Toggle checked={s.highContrast} onChange={(v) => patch({ highContrast: v })} label="High contrast" />
+            <span className="text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>Increases border thickness and contrast for better visibility.</span>
           </div>
         ))}
 
