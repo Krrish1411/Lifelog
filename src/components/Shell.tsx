@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import {
-  BarChart3, Calendar, Check, FileClock, FileText, Flame, LayoutDashboard, ListTodo,
-  Pause, PenLine, Play, Plus, Quote, Settings, SlidersHorizontal, Square, Timer, ArrowLeftRight,
+import { BarChart3, Calendar, Check, FileClock, FileText, Flame, LayoutDashboard, ListTodo,
+  Pause, PenLine, Play, Plus, Quote, Settings, SlidersHorizontal, Square, Timer,
 } from "lucide-react";
 import type { TokenKey, ViewId } from "../types";
 import { FONT_PAIRS, QUOTES, SHORTCUT_ACTIONS } from "../types";
@@ -23,7 +22,6 @@ import { DayLogView } from "../views/DayLog";
 import { ReportsView } from "../views/Reports";
 import { ReviewView } from "../views/Review";
 import { SettingsView } from "../views/Settings";
-import { SyncView } from "../views/Sync";
 
 const NAV: { id: ViewId; label: string; icon: typeof Timer }[] = [
   { id: "dashboard", label: "Today", icon: LayoutDashboard },
@@ -35,7 +33,6 @@ const NAV: { id: ViewId; label: string; icon: typeof Timer }[] = [
   { id: "daylog", label: "Day Log", icon: FileClock },
   { id: "reports", label: "Reports", icon: BarChart3 },
   { id: "review", label: "Review", icon: PenLine },
-  { id: "sync", label: "Sync", icon: ArrowLeftRight },
   { id: "settings", label: "Settings", icon: Settings },
 ];
 
@@ -201,7 +198,6 @@ export function Shell() {
     daylog: <DayLogView />,
     reports: <ReportsView />,
     review: <ReviewView />,
-    sync: <SyncView />,
     settings: <SettingsView />,
   };
 
