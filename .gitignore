@@ -2,29 +2,22 @@
 # Build artifacts
 dist/
 build/
-*.css
-*.js
 
 # Dependencies
 node_modules/
 
+# Logs and temp files
+*.log
+*.tmp
+
 # Environment
 .env
 .env.local
-*.env.*
+.env.*
 
 # Editors
 .vscode/
 .idea/
-
-# Logs and temp files
-*.log
-*.tmp
-*.swp
-
-# OS generated files
-.DS_Store
-Thumbs.db
 
 # Python
 __pycache__/
@@ -33,7 +26,6 @@ __pycache__/
 *.pyd
 
 # Compiled files
-*.class
 *.o
 *.obj
 *.exe
@@ -42,20 +34,7 @@ __pycache__/
 *.a
 *.out
 
-# Coverage
-coverage/
-htmlcov/
-.coverage
-
-# Testing
-.mypy_cache/
-.pytest_cache/
-
-# Java/Gradle
-target/
-.gradle/
-
-# Compressed files
+# Compression
 *.zip
 *.gz
 *.tar
@@ -74,8 +53,19 @@ target/
 *.Z
 *.lz
 *.lzo
-*.tar.gz
-*.tar.bz2
-*.tar.xz
-*.tar.zst
+
+# Coverage
+coverage/
+htmlcov/
+.coverage
+
+# Cache
+.mypy_cache/
+.pytest_cache/
+.gradle/
+target/
+
+# System files
+.DS_Store
+Thumbs.db
 ```

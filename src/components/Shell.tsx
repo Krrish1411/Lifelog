@@ -146,6 +146,10 @@ export function Shell() {
     root.dataset.theme = dark ? "dark" : "light";
     root.dataset.engine = s.layout;
     root.style.background = bg;
+    /* Accessibility settings */
+    root.dataset.reduceMotion = String(s.reduceMotion);
+    root.dataset.reduceTransparency = String(s.reduceTransparency);
+    root.dataset.highContrast = String(s.highContrast);
   }, [state.settings]);
 
   /* ---------- launch greeting ---------- */
@@ -249,7 +253,7 @@ export function Shell() {
   if (layout === "planify") {
     return (
       <div className="relative min-h-screen">
-        <aside className="fixed inset-y-0 left-0 z-40 flex w-[74px] flex-col items-center gap-1.5 border-r py-5"
+        <aside className="fixed inset-y-0 left-0 z-40 flex w-[74px] flex-col items-center gap-1.5 border-r py-5 md:w-[84px]"
           style={{ background: "var(--panel)", borderColor: "var(--line)" }}>
           <Logo small />
           <div className="mt-4 flex w-full flex-col items-center gap-1 px-2">{NAV.map((n) => navButton(n, { iconOnly: true }))}</div>
@@ -261,7 +265,7 @@ export function Shell() {
             </button>
           </div>
         </aside>
-        <main className="zoomable ml-[74px] w-[calc(100%-74px)] px-7 py-7">
+        <main className="zoomable ml-[74px] w-[calc(100%-74px)] px-4 py-4 md:ml-[84px] md:w-[calc(100%-84px)] md:px-6 md:py-6">
           <div className="w-full">{views[view]}</div>
         </main>
         <Overlays greeting={greeting} closeGreeting={closeGreeting} />
