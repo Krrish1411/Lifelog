@@ -312,7 +312,7 @@ export function Shell() {
           <main className="zoomable min-h-0 w-full flex-1 px-6 py-6 pb-[76px]">
             <div className="w-full">{views[view]}</div>
           </main>
-          <StatusBar dueToday={dueToday} todayMin={tracked.get(today) ?? 0} bestStreak={bestStreak} goFocus={() => setView("focus")} />
+          <StatusBarDesk dueToday={dueToday} todayMin={tracked.get(today) ?? 0} bestStreak={bestStreak} goFocus={() => setView("focus")} />
         </div>
         <Overlays greeting={greeting} closeGreeting={closeGreeting} />
         <MiniTimer />
@@ -559,6 +559,36 @@ function StatusBar({ dueToday, todayMin, bestStreak, goFocus }: { dueToday: numb
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 flex h-[52px] items-center gap-4 border-t px-4 backdrop-blur-md"
       style={{ background: "color-mix(in srgb, var(--panel) 92%, transparent)", borderColor: "var(--line)" }}>
+      <span className="chip !py-0.5 text-[11px]"><Flame size={11} style={{ color: "var(--accent)" }} /> {fmtDur(todayMin)} today</span>
+      <span className="chip !py-0.5 text-[11px]"><ListTodo size={11} style={{ color: "var(--mut)" }} /> {dueToday} due</span>
+      <span className="chip !py-0.5 text-[11px]"><Check size={11} style={{ color: "var(--ok)" }} /> streak {bestStreak}d</span>
+      {running && (
+        <button onClick={goFocus} className="ml-auto flex items-center gap-2 rounded-lg px-2.5 py-1 font-mono text-[12.5px] font-bold tnum transition-all hover:opacity-80"
+          style={{ background: "var(--accent-soft)", color: "var(--accent)", cursor: "pointer" }}>
+          <span className="h-[7px] w-[7px] rounded-full" style={{ background: "var(--ok)", animation: "nowpulse 1.6s infinite" }} />
+          {running.mode} · {fmtHMS(sessionSeconds(running))}
+        </button>
+      )}
+      <span className={cn("ml-auto text-[10.5px] font-bold uppercase tracking-wider", running && "ml-0")} style={{ color: "var(--mut)" }}>
+        AES-256 · local only
+      </span>
+    </div>
+  );
+}
+
+/* Desk engine status bar: positioned right of sidebar so it doesn't cover the Add button */
+function StatusBarDesk({ dueToday, todayMin, bestStreak, goFocus }: { dueToday: number; todayMin: number; bestStreak: number; goFocus: () => void }) {
+  const { state } = useApp();
+  const running = state.sessions.find((s) => s.status === "running");
+  const [, force] = useState(0);
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => force((x) => x + 1), 500);
+    return () => clearInterval(t);
+  }, [running]);
+  return (
+    <div className="fixed bottom-0 right-0 z-40 flex h-[52px] items-center gap-4 border-l border-t px-4 backdrop-blur-md"
+      style={{ background: "color-mix(in srgb, var(--panel) 92%, transparent)", borderColor: "var(--line)", left: "228px" }}>
       <span className="chip !py-0.5 text-[11px]"><Flame size={11} style={{ color: "var(--accent)" }} /> {fmtDur(todayMin)} today</span>
       <span className="chip !py-0.5 text-[11px]"><ListTodo size={11} style={{ color: "var(--mut)" }} /> {dueToday} due</span>
       <span className="chip !py-0.5 text-[11px]"><Check size={11} style={{ color: "var(--ok)" }} /> streak {bestStreak}d</span>
