@@ -18,7 +18,8 @@ export type ViewId =
   | "daylog"
   | "reports"
   | "review"
-  | "settings";
+  | "settings"
+  | "sync";
 
 /** Encrypted payload. `plain` is only used when Web Crypto is unavailable. */
 export interface EncBlob {
