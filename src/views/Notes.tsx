@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bold, Film, FolderPlus, Heading1, Heading2, Highlighter, ImageIcon, Italic, Link2,
-  List, ListOrdered, ListTodo, Lock, Maximize2, Mic, Minimize2, Minus, Paperclip,
-  Pin, PinOff, Plus, Quote, Square, Strikethrough, Trash2, Underline,
+  Bold, CheckSquare, Film, FolderPlus, Heading1, Heading2,
+  Highlighter, ImageIcon, Italic, Link2, List, ListOrdered, ListTodo,
+  Lock, Maximize2, Mic, Minimize2, Minus, PanelLeft,
+  Paperclip, Pencil, Pin, PinOff, Plus, Quote, Square, Strikethrough,
+  Trash2, Underline, X, Loader2
 } from "lucide-react";
 import type { Attachment, Note } from "../types";
 import { useApp } from "../store";
@@ -10,10 +12,11 @@ import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
 import { fmtClock, fmtDayShort, fmtNoteName, todayIso, uid } from "../utils/core";
 import { applyLinePrefix, applyWrap, renderMarkdown } from "../utils/markdown";
 import { consumeDailyNote } from "../utils/nav";
+import { useBodyScrollLock } from "../utils/scrollLock";
 import { Btn, EmptyState, Modal, SearchInput, Seg, TextInput, cn } from "../components/ui";
 
 interface Draft { title: string; text: string }
-const MAX_ATTACH = 3 * 1024 * 1024; // 3 MB per attachment (local storage friendly)
+const MAX_ATTACH = 50 * 1024 * 1024; // 50 MB per attachment
 
 function fileToDataUrl(f: File): Promise<string> {
   return new Promise((res, rej) => {
@@ -25,7 +28,7 @@ function fileToDataUrl(f: File): Promise<string> {
 }
 
 export function NotesView() {
-  const { state, set, toast, confirm } = useApp();
+  const { state, set, toast, confirm, openTaskDialog } = useApp();
   const today = todayIso();
   const [folderSel, setFolderSel] = useState<string>("all");
   const [selId, setSelId] = useState<string | null>(null);
@@ -33,6 +36,10 @@ export function NotesView() {
   const [draft, setDraft] = useState<Draft>({ title: "", text: "" });
   const [newFolder, setNewFolder] = useState("");
   const [showNewFolder, setShowNewFolder] = useState(false);
+  const [editingFolder, setEditingFolder] = useState<{ id: string; name: string } | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
+
+  useBodyScrollLock(drawerOpen);
   const [popped, setPopped] = useState(false);
   const [preview, setPreview] = useState<"write" | "preview">("write");
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
@@ -53,18 +60,60 @@ export function NotesView() {
     const requested = consumeDailyNote();
     const targetIso = requested ?? today;
     const existing = state.notes.find((n) => n.daily && n.day === targetIso);
-    if (existing) setSelId(existing.id);
-    else if (requested) {
+    if (existing) {
+      setSelId(existing.id);
+    } else if (requested) {
       const id = uid();
       set((s) => ({ ...s, notes: [{ id, title: fmtNoteName(requested), folderId: "f-daily", createdAt: Date.now(), updatedAt: Date.now(), blob: { plain: "" }, daily: true, day: requested }, ...s.notes] }));
       setSelId(id);
+    } else if (!selId && state.notes.length > 0) {
+      setSelId(state.notes[0].id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* load + decrypt selected note */
   useEffect(() => {
+    const handler = () => setDrawerOpen(true);
+    window.addEventListener("lifelog:open-notes-drawer", handler);
+    return () => window.removeEventListener("lifelog:open-notes-drawer", handler);
+  }, []);
+
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const selIdRef = useRef(selId);
+  selIdRef.current = selId;
+
+  const flushSave = async () => {
+    const curId = selIdRef.current;
+    if (!curId || !dirty.current) return;
+    const curDraft = draftRef.current;
+    dirty.current = false;
+    try {
+      const key = await getDeviceKey();
+      const blob = await encryptText(key, curDraft.text);
+      set((s) => ({
+        ...s,
+        notes: s.notes.map((n) => (n.id === curId ? { ...n, title: curDraft.title.trim() || n.title, blob, updatedAt: Date.now() } : n)),
+      }));
+      setSaveState("saved");
+    } catch {
+      // ignore
+    }
+  };
+
+  /* flush pending save on unmount */
+  useEffect(() => () => { flushSave(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  /* load + decrypt selected note */
+  const prevSelId = useRef<string | null>(null);
+  useEffect(() => {
+    if (prevSelId.current && prevSelId.current !== selId && dirty.current) {
+      flushSave();
+    }
+    prevSelId.current = selId;
+
     if (!selId) return;
+    if (taRef.current) taRef.current.scrollTop = 0;
     const note = state.notes.find((n) => n.id === selId);
     if (!note || loadedFor.current === selId) return;
     loadedFor.current = selId;
@@ -108,6 +157,13 @@ export function NotesView() {
   }, [state.notes, folderSel, query]);
 
   const selNote = state.notes.find((n) => n.id === selId);
+  const selFolder = state.folders.find((f) => f.id === selNote?.folderId);
+  const currentFolderName = folderSel === "all" ? "All Notes" : (state.folders.find((f) => f.id === folderSel)?.name ?? "Folder");
+
+  const linkedTasks = useMemo(
+    () => state.tasks.filter((t) => t.linkedNoteIds?.includes(selId ?? "")),
+    [state.tasks, selId]
+  );
   const folders = useMemo(
     () => [...state.folders].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || a.name.localeCompare(b.name)),
     [state.folders],
@@ -119,21 +175,30 @@ export function NotesView() {
     set((s) => ({ ...s, notes: [{ id, title: "Untitled note", folderId, createdAt: Date.now(), updatedAt: Date.now(), blob: { plain: "" }, daily: false, day: null }, ...s.notes] }));
     loadedFor.current = null;
     setSelId(id);
+    setDrawerOpen(false);
     toast("Note created — encrypted as you type", "ok");
   };
+
   const deleteNote = async (n: Note) => {
     const ok = await confirm({ title: "Delete note", body: `“${n.title}” and its ${n.attachments?.length ?? 0} attachment(s) will be permanently removed from local storage.`, confirmLabel: "Delete note", danger: true });
     if (!ok) return;
     set((s) => ({ ...s, notes: s.notes.filter((x) => x.id !== n.id) }));
-    if (selId === n.id) { setSelId(null); loadedFor.current = null; }
+    if (selId === n.id) {
+      const remaining = state.notes.filter((x) => x.id !== n.id);
+      setSelId(remaining[0]?.id ?? null);
+      loadedFor.current = null;
+    }
     toast("Note deleted", "warn");
   };
+
   const togglePinNote = (n: Note) => {
     set((s) => ({ ...s, notes: s.notes.map((x) => (x.id === n.id ? { ...x, pinned: !x.pinned } : x)) }));
     toast(n.pinned ? "Unpinned" : "Pinned to top", "ok");
   };
+
   const togglePinFolder = (id: string, pinned?: boolean) =>
     set((s) => ({ ...s, folders: s.folders.map((f) => (f.id === id ? { ...f, pinned: !pinned } : f)) }));
+
   const addFolder = () => {
     const v = newFolder.trim();
     if (!v) return;
@@ -141,13 +206,43 @@ export function NotesView() {
     setNewFolder(""); setShowNewFolder(false);
     toast("Folder added", "ok");
   };
+
+  const saveFolderEdit = () => {
+    if (!editingFolder) return;
+    const name = editingFolder.name.trim();
+    if (!name) {
+      toast("Folder name cannot be empty", "err");
+      return;
+    }
+    set((s) => ({
+      ...s,
+      folders: s.folders.map((f) => (f.id === editingFolder.id ? { ...f, name } : f)),
+    }));
+    setEditingFolder(null);
+    toast("Folder renamed", "ok");
+  };
+
   const deleteFolder = async (id: string) => {
+    const f = state.folders.find((x) => x.id === id);
     const count = state.notes.filter((n) => n.folderId === id).length;
-    if (count > 0) return toast(`Folder still has ${count} note(s) — move or delete them first`, "err");
-    const ok = await confirm({ title: "Delete folder", body: "This empty folder will be removed.", confirmLabel: "Delete", danger: true });
+    const body =
+      count > 0
+        ? `Delete folder “${f?.name ?? "Folder"}”? Its ${count} note(s) will be kept in All Notes.`
+        : `Delete empty folder “${f?.name ?? "Folder"}”?`;
+    const ok = await confirm({
+      title: "Delete folder",
+      body,
+      confirmLabel: "Delete folder",
+      danger: true,
+    });
     if (!ok) return;
-    set((s) => ({ ...s, folders: s.folders.filter((f) => f.id !== id) }));
-    setFolderSel("all");
+    set((s) => ({
+      ...s,
+      folders: s.folders.filter((item) => item.id !== id),
+      notes: s.notes.map((n) => (n.folderId === id ? { ...n, folderId: "f-daily" } : n)),
+    }));
+    if (folderSel === id) setFolderSel("all");
+    toast("Folder deleted", "warn");
   };
 
   /* ---------------- attachments ---------------- */
@@ -157,19 +252,22 @@ export function NotesView() {
       ...s,
       notes: s.notes.map((n) => (n.id === selId ? { ...n, attachments: [...(n.attachments ?? []), a], updatedAt: Date.now() } : n)),
     }));
-    toast(`${a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : "Audio"} attached — encrypted with the note`, "ok");
+    toast(`${a.kind === "image" ? "Photo" : a.kind === "video" ? "Video" : "Audio"} attached — encrypted with note`, "ok");
   };
+
   const removeAttachment = (id: string) => {
     if (!selId) return;
     set((s) => ({ ...s, notes: s.notes.map((n) => (n.id === selId ? { ...n, attachments: (n.attachments ?? []).filter((a) => a.id !== id) } : n)) }));
     toast("Attachment removed", "warn");
   };
+
   const onMediaFile = async (f: File | undefined, kind: "image" | "video") => {
     if (!f) return;
-    if (f.size > MAX_ATTACH) return toast("Keep attachments under 3 MB — this stays in local encrypted storage", "err");
+    if (f.size > MAX_ATTACH) return toast("Attachment exceeds 50 MB limit", "err");
     const dataUrl = await fileToDataUrl(f);
     pushAttachment({ id: uid(), kind, name: f.name, dataUrl, size: f.size, createdAt: Date.now() });
   };
+
   const startRecording = async () => {
     if (recRef.current) return;
     if (typeof MediaRecorder === "undefined" || !navigator.mediaDevices?.getUserMedia) {
@@ -179,23 +277,32 @@ export function NotesView() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       const rec = new MediaRecorder(stream);
       const chunks: Blob[] = [];
-      rec.ondataavailable = (e) => chunks.push(e.data);
+      rec.ondataavailable = (e) => {
+        if (e.data && e.data.size > 0) chunks.push(e.data);
+      };
       rec.onstop = async () => {
         stream.getTracks().forEach((t) => t.stop());
         const blob = new Blob(chunks, { type: rec.mimeType || "audio/webm" });
-        if (blob.size > MAX_ATTACH) return toast("Recording too long — keep it under 3 MB", "err");
+        if (blob.size > MAX_ATTACH) return toast("Recording exceeds 50 MB limit", "err");
         const dataUrl = await fileToDataUrl(new File([blob], "recording.webm", { type: blob.type }));
         pushAttachment({ id: uid(), kind: "audio", name: `Voice note · ${fmtClock(Date.now())}`, dataUrl, size: blob.size, createdAt: Date.now() });
       };
       recRef.current = rec;
       setRecSec(0);
       recTimer.current = window.setInterval(() => setRecSec((s) => (s === null ? s : s + 1)), 1000);
-      rec.start();
+      rec.start(250);
       toast("Recording… speak your note", "ok");
-    } catch {
-      toast("Microphone permission denied", "err");
+    } catch (err: unknown) {
+      const error = err as { name?: string; message?: string };
+      console.error("Audio recording error:", err);
+      if (error?.name === "NotAllowedError" || error?.name === "PermissionDeniedError" || error?.message?.includes("Permission")) {
+        toast("Microphone permission denied. Please allow microphone access in Android settings.", "err");
+      } else {
+        toast("Microphone unavailable or permission denied", "err");
+      }
     }
   };
+
   const stopRecording = (save = true) => {
     const rec = recRef.current;
     if (recTimer.current) { clearInterval(recTimer.current); recTimer.current = null; }
@@ -207,10 +314,10 @@ export function NotesView() {
     }
   };
 
-  /* ---------------- editor (inline + pop-out) ---------------- */
+  /* ---------------- editor actions ---------------- */
   const mdBtn = (title: string, icon: React.ReactNode, fn: () => void) => (
     <button key={title} title={title} onClick={fn} disabled={preview === "preview" || !selNote}
-      className="flex h-7 w-7 items-center justify-center rounded-lg transition-all hover:scale-105 disabled:opacity-35"
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:scale-105 disabled:opacity-35"
       style={{ color: "var(--mut)", cursor: "pointer", background: "var(--bg)", border: "1px solid var(--line)" }}>
       {icon}
     </button>
@@ -219,7 +326,7 @@ export function NotesView() {
   const prefix = (p: string) => { if (taRef.current) applyLinePrefix(taRef.current, p, (v) => { setDraft((d) => ({ ...d, text: v })); dirty.current = true; }); };
 
   const toolbar = (
-    <div className="flex flex-wrap items-center gap-1">
+    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5 flex-nowrap w-full min-w-0">
       {mdBtn("Heading 1", <Heading1 size={13} />, () => prefix("# "))}
       {mdBtn("Heading 2", <Heading2 size={13} />, () => prefix("## "))}
       {mdBtn("Bold", <Bold size={13} />, () => wrap("**", "**"))}
@@ -234,55 +341,55 @@ export function NotesView() {
       {mdBtn("Checklist", <ListTodo size={13} />, () => prefix("- [ ] "))}
       {mdBtn("Link", <Link2 size={13} />, () => wrap("[", "](https://)"))}
       {mdBtn("Divider", <Minus size={13} />, () => { setDraft((d) => ({ ...d, text: `${d.text}\n---\n` })); dirty.current = true; })}
-      <span className="mx-1 h-5 w-px" style={{ background: "var(--line)" }} />
-      <Seg size="sm" options={[{ value: "write", label: "Write" }, { value: "preview", label: "Preview" }]} value={preview} onChange={setPreview} />
     </div>
   );
 
   const attachmentsBar = (
-    <div className="flex flex-wrap items-center gap-1.5">
-      <label className="flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
+    <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 flex-nowrap w-full min-w-0">
+      <label className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
         style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--mut)" }}>
         <ImageIcon size={12} /> Photo
         <input type="file" accept="image/*" className="hidden" onChange={(e) => { onMediaFile(e.target.files?.[0], "image"); e.target.value = ""; }} />
       </label>
-      <label className="flex h-7 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
+      <label className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
         style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--mut)" }}>
         <Film size={12} /> Video
         <input type="file" accept="video/*" className="hidden" onChange={(e) => { onMediaFile(e.target.files?.[0], "video"); e.target.value = ""; }} />
       </label>
       {recSec === null ? (
-        <button onClick={startRecording} className="flex h-7 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
+        <button onClick={startRecording} className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
           style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--mut)", cursor: "pointer" }}>
           <Mic size={12} /> Record audio
         </button>
       ) : (
-        <button onClick={() => stopRecording(true)} className="ring-pulse flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold"
+        <button onClick={() => stopRecording(true)} className="ring-pulse flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold"
           style={{ borderColor: "var(--danger)", background: "color-mix(in srgb, var(--danger) 15%, transparent)", color: "var(--danger)", cursor: "pointer" }}>
           <Square size={11} /> Stop · {recSec}s
         </button>
       )}
-      <span className="text-[10px] font-semibold" style={{ color: "var(--mut)" }}>max 3 MB each · stored encrypted</span>
+      <span className="text-[10px] font-medium shrink-0 ml-auto" style={{ color: "var(--mut)" }}>
+        AES-256 encrypted
+      </span>
     </div>
   );
 
   const attachmentTiles = selNote && (selNote.attachments?.length ?? 0) > 0 && (
-    <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+    <div className="mt-3 grid grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-6 shrink-0">
       {selNote!.attachments!.map((a) => (
         <div key={a.id} className="attach-tile group relative aspect-square">
           {a.kind === "image" ? (
             <button onClick={() => setLightbox(a)} className="h-full w-full cursor-zoom-in" style={{ cursor: "zoom-in" }}>
-              <img src={a.dataUrl} alt={a.name} className="h-full w-full object-cover" />
+              <img src={a.dataUrl} alt={a.name} className="h-full w-full object-cover rounded-lg" />
             </button>
           ) : (
-            <button onClick={() => setLightbox(a)} className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center" style={{ cursor: "pointer" }}>
+            <button onClick={() => setLightbox(a)} className="flex h-full w-full flex-col items-center justify-center gap-1 p-2 text-center rounded-lg border" style={{ cursor: "pointer", borderColor: "var(--line)" }}>
               {a.kind === "video" ? <Film size={20} style={{ color: "var(--accent)" }} /> : <Mic size={20} style={{ color: "var(--accent)" }} />}
               <span className="w-full truncate text-[9.5px] font-bold" style={{ color: "var(--mut)" }}>{a.name}</span>
             </button>
           )}
           <button onClick={() => removeAttachment(a.id)}
-            className="absolute right-1 top-1 hidden rounded-md p-1 group-hover:block"
-            style={{ background: "color-mix(in srgb, var(--bg) 80%, transparent)", color: "var(--danger)", cursor: "pointer" }} title="Remove">
+            className="absolute right-1 top-1 hidden rounded-md p-1 group-hover:block shadow-sm"
+            style={{ background: "color-mix(in srgb, var(--bg) 85%, transparent)", color: "var(--danger)", cursor: "pointer" }} title="Remove">
             <Trash2 size={11} />
           </button>
         </div>
@@ -290,168 +397,502 @@ export function NotesView() {
     </div>
   );
 
-  const editor = (popout: boolean) => (
-    <div className={cn("flex min-h-0 flex-1 flex-col", popout && "h-full")}>
-      {!selNote ? (
-        <EmptyState icon={Lock} title="Select a note" body="Pick one from the list, or create a new note. Everything is encrypted before it touches storage." />
+  /* ---------------- Folders sidebar content ---------------- */
+  const foldersContent = (
+    <div className="flex flex-col gap-1 overflow-y-auto p-2.5 w-full min-w-0">
+      <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-1" style={{ color: "var(--mut)" }}>
+        Folders
+      </div>
+      {[{ id: "all", name: "All notes", emoji: "🗂️", pinned: false }, ...folders.map((f) => ({ id: f.id, name: f.name, emoji: f.id === "f-daily" ? "📅" : "📁", pinned: !!f.pinned }))].map((f) => {
+        const count = f.id === "all" ? state.notes.length : state.notes.filter((n) => n.folderId === f.id).length;
+        return (
+          <div key={f.id} className="group flex items-center gap-1">
+            <button
+              onClick={() => { setFolderSel(f.id); }}
+              className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12.5px] font-bold transition-all"
+              style={folderSel === f.id ? { background: "var(--accent-soft)", color: "var(--accent)" } : { color: "var(--text)", cursor: "pointer" }}
+            >
+              <span>{f.pinned ? "📌" : f.emoji}</span>
+              <span className="truncate">{f.name}</span>
+              <span className="tnum ml-auto text-[10.5px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--panel2)", color: "var(--mut)" }}>{count}</span>
+            </button>
+            {f.id !== "all" && (
+              <span className="flex items-center gap-0.5 pr-1 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => togglePinFolder(f.id, f.pinned)}
+                  className="rounded p-1 text-[var(--mut)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                  style={{ color: f.pinned ? "var(--accent)" : undefined }}
+                  title={f.pinned ? "Unpin folder" : "Pin folder"}
+                >
+                  {f.pinned ? <PinOff size={12} /> : <Pin size={12} />}
+                </button>
+                {f.id !== "f-daily" && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => setEditingFolder({ id: f.id, name: f.name })}
+                      className="rounded p-1 text-[var(--mut)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                      title="Rename folder"
+                    >
+                      <Pencil size={12} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => deleteFolder(f.id)}
+                      className="rounded p-1 text-[var(--mut)] hover:text-[var(--danger)] transition-colors cursor-pointer"
+                      title="Delete folder"
+                    >
+                      <Trash2 size={12} />
+                    </button>
+                  </>
+                )}
+              </span>
+            )}
+          </div>
+        );
+      })}
+      {showNewFolder ? (
+        <div className="mt-1 flex gap-1 px-1">
+          <TextInput autoFocus value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFolder()} placeholder="Folder name" />
+        </div>
       ) : (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <input
-              className={cn("inp min-w-0 flex-1 border-0 bg-transparent font-display font-bold !shadow-none focus:!border-0 focus:!shadow-none", popout ? "text-[26px]" : "text-[20px]")}
-              value={draft.title}
-              onChange={(e) => { setDraft((d) => ({ ...d, title: e.target.value })); dirty.current = true; }}
-              placeholder="Note title"
-            />
-            <button onClick={() => togglePinNote(selNote)} title={selNote.pinned ? "Unpin" : "Pin to top"}
-              className="rounded-lg p-1.5 transition-all hover:scale-110" style={{ color: selNote.pinned ? "var(--accent)" : "var(--mut)", cursor: "pointer" }}>
-              {selNote.pinned ? <Pin size={15} fill="var(--accent)" /> : <Pin size={15} />}
-            </button>
-            <span className="chip shrink-0 text-[10px]" style={{ color: "var(--accent)" }}><Lock size={10} /> AES-256</span>
-            <span className="chip shrink-0 text-[10px]" style={{ color: saveState === "saving" ? "var(--warn)" : "var(--ok)" }}>
-              {saveState === "saving" ? "encrypting…" : "🔒 saved"}
-            </span>
-            <button onClick={() => setPopped((v) => !v)} title={popout ? "Back to normal view" : "Pop out to full screen"}
-              className="rounded-lg p-1.5 transition-all hover:scale-110" style={{ color: "var(--mut)", cursor: "pointer" }}>
-              {popout ? <Minimize2 size={15} /> : <Maximize2 size={15} />}
-            </button>
-          </div>
-          <div className="mt-1 text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
-            {selNote.daily && selNote.day ? `Daily note · ${fmtDayShort(selNote.day)} · ` : `${state.folders.find((f) => f.id === selNote.folderId)?.name ?? ""} · `}
-            markdown supported · autosaves as you type
-          </div>
-
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-            {toolbar}
-            {attachmentsBar}
-          </div>
-
-          {preview === "write" ? (
-            <textarea
-              ref={taRef}
-              className={cn("note-page inp mt-3 min-h-0 flex-1 resize-none border-0 !bg-transparent !shadow-none", popout && "mx-auto w-full max-w-[760px]")}
-              value={draft.text}
-              onChange={(e) => { setDraft((d) => ({ ...d, text: e.target.value })); dirty.current = true; }}
-              placeholder={selNote.daily ? "# Intentions\n- [ ] Finish hero wireframe\n\n# Log\n==Highlight== what mattered…" : "# Write freely\n**Bold**, *italic*, ++underline++, ==highlight==, lists, quotes…"}
-            />
-          ) : (
-            <div className={cn("note-page mt-3 min-h-0 flex-1 overflow-y-auto rounded-xl border p-4", popout && "mx-auto w-full max-w-[760px]")}
-              style={{ borderColor: "var(--line)", background: "color-mix(in srgb, var(--bg) 55%, var(--panel))" }}>
-              {draft.text.trim() ? renderMarkdown(draft.text) : <div style={{ color: "var(--mut)" }}>Nothing to preview yet — switch to Write and start typing.</div>}
-            </div>
-          )}
-
-          {attachmentTiles}
-        </>
+        <button onClick={() => setShowNewFolder(true)} className="mt-1 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--panel2)] transition-colors cursor-pointer">
+          <FolderPlus size={13} /> New folder
+        </button>
       )}
     </div>
   );
 
-  return (
-    <div className="flex h-[calc(100vh-120px)] min-h-[500px] flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight">Notes</h1>
-          <p className="flex items-center gap-1.5 text-[13px] font-semibold" style={{ color: "var(--mut)" }}>
-            <Lock size={12} /> Second brain — markdown, media and voice, all encrypted at rest
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <SearchInput value={query} onChange={setQuery} placeholder="Search titles…" width={200} />
-          <Btn variant="primary" onClick={createNote}><Plus size={13} /> Note</Btn>
-        </div>
+  /* ---------------- Notes list sidebar content ---------------- */
+  const notesListContent = (
+    <div className="flex min-h-0 flex-1 flex-col p-2.5 w-full min-w-0 overflow-hidden">
+      <div className="flex items-center justify-between px-2 pb-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--mut)" }}>
+          {notes.length} {notes.length === 1 ? "Note" : "Notes"}
+        </span>
+        <button onClick={createNote} className="flex items-center gap-1 text-[11px] font-bold text-[var(--accent)] hover:underline cursor-pointer">
+          <Plus size={13} /> New
+        </button>
       </div>
-
-      <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[196px_280px_1fr]">
-        {/* folders */}
-        <div className="card engine-panel flex flex-col gap-1 overflow-y-auto p-2.5">
-          {[{ id: "all", name: "All notes", emoji: "🗂️", pinned: false }, ...folders.map((f) => ({ id: f.id, name: f.name, emoji: f.id === "f-daily" ? "📅" : "📁", pinned: !!f.pinned }))].map((f) => {
-            const count = f.id === "all" ? state.notes.length : state.notes.filter((n) => n.folderId === f.id).length;
-            return (
-              <div key={f.id} className="group flex items-center">
-                <button
-                  onClick={() => setFolderSel(f.id)}
-                  className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-bold transition-all"
-                  style={folderSel === f.id ? { background: "var(--accent-soft)", color: "var(--accent)" } : { color: "var(--mut)", cursor: "pointer" }}
-                >
-                  <span>{f.pinned ? "📌" : f.emoji}</span>
-                  <span className="truncate">{f.name}</span>
-                  <span className="tnum ml-auto text-[10.5px]" style={{ color: "var(--mut)" }}>{count}</span>
+      <div className="flex-1 overflow-y-auto pr-0.5 space-y-1">
+        {notes.length === 0 && <EmptyState icon={Lock} title="No notes found" body="Create a note or select another folder." />}
+        {notes.map((n) => {
+          const isSelected = selId === n.id;
+          return (
+            <div key={n.id} className="group relative flex items-center">
+              <button
+                onClick={() => {
+                  loadedFor.current = null;
+                  setSelId(n.id);
+                  setDrawerOpen(false);
+                }}
+                className={cn(
+                  "min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer",
+                  isSelected
+                    ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-xs"
+                    : "border-[var(--line)] bg-[var(--panel)] hover:bg-[var(--panel2)]"
+                )}
+              >
+                <div className="flex items-center gap-1.5 pr-12">
+                  {n.pinned && <Pin size={11} fill="var(--accent)" style={{ color: "var(--accent)" }} />}
+                  {n.daily && <span className="text-[12px]">📅</span>}
+                  <span className={cn("truncate text-[13px] font-bold", isSelected ? "text-[var(--accent)]" : "text-[var(--text)]")}>
+                    {n.title || "Untitled note"}
+                  </span>
+                  {(n.attachments?.length ?? 0) > 0 && <Paperclip size={10} style={{ color: "var(--mut)" }} />}
+                </div>
+                <div className="mt-1 flex items-center justify-between text-[10.5px] font-medium tnum" style={{ color: "var(--mut)" }}>
+                  <span className="truncate">
+                    {n.daily && n.day ? fmtDayShort(n.day) : state.folders.find((f) => f.id === n.folderId)?.name}
+                  </span>
+                  <span className="shrink-0 ml-1">
+                    {fmtDayShort(isoOf(n.updatedAt))}
+                  </span>
+                </div>
+              </button>
+              <div className="absolute right-2 top-2 flex sm:hidden sm:group-hover:flex items-center gap-1 bg-[var(--panel)] rounded-md p-1 shadow-sm border border-[var(--line)]">
+                <button onClick={(e) => { e.stopPropagation(); togglePinNote(n); }} style={{ color: n.pinned ? "var(--accent)" : "var(--mut)", cursor: "pointer" }} title={n.pinned ? "Unpin" : "Pin"}>
+                  {n.pinned ? <PinOff size={12} /> : <Pin size={12} />}
                 </button>
-                {f.id !== "all" && (
-                  <span className="mr-1 hidden items-center gap-0.5 group-hover:flex">
-                    <button onClick={() => togglePinFolder(f.id, f.pinned)} className="rounded p-0.5" style={{ color: f.pinned ? "var(--accent)" : "var(--mut)", cursor: "pointer" }} title={f.pinned ? "Unpin folder" : "Pin folder"}>
-                      {f.pinned ? <PinOff size={11} /> : <Pin size={11} />}
-                    </button>
-                    {f.id !== "f-daily" && (
-                      <button onClick={() => deleteFolder(f.id)} className="rounded p-0.5" style={{ color: "var(--mut)", cursor: "pointer" }} title="Delete folder">
-                        <Trash2 size={11} />
-                      </button>
-                    )}
+                <button onClick={(e) => { e.stopPropagation(); deleteNote(n); }} style={{ color: "var(--danger)", cursor: "pointer" }} title="Delete">
+                  <Trash2 size={12} />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  /* ---------------- Note Editor Canvas ---------------- */
+  const editor = (popout: boolean) => {
+    const wordCount = draft.text.trim() ? draft.text.trim().split(/\s+/).length : 0;
+    const noteDate = selNote?.daily && selNote?.day
+      ? `Daily Note · ${fmtDayShort(selNote.day)}`
+      : selNote ? `${fmtDayShort(isoOf(selNote.updatedAt))} at ${fmtClock(selNote.updatedAt)}` : "";
+
+    return (
+      <div className={cn("flex min-h-0 flex-1 flex-col w-full min-w-0", popout && "h-full")}>
+        {!selNote ? (
+          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
+            <EmptyState
+              icon={Lock}
+              title="No note selected"
+              body="Open the sidebar to select an encrypted note or create a new one."
+            />
+            <div className="mt-4 flex gap-2">
+              <Btn variant="outline" onClick={() => setDrawerOpen(true)}>
+                <PanelLeft size={14} /> Open Folders & Notes
+              </Btn>
+              <Btn variant="primary" onClick={createNote}>
+                <Plus size={14} /> New Note
+              </Btn>
+            </div>
+          </div>
+        ) : (
+          <>
+            {/* Top Toolbar inside note canvas */}
+            <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-[var(--line)] shrink-0">
+              <div className="flex items-center gap-2 min-w-0">
+                {/* Mobile Drawer trigger button */}
+                <button
+                  onClick={() => setDrawerOpen(true)}
+                  className="flex md:hidden items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] hover:bg-[var(--panel)] transition-colors text-xs font-bold text-[var(--text)] shadow-xs shrink-0 cursor-pointer"
+                  title="Open folders & notes list"
+                >
+                  <PanelLeft size={15} className="text-[var(--accent)] shrink-0" />
+                  <span className="truncate max-w-[130px] font-bold">
+                    {currentFolderName}
+                  </span>
+                  <span className="text-[10.5px] text-[var(--mut)] bg-[var(--bg)] px-1.5 py-0.2 rounded-full tnum shrink-0">
+                    {notes.length}
+                  </span>
+                </button>
+
+                {/* Desktop Folder Heading */}
+                <div className="hidden md:flex items-center gap-2 text-xs font-bold text-[var(--text)]">
+                  <span className="truncate max-w-[220px] font-bold text-sm">
+                    {currentFolderName}
+                  </span>
+                  <span className="text-[10.5px] text-[var(--mut)] bg-[var(--panel2)] px-2 py-0.5 rounded-full tnum shrink-0">
+                    {notes.length} {notes.length === 1 ? "note" : "notes"}
+                  </span>
+                </div>
+
+                <div className="hidden sm:flex items-center gap-1.5 text-xs text-[var(--mut)] font-semibold">
+                  {saveState === "saving" ? (
+                    <span className="text-[var(--warn)] flex items-center gap-1">
+                      <Loader2 size={12} className="animate-spin" /> Saving…
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 opacity-70">
+                      <Lock size={11} className="text-[var(--accent)]" /> Saved
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Seg
+                  size="sm"
+                  options={[
+                    { value: "write", label: "Write" },
+                    { value: "preview", label: "Preview" },
+                  ]}
+                  value={preview}
+                  onChange={setPreview}
+                />
+
+                <button
+                  onClick={() => togglePinNote(selNote)}
+                  title={selNote.pinned ? "Unpin note" : "Pin note to top"}
+                  className="rounded-lg p-1.5 transition-all hover:bg-[var(--panel2)] cursor-pointer shrink-0"
+                  style={{ color: selNote.pinned ? "var(--accent)" : "var(--mut)" }}
+                >
+                  {selNote.pinned ? <Pin size={16} fill="var(--accent)" /> : <Pin size={16} />}
+                </button>
+
+                <button
+                  onClick={() => setPopped((v) => !v)}
+                  title={popout ? "Minimize" : "Full screen"}
+                  className="rounded-lg p-1.5 transition-all hover:bg-[var(--panel2)] cursor-pointer text-[var(--mut)] shrink-0 hidden sm:inline-flex"
+                >
+                  {popout ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+                </button>
+
+                <button
+                  onClick={() => deleteNote(selNote)}
+                  title="Delete note"
+                  className="rounded-lg p-1.5 transition-all hover:bg-[var(--panel2)] hover:text-[var(--danger)] cursor-pointer text-[var(--mut)] shrink-0"
+                >
+                  <Trash2 size={16} />
+                </button>
+
+                <Btn variant="primary" size="sm" onClick={createNote} className="shrink-0">
+                  <Plus size={14} /> <span className="hidden sm:inline">Note</span>
+                </Btn>
+              </div>
+            </div>
+
+            {/* Note Title & Header Metadata */}
+            <div className="pt-3 pb-1 shrink-0">
+              <input
+                value={draft.title}
+                onChange={(e) => {
+                  setDraft((d) => ({ ...d, title: e.target.value }));
+                  dirty.current = true;
+                }}
+                placeholder="Note title"
+                className={cn(
+                  "w-full bg-transparent border-none outline-none font-extrabold font-display tracking-tight text-[var(--text)] placeholder:text-[var(--mut)]/30 p-0 focus:outline-none focus:ring-0",
+                  popout ? "text-3xl" : "text-2xl sm:text-3xl"
+                )}
+              />
+              <div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-[var(--mut)] flex-wrap">
+                <span>{noteDate}</span>
+                <span>•</span>
+                <select
+                  value={selNote.folderId}
+                  onChange={(e) => {
+                    const folderId = e.target.value;
+                    set((s) => ({
+                      ...s,
+                      notes: s.notes.map((n) => (n.id === selNote.id ? { ...n, folderId, updatedAt: Date.now() } : n)),
+                    }));
+                    toast("Folder updated", "ok");
+                  }}
+                  className="bg-transparent border border-[var(--line)] rounded px-1.5 py-0.5 text-[10.5px] font-bold text-[var(--mut)] hover:text-[var(--text)] cursor-pointer outline-none"
+                  title="Change folder"
+                >
+                  {state.folders.map((f) => (
+                    <option key={f.id} value={f.id} className="bg-[var(--panel)] text-[var(--text)]">
+                      {f.id === "f-daily" ? "📅 " : "📁 "} {f.name}
+                    </option>
+                  ))}
+                </select>
+                <span>•</span>
+                <span>{wordCount} words</span>
+                <span>•</span>
+                <span className="inline-flex items-center gap-1 text-[var(--accent)] font-semibold">
+                  <Lock size={10} /> AES-256
+                </span>
+                {saveState === "saving" && (
+                  <span className="sm:hidden text-[var(--warn)] font-semibold flex items-center gap-1">
+                    • <Loader2 size={10} className="animate-spin" /> Saving
                   </span>
                 )}
               </div>
-            );
-          })}
-          {showNewFolder ? (
-            <div className="mt-1 flex gap-1">
-              <TextInput autoFocus value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFolder()} placeholder="Folder name" />
             </div>
-          ) : (
-            <button onClick={() => setShowNewFolder(true)} className="mt-1 flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-[12px] font-bold" style={{ color: "var(--mut)", cursor: "pointer" }}>
-              <FolderPlus size={13} /> New folder
-            </button>
-          )}
-          <div className="mt-2 rounded-xl border p-2 text-[10px] font-semibold leading-relaxed" style={{ borderColor: "var(--line)", color: "var(--mut)" }}>
-            <Paperclip size={10} className="mr-1 inline" /> Attach photos, video clips and voice notes — they live inside the encrypted vault.
-          </div>
-        </div>
 
-        {/* list */}
-        <div className="card engine-panel flex min-h-0 flex-col p-2.5">
-          <div className="flex-1 overflow-y-auto pr-1">
-            {notes.length === 0 && <EmptyState icon={Lock} title="No notes here" body="Create a note or open today’s daily note." />}
-            {notes.map((n) => (
-              <div key={n.id} className="group mb-1 flex items-center">
-                <button
-                  onClick={() => { loadedFor.current = null; setSelId(n.id); }}
-                  className="min-w-0 flex-1 rounded-xl border px-2.5 py-2 text-left transition-all"
-                  style={selId === n.id ? { borderColor: "var(--accent)", background: "var(--accent-soft)" } : { borderColor: "transparent", cursor: "pointer" }}
-                >
-                  <div className="flex items-center gap-1.5">
-                    {n.pinned && <Pin size={11} fill="var(--accent)" style={{ color: "var(--accent)" }} />}
-                    {n.daily && <span className="text-[12px]">📅</span>}
-                    <span className="truncate text-[12.5px] font-bold">{n.title}</span>
-                    {(n.attachments?.length ?? 0) > 0 && <Paperclip size={10} style={{ color: "var(--mut)" }} />}
-                    <Lock size={10} className="ml-auto shrink-0" style={{ color: "var(--mut)" }} />
-                  </div>
-                  <div className="mt-0.5 text-[10.5px] font-semibold tnum" style={{ color: "var(--mut)" }}>
-                    {n.daily && n.day ? fmtDayShort(n.day) : state.folders.find((f) => f.id === n.folderId)?.name} · edited {fmtDayShort(isoOf(n.updatedAt))} {fmtClock(n.updatedAt)}
-                  </div>
-                </button>
-                <span className="ml-1 hidden shrink-0 flex-col group-hover:flex">
-                  <button onClick={() => togglePinNote(n)} style={{ color: n.pinned ? "var(--accent)" : "var(--mut)", cursor: "pointer" }} title="Pin">
-                    {n.pinned ? <PinOff size={12} /> : <Pin size={12} />}
-                  </button>
-                  <button onClick={() => deleteNote(n)} style={{ color: "var(--mut)", cursor: "pointer" }} title="Delete">
-                    <Trash2 size={12} />
-                  </button>
+            {/* Linked Tasks */}
+            {linkedTasks.length > 0 && (
+              <div className="mt-2 flex items-center gap-1.5 flex-wrap rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs shrink-0">
+                <span className="font-bold text-blue-500 flex items-center gap-1 shrink-0">
+                  <CheckSquare size={12} /> Linked Tasks ({linkedTasks.length}):
                 </span>
+                {linkedTasks.map((t) => (
+                  <button
+                    key={t.id}
+                    onClick={() => openTaskDialog({ taskId: t.id })}
+                    className="chip text-[11px] !py-0.5 hover:border-accent cursor-pointer flex items-center gap-1 transition-all"
+                    title="Click to view task"
+                  >
+                    <span>{t.emoji ?? "▸"}</span>
+                    <span className={cn("font-medium", t.done && "line-through opacity-60")}>
+                      {t.title}
+                    </span>
+                    {t.done && <span className="text-emerald-500 font-bold">✓</span>}
+                  </button>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
+            )}
 
-        {/* page editor */}
-        <div className="card engine-panel flex min-h-0 flex-col p-5">{editor(false)}</div>
+            {/* Note Body Textarea or Markdown View */}
+            {preview === "write" ? (
+              <textarea
+                ref={taRef}
+                className={cn(
+                  "note-page flex-1 min-h-0 w-full resize-none border-0 !bg-transparent text-[14.5px] sm:text-[15px] leading-relaxed text-[var(--text)] placeholder:text-[var(--mut)]/35 focus:outline-none focus:ring-0 !p-0 mt-3",
+                  popout && "mx-auto max-w-[800px]"
+                )}
+                value={draft.text}
+                onChange={(e) => {
+                  setDraft((d) => ({ ...d, text: e.target.value }));
+                  dirty.current = true;
+                }}
+                placeholder={
+                  selNote.daily
+                    ? "# Intentions\n- [ ] Finish hero wireframe\n\n# Log\n==Highlight== what mattered today…"
+                    : "# Start writing freely\n**Bold**, *italic*, ==highlight==, checklists, lists…"
+                }
+              />
+            ) : (
+              <div
+                className={cn(
+                  "note-page flex-1 min-h-0 w-full overflow-y-auto rounded-xl border border-[var(--line)] bg-[var(--bg)]/40 p-4 mt-3",
+                  popout && "mx-auto max-w-[800px]"
+                )}
+              >
+                {draft.text.trim() ? (
+                  renderMarkdown(draft.text)
+                ) : (
+                  <div style={{ color: "var(--mut)" }}>Nothing to preview yet — switch to Write and start typing.</div>
+                )}
+              </div>
+            )}
+
+            {/* Attachment tiles */}
+            {attachmentTiles}
+
+            {/* Formatting & Media Toolbar */}
+            <div className="mt-2 pt-2 border-t border-[var(--line)] flex flex-col gap-1.5 w-full min-w-0 shrink-0">
+              {toolbar}
+              {attachmentsBar}
+            </div>
+          </>
+        )}
+      </div>
+    );
+  };
+
+  return (
+    <div className="flex h-[calc(100vh-140px)] sm:h-[calc(100vh-115px)] flex-col w-full max-w-full overflow-hidden">
+      {/* Slide-over Drawer for Folders & Notes */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 flex overscroll-contain" role="dialog" aria-modal="true" aria-label="Folders and notes drawer">
+          {/* Dimmed backdrop */}
+          <div
+            className="fixed inset-0 bg-black/60 backdrop-blur-xs transition-opacity animate-in fade-in duration-200"
+            onClick={() => setDrawerOpen(false)}
+          />
+
+          {/* Drawer content */}
+          <aside
+            className="relative z-10 flex h-full w-[310px] max-w-[86vw] flex-col border-r bg-[var(--panel)] shadow-2xl transition-transform animate-in slide-in-from-left duration-250 select-none overscroll-contain"
+            style={{
+              borderColor: "var(--line)",
+              paddingTop: "max(calc(var(--safe-top) + 8px), 16px)",
+              paddingBottom: "max(var(--safe-bottom), 16px)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Drawer Header */}
+            <div className="flex items-center justify-between border-b px-4 py-3 shrink-0" style={{ borderColor: "var(--line)" }}>
+              <div className="flex items-center gap-2">
+                <PanelLeft size={18} style={{ color: "var(--accent)" }} />
+                <span className="font-display text-[15px] font-bold tracking-tight">Folders & Notes</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                className="rounded-lg p-1.5 text-[var(--mut)] hover:bg-[var(--panel2)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                aria-label="Close drawer"
+              >
+                <X size={17} />
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="px-3 pt-3 shrink-0">
+              <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" />
+            </div>
+
+            {/* Folders List in Drawer */}
+            <div className="border-b border-[var(--line)] shrink-0 max-h-[190px] overflow-y-auto overscroll-contain">
+              {foldersContent}
+            </div>
+
+            {/* Notes List in Drawer */}
+            <div className="flex-1 min-h-0 overflow-hidden flex flex-col overscroll-contain">
+              {notesListContent}
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* Main Container Layout: Desktop Docked Sidebar + Canvas */}
+      <div className="flex min-h-0 flex-1 w-full min-w-0 gap-3">
+        {/* Desktop Docked Sidebar (>= md) */}
+        <aside
+          className="hidden md:flex md:w-[270px] lg:w-[310px] shrink-0 flex-col rounded-2xl border bg-[var(--panel)] shadow-sm select-none overflow-hidden"
+          style={{ borderColor: "var(--line)" }}
+        >
+          {/* Search Input */}
+          <div className="p-3 border-b border-[var(--line)] shrink-0">
+            <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" />
+          </div>
+
+          {/* Folders List in Sidebar */}
+          <div className="border-b border-[var(--line)] shrink-0 max-h-[190px] overflow-y-auto">
+            {foldersContent}
+          </div>
+
+          {/* Notes List in Sidebar */}
+          <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
+            {notesListContent}
+          </div>
+        </aside>
+
+        {/* Editor Canvas */}
+        <div className="card engine-panel flex flex-1 min-h-0 flex-col p-3 sm:p-5 w-full min-w-0 overflow-hidden">
+          {editor(false)}
+        </div>
       </div>
 
-      {/* pop-out editor */}
-      <Modal open={popped} onClose={() => setPopped(false)} title={selNote?.title ?? "Note"} width={1080}>
-        <div className="h-[74vh]">{editor(true)}</div>
+      {/* Rename / Edit Folder Modal */}
+      <Modal
+        open={!!editingFolder}
+        onClose={() => setEditingFolder(null)}
+        title="Rename Folder"
+        width={380}
+        footer={
+          <div className="flex items-center justify-between w-full">
+            {editingFolder && editingFolder.id !== "f-daily" && (
+              <Btn
+                variant="danger"
+                size="sm"
+                onClick={() => {
+                  const id = editingFolder.id;
+                  setEditingFolder(null);
+                  deleteFolder(id);
+                }}
+              >
+                <Trash2 size={13} /> Delete
+              </Btn>
+            )}
+            <div className="flex items-center gap-2 ml-auto">
+              <Btn variant="ghost" size="sm" onClick={() => setEditingFolder(null)}>
+                Cancel
+              </Btn>
+              <Btn variant="primary" size="sm" onClick={saveFolderEdit}>
+                Save
+              </Btn>
+            </div>
+          </div>
+        }
+      >
+        <div className="flex flex-col gap-2 py-1">
+          <label className="text-xs font-bold text-[var(--mut)] uppercase tracking-wider">
+            Folder Name
+          </label>
+          <TextInput
+            autoFocus
+            value={editingFolder?.name ?? ""}
+            onChange={(e) => setEditingFolder((prev) => (prev ? { ...prev, name: e.target.value } : null))}
+            onKeyDown={(e) => e.key === "Enter" && saveFolderEdit()}
+            placeholder="Folder name"
+          />
+        </div>
       </Modal>
 
-      {/* media viewer */}
+      {/* Pop-out fullscreen editor */}
+      <Modal open={popped} onClose={() => setPopped(false)} title={selNote?.title ?? "Note"} width={1080}>
+        <div className="h-[76vh] flex flex-col">{editor(true)}</div>
+      </Modal>
+
+      {/* Media lightbox viewer */}
       <Modal open={!!lightbox} onClose={() => setLightbox(null)} title={lightbox?.name ?? ""} width={lightbox?.kind === "image" ? 900 : 620}>
         {lightbox?.kind === "image" && <img src={lightbox.dataUrl} alt={lightbox.name} className="mx-auto max-h-[72vh] rounded-xl" />}
         {lightbox?.kind === "video" && <video src={lightbox.dataUrl} controls className="mx-auto max-h-[72vh] w-full rounded-xl" />}

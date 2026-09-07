@@ -121,28 +121,30 @@ export function ReviewView() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight">Review</h1>
-          <p className="text-[13px] font-semibold" style={{ color: "var(--mut)" }}>
+    <div className="flex flex-col gap-4 w-full max-w-full min-w-0 overflow-x-hidden">
+      <div className="flex flex-wrap items-center justify-between gap-3 w-full min-w-0">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-[24px] font-bold tracking-tight truncate">Review</h1>
+          <p className="text-[13px] font-semibold truncate" style={{ color: "var(--mut)" }}>
             A guided look back — numbers first, then your own words. Saved as an encrypted note.
           </p>
         </div>
-        <Seg
-          options={[
-            { value: "this-week", label: "This week" },
-            { value: "last-week", label: "Last week" },
-            { value: "this-month", label: "This month" },
-            { value: "last-month", label: "Last month" },
-          ]}
-          value={period}
-          onChange={setPeriod}
-        />
+        <div className="w-full sm:w-auto overflow-x-auto scrollbar-none py-0.5 min-w-0">
+          <Seg
+            options={[
+              { value: "this-week", label: "This week" },
+              { value: "last-week", label: "Last week" },
+              { value: "this-month", label: "This month" },
+              { value: "last-month", label: "Last month" },
+            ]}
+            value={period}
+            onChange={setPeriod}
+          />
+        </div>
       </div>
 
       {/* insights */}
-      <div className="stagger grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="stagger grid gap-2.5 sm:grid-cols-2 lg:grid-cols-4 w-full min-w-0">
         <InsightCard icon={<Flame size={16} />} title="Focused time" big={fmtDur(stats.total)} sub={`${stats.sessions} sessions · ${stats.withWork}/${days.length} active days`} />
         <InsightCard icon={<Sparkles size={16} />} title="Best day" big={stats.bestMin > 0 ? fmtDur(stats.bestMin) : "—"} sub={stats.bestMin > 0 ? `${fmtDateLong(parseIso(stats.bestDay))}` : "no tracked work"} />
         <InsightCard icon={<CheckCircle2 size={16} />} title="Completed" big={String(stats.done)} sub="tasks & recurring check-offs" />
@@ -155,9 +157,9 @@ export function ReviewView() {
         />
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr]">
+      <div className="grid gap-4 lg:grid-cols-[1.2fr_1fr] w-full min-w-0">
         {/* top projects + habits */}
-        <div className="card engine-panel p-4">
+        <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
           <div className="font-display text-[15px] font-bold tracking-tight">Where the time went</div>
           {stats.top.length === 0 ? (
             <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>No focus recorded in this period.</div>
@@ -167,15 +169,15 @@ export function ReviewView() {
                 const p = state.projects.find((x) => x.id === pid);
                 const pct = Math.round((min / Math.max(1, stats.total)) * 100);
                 return (
-                  <div key={pid} className="flex items-center gap-3">
-                    <span className="tnum font-mono text-[12px] font-bold" style={{ color: "var(--mut)" }}>#{i + 1}</span>
-                    <span className="text-[16px]">{p?.emoji}</span>
+                  <div key={pid} className="flex items-center gap-3 min-w-0 w-full">
+                    <span className="tnum font-mono text-[12px] font-bold shrink-0" style={{ color: "var(--mut)" }}>#{i + 1}</span>
+                    <span className="text-[16px] shrink-0">{p?.emoji}</span>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-baseline justify-between text-[12.5px] font-bold">
+                      <div className="flex items-baseline justify-between text-[12.5px] font-bold min-w-0 gap-2">
                         <span className="truncate">{p?.name ?? "Deleted project"}</span>
-                        <span className="tnum font-mono" style={{ color: "var(--accent)" }}>{fmtDur(min)} · {pct}%</span>
+                        <span className="tnum font-mono shrink-0" style={{ color: "var(--accent)" }}>{fmtDur(min)} · {pct}%</span>
                       </div>
-                      <div className="mt-1 h-[7px] overflow-hidden rounded-full" style={{ background: "var(--bg)" }}>
+                      <div className="mt-1 h-[7px] overflow-hidden rounded-full w-full" style={{ background: "var(--bg)" }}>
                         <div className="h-full rounded-full transition-all duration-500" style={{ width: `${pct}%`, background: p?.color }} />
                       </div>
                     </div>
@@ -188,9 +190,9 @@ export function ReviewView() {
           {stats.habits.length === 0 ? (
             <div className="mt-2 text-[12.5px]" style={{ color: "var(--mut)" }}>No habits yet.</div>
           ) : (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-2 min-w-0">
               {stats.habits.slice(0, 4).map(({ h, st }) => (
-                <span key={h.id} className="chip" style={{ borderColor: `color-mix(in srgb, ${h.color} 55%, var(--line))` }}>
+                <span key={h.id} className="chip truncate max-w-full" style={{ borderColor: `color-mix(in srgb, ${h.color} 55%, var(--line))` }}>
                   {h.emoji} {h.name} · <b style={{ color: "var(--accent)" }}>{st.current}d</b>
                 </span>
               ))}
@@ -199,18 +201,18 @@ export function ReviewView() {
         </div>
 
         {/* reflection */}
-        <div className="card engine-panel p-4">
+        <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
           <div className="flex items-center gap-2">
             <PenLine size={15} style={{ color: "var(--accent)" }} />
             <span className="font-display text-[15px] font-bold tracking-tight">Reflection</span>
           </div>
-          <div className="mt-3 flex flex-col gap-3">
+          <div className="mt-3 flex flex-col gap-3 w-full min-w-0">
             {QUESTIONS.map((qq) => (
-              <div key={qq.k} className="review-q rounded-xl border p-2.5" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                <div className="text-[12.5px] font-bold">{qq.q}</div>
-                <div className="mb-1.5 text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>{qq.hint}</div>
+              <div key={qq.k} className="review-q rounded-xl border p-2.5 w-full min-w-0 overflow-hidden" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                <div className="text-[12.5px] font-bold truncate">{qq.q}</div>
+                <div className="mb-1.5 text-[10.5px] font-semibold truncate" style={{ color: "var(--mut)" }}>{qq.hint}</div>
                 <textarea
-                  className="inp min-h-[52px] resize-y !border-0 !bg-transparent !p-0 !shadow-none text-[13px]"
+                  className="inp min-h-[52px] resize-y !border-0 !bg-transparent !p-0 !shadow-none text-[13px] w-full min-w-0"
                   value={answers[qq.k] ?? ""}
                   onChange={(e) => setAnswers((a) => ({ ...a, [qq.k]: e.target.value }))}
                   placeholder="A few honest words…"
@@ -218,36 +220,39 @@ export function ReviewView() {
               </div>
             ))}
             <Btn variant="primary" size="lg" onClick={saveReview} className={cn("w-full")}>
-              <Save size={14} /> Save review as encrypted note
+              <Save size={14} /> Save this review
             </Btn>
-            <Btn variant="ghost" size="sm" onClick={() => setView("notes")} className="w-full">Browse saved reviews in Notes → “Reviews” folder</Btn>
           </div>
         </div>
       </div>
 
       {/* history */}
-      <div className="card engine-panel p-4">
+      <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
         <div className="flex items-center gap-2">
           <History size={15} style={{ color: "var(--accent)" }} />
-          <span className="font-display text-[15px] font-bold tracking-tight">Review history</span>
-          <span className="text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>{reviewNotes.length} saved</span>
+          <span className="font-display text-[15px] font-bold tracking-tight">Past reviews</span>
+          <span className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
+            ({reviewNotes.length}) · encrypted in your vault
+          </span>
         </div>
         {reviewNotes.length === 0 ? (
           <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>
-            No saved reviews yet — answer the reflections above and save your first one.
+            No saved reviews yet. Finish the reflection above and save to start your record.
           </div>
         ) : (
-          <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {reviewNotes.slice(0, 9).map((n) => (
-              <button key={n.id} onClick={() => openHistory(n)}
-                className="rounded-xl border px-3 py-2.5 text-left transition-all hover:-translate-y-0.5 hover:border-[var(--accent)]"
-                style={{ borderColor: "var(--line)", background: "var(--bg)", cursor: "pointer" }}>
-                <div className="flex items-center gap-1.5 text-[12.5px] font-bold">
-                  <PenLine size={12} style={{ color: "var(--accent)" }} />
-                  <span className="truncate">{n.title}</span>
-                  <Lock size={10} className="ml-auto shrink-0" style={{ color: "var(--mut)" }} />
+          <div className="mt-3 flex flex-col gap-1.5 w-full min-w-0">
+            {reviewNotes.map((n) => (
+              <button
+                key={n.id}
+                onClick={() => openHistory(n)}
+                className="flex flex-col items-start rounded-xl border p-3 text-left transition-all hover:translate-x-[2px] w-full min-w-0 cursor-pointer"
+                style={{ borderColor: "var(--line)", background: "var(--bg)" }}
+              >
+                <div className="flex items-center gap-2 font-display text-[13.5px] font-bold w-full min-w-0">
+                  <Lock size={11} className="shrink-0" style={{ color: "var(--accent)" }} />
+                  <span className="truncate flex-1 min-w-0">{n.title}</span>
                 </div>
-                <div className="mt-0.5 text-[10.5px] font-semibold tnum" style={{ color: "var(--mut)" }}>
+                <div className="mt-0.5 text-[10.5px] font-semibold tnum truncate" style={{ color: "var(--mut)" }}>
                   saved {fmtDayShort(isoOf(n.updatedAt))} · click to read the summary
                 </div>
               </button>
@@ -275,12 +280,13 @@ function isoOf(ts: number): string {
 
 function InsightCard({ icon, title, big, sub, tone }: { icon: React.ReactNode; title: string; big: string; sub: string; tone?: "warn" }) {
   return (
-    <div className="card card-hover p-4">
-      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--mut)" }}>
-        <span style={{ color: tone === "warn" ? "var(--warn)" : "var(--accent)" }}>{icon}</span> {title}
+    <div className="card card-hover p-4 w-full min-w-0 overflow-hidden">
+      <div className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--mut)" }}>
+        <span className="shrink-0" style={{ color: tone === "warn" ? "var(--warn)" : "var(--accent)" }}>{icon}</span>
+        <span className="truncate">{title}</span>
       </div>
-      <div className="mt-2 font-mono text-[24px] font-bold leading-none tnum" style={{ color: tone === "warn" ? "var(--warn)" : "var(--text)" }}>{big}</div>
-      <div className="mt-1.5 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>{sub}</div>
+      <div className="mt-2 font-mono text-[24px] font-bold leading-none tnum truncate" style={{ color: tone === "warn" ? "var(--warn)" : "var(--text)" }}>{big}</div>
+      <div className="mt-1.5 text-[11.5px] font-semibold truncate" style={{ color: "var(--mut)" }}>{sub}</div>
     </div>
   );
 }

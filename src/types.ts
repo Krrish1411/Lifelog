@@ -37,6 +37,16 @@ export interface Recurrence {
   setPos: number; // 1..4 or -1 (last) when monthMode = "weekday"
 }
 
+export interface TaskTimeBlock {
+  id: string;
+  date: string | null; // ISO yyyy-mm-dd (null if unscheduled)
+  time: string | null; // HH:mm start (null if unscheduled)
+  durationMin: number;
+  label?: string; // e.g. "Part 1", "Drafting"
+  done?: boolean;
+  doneAt?: number | null;
+}
+
 export interface Subtask {
   id: string;
   title: string;
@@ -64,6 +74,9 @@ export interface Task {
   recurrence: Recurrence | null;
   completions: { at: number }[]; // history for recurring tasks
   privateNote: EncBlob | null; // encrypted per-task note
+  order?: number; // manual ordering
+  timeBlocks?: TaskTimeBlock[]; // multi-block calendar scheduling
+  linkedNoteIds?: string[]; // bi-directional note links
 }
 
 export interface Project {
@@ -72,6 +85,7 @@ export interface Project {
   emoji: string;
   color: string;
   createdAt: number;
+  order?: number;
 }
 
 export interface Habit {
@@ -158,6 +172,11 @@ export interface Settings {
   breakMin: number;
   countdownMin: number;
   notifyEnabled: boolean;
+  tagOrder?: string[]; // ordered list of tag names
+  taskSortMode?: "manual" | "due" | "priority";
+  soundscape?: string;
+  soundscapeVolume?: number; // 0..1
+  dashboardWidgets?: Record<string, boolean>;
   reportWidgets: Record<string, boolean>;
   shortcuts: Record<string, string>; // action → key (lowercase; "space" for spacebar)
   /* Accessibility */
@@ -168,6 +187,7 @@ export interface Settings {
 
 export const SHORTCUT_ACTIONS: { action: string; label: string }[] = [
   { action: "newTask", label: "New task" },
+  { action: "commandPalette", label: "Command Palette / Quick search" },
   { action: "togglePause", label: "Pause / resume running timer" },
   { action: "openFocus", label: "Go to Focus" },
   { action: "openCalendar", label: "Go to Calendar" },
@@ -178,6 +198,7 @@ export const SHORTCUT_ACTIONS: { action: string; label: string }[] = [
 ];
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
   newTask: "n",
+  commandPalette: "k",
   togglePause: "space",
   openFocus: "f",
   openCalendar: "c",
@@ -190,6 +211,8 @@ export const DEFAULT_SHORTCUTS: Record<string, string> = {
 export interface Meta {
   createdAt: number;
   lastGreetingDay: string | null;
+  hasSeenWelcome?: boolean;
+  hasCompletedNamePrompt?: boolean;
 }
 
 export interface State {
@@ -223,10 +246,10 @@ export const REPORT_WIDGETS: { key: string; label: string; desc: string }[] = [
 
 export const DEFAULT_SETTINGS: Settings = {
   layout: "glass",
-  themeMode: "dark",
-  accent: "#e8a33d",
-  bgDark: "#0f1714",
-  bgLight: "#eef1ee",
+  themeMode: "light",
+  accent: "#dc2626",
+  bgDark: "#000000",
+  bgLight: "#ffffff",
   tokens: {},
   greeting: "daily",
   profileName: "",
@@ -240,6 +263,19 @@ export const DEFAULT_SETTINGS: Settings = {
   breakMin: 5,
   countdownMin: 45,
   notifyEnabled: false,
+  tagOrder: [],
+  taskSortMode: "manual",
+  soundscape: "none",
+  soundscapeVolume: 0.5,
+  dashboardWidgets: {
+    greeting: true,
+    focusMetric: true,
+    quickTasks: true,
+    upcomingSchedule: true,
+    habitsRadar: true,
+    dayCheckin: true,
+    weeklyProgress: true,
+  },
   reportWidgets: {
     timeOfDay: true,
     projects: true,

@@ -19,7 +19,20 @@ import {
 import { buildSeedState } from "./data/seed";
 import { loadStoredFont } from "./utils/fonts";
 import { fmtClock, nextOccurrence, todayIso } from "./utils/core";
-import { loadStateFromIDB, saveStateToIDB, loadErasuredFlag, saveErasedFlag, migrateToIDB } from "./utils/idb";
+import {
+  loadStateFromIDB,
+  saveStateToIDB,
+  loadErasuredFlag,
+  saveErasedFlag,
+  migrateToIDB,
+} from "./utils/idb";
+import {
+  cancelTaskDueNotification,
+  isNative,
+  scheduleTaskDueNotification,
+  triggerHaptic,
+} from "./utils/native";
+import { syncEngine } from "./sync/syncEngine";
 
 const LS_KEY = "lifelog.state.v1";
 /** When set, a missing state file boots into a blank app instead of demo data. */
@@ -66,6 +79,7 @@ export interface TaskDialogState {
   taskId: string | null;
   projectId?: string;
   presetDate?: string | null;
+  presetTime?: string | null;
 }
 
 interface AppCtx {
@@ -80,11 +94,15 @@ interface AppCtx {
   taskDialog: TaskDialogState;
   openTaskDialog: (o?: Partial<TaskDialogState>) => void;
   closeTaskDialog: () => void;
+  syncDialogOpen: boolean;
+  openSyncDialog: () => void;
+  closeSyncDialog: () => void;
   confirm: (o: ConfirmOpts) => Promise<boolean>;
   confirmReq: (ConfirmOpts & { open: boolean }) | null;
   resolveConfirm: (v: boolean) => void;
   toggleDone: (taskId: string) => void;
 }
+
 
 const Ctx = createContext<AppCtx | null>(null);
 
@@ -128,6 +146,8 @@ function mergeState(raw: Partial<State>): State {
     meta: {
       createdAt: base.meta?.createdAt ?? Date.now(),
       lastGreetingDay: base.meta?.lastGreetingDay ?? null,
+      hasSeenWelcome: base.meta?.hasSeenWelcome ?? false,
+      hasCompletedNamePrompt: base.meta?.hasCompletedNamePrompt ?? false,
     },
   };
 }
@@ -140,9 +160,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [view, setView] = useState<ViewId>("dashboard");
   const [focusTaskId, setFocusTaskId] = useState<string | null>(null);
   const [taskDialog, setTaskDialog] = useState<TaskDialogState>({ open: false, taskId: null });
+  const [syncDialogOpen, setSyncDialogOpen] = useState(false);
+  const openSyncDialog = useCallback(() => setSyncDialogOpen(true), []);
+  const closeSyncDialog = useCallback(() => setSyncDialogOpen(false), []);
   const [confirmReq, setConfirmReq] = useState<(ConfirmOpts & { open: boolean }) | null>(null);
   const confirmResolve = useRef<((v: boolean) => void) | null>(null);
   const warnedCrypto = useRef(false);
+
+  /* ----- sync engine listener for incoming remote changes ----- */
+  useEffect(() => {
+    return syncEngine.onStateApply((updater) => {
+      setState((prev) => (prev ? updater(prev) : prev));
+    });
+  }, []);
 
   /* ----- boot: decrypt at-rest state, or seed on first run ----- */
   useEffect(() => {
@@ -161,7 +191,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       
       // First try IndexedDB
       try {
-        next = await loadStateFromIDB();
+        const idbState = await loadStateFromIDB();
+        if (idbState) next = mergeState(idbState);
       } catch {
         next = null;
       }
@@ -182,10 +213,6 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       
       if (!cancelled) {
-        if (!hasCrypto && !warnedCrypto.current) {
-          warnedCrypto.current = true;
-          pushToast("Web Crypto unavailable — data stored unencrypted in this browser", "warn");
-        }
         setState(next);
       }
     })();
@@ -264,6 +291,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
           if (task.done) return s; // recurring tasks are never "permanently" done
           const anchor = task.due ?? todayIso();
           const nextDue = nextOccurrence(anchor, task.recurrence);
+          if (isNative) cancelTaskDueNotification(taskId);
           pushToast(`Done — next occurrence ${nextDue}`, "ok");
           return {
             ...s,
@@ -275,6 +303,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
         }
         const nowDone = !task.done;
+        if (nowDone && isNative) cancelTaskDueNotification(taskId);
+        triggerHaptic(nowDone ? "success" : "light");
         return {
           ...s,
           tasks: s.tasks.map((t) =>
@@ -286,12 +316,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [pushToast],
   );
 
-  /* ----- reminder scheduler (blocks + snoozes) ----- */
+  /* ----- reminder scheduler (blocks + snoozes + Android AlarmManager exact alarms) ----- */
   useEffect(() => {
     if (!state) return;
     const timers: number[] = [];
     const now = Date.now();
-    const lead = state.settings.reminderLeadMin * 60000;
+    const leadMin = state.settings.reminderLeadMin;
+    const lead = leadMin * 60000;
     const notify = (title: string, body: string) => {
       pushToast(`${title} — ${body}`, "warn");
       if (
@@ -307,7 +338,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     };
     for (const t of state.tasks) {
-      if (t.done) continue;
+      if (t.done) {
+        if (isNative) cancelTaskDueNotification(t.id);
+        continue;
+      }
+
+      // Schedule background exact alarm via Android AlarmManager (fires even when app is killed)
+      if (state.settings.notifyEnabled && isNative && t.due && t.dueTime) {
+        scheduleTaskDueNotification(t, leadMin);
+      }
+
       const targets: { at: number; what: string }[] = [];
       if (t.due && t.dueTime) {
         targets.push({ at: new Date(`${t.due}T${t.dueTime}:00`).getTime(), what: "Time block starting" });
@@ -350,13 +390,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
             taskDialog,
             openTaskDialog,
             closeTaskDialog,
+            syncDialogOpen,
+            openSyncDialog,
+            closeSyncDialog,
             confirm,
             confirmReq,
             resolveConfirm,
             toggleDone,
           }
         : null,
-    [state, set, toast, view, focusTaskId, taskDialog, confirmReq, requestFocus, clearFocusRequest, openTaskDialog, closeTaskDialog, confirm, resolveConfirm, toggleDone],
+    [state, set, toast, view, focusTaskId, taskDialog, syncDialogOpen, confirmReq, requestFocus, clearFocusRequest, openTaskDialog, closeTaskDialog, openSyncDialog, closeSyncDialog, confirm, resolveConfirm, toggleDone],
   );
 
   if (!value) {
@@ -388,7 +431,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     <Ctx.Provider value={value}>
       {children}
       {/* toast host */}
-      <div className="pointer-events-none fixed bottom-5 right-5 z-[90] flex w-[320px] flex-col gap-2">
+      <div className="pointer-events-none fixed bottom-5 right-5 z-[110] flex w-[320px] flex-col gap-2">
         {toasts.map((t) => (
           <div
             key={t.id}

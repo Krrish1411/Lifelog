@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">LifeLog</string>
+    <string name="title_activity_main">LifeLog</string>
+    <string name="package_name">com.lifelog.app</string>
+    <string name="custom_url_scheme">com.lifelog.app</string>
+</resources>

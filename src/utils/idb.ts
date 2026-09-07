@@ -3,7 +3,7 @@
 /* Encrypted state is stored in a single key-value store.              */
 /* ------------------------------------------------------------------ */
 
-import { getDeviceKey } from "./crypto";
+import { getDeviceKey, encryptEnvelope, decryptEnvelope } from "./crypto";
 import type { State } from "../types";
 
 const DB_NAME = "LifeLogDB";
@@ -51,7 +51,6 @@ export async function loadStateFromIDB(): Promise<State | null> {
       }
       try {
         const key = await getDeviceKey();
-        const { decryptEnvelope } = await import("./crypto");
         const state = await decryptEnvelope<State>(key, encrypted);
         resolve(state);
       } catch {
@@ -63,24 +62,24 @@ export async function loadStateFromIDB(): Promise<State | null> {
 
 export async function saveStateToIDB(state: State): Promise<void> {
   const db = await openDB();
-  if (!db) return;
+  if (!db) throw new Error("IndexedDB unavailable");
   const key = await getDeviceKey();
-  const { encryptEnvelope } = await import("./crypto");
   const encrypted = await encryptEnvelope(key, state);
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
     store.put(encrypted, LS_KEY);
     tx.oncomplete = () => resolve();
-    tx.onerror = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("IDB transaction failed"));
   });
 }
 
 export async function loadErasuredFlag(): Promise<boolean> {
-  const db = await openDB();
-  if (!db) {
-    return !!localStorage.getItem(ERASED_KEY);
+  if (typeof localStorage !== "undefined" && localStorage.getItem(ERASED_KEY)) {
+    return true;
   }
+  const db = await openDB();
+  if (!db) return false;
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, "readonly");
     const store = tx.objectStore(STORE_NAME);
@@ -91,11 +90,11 @@ export async function loadErasuredFlag(): Promise<boolean> {
 }
 
 export async function saveErasedFlag(): Promise<void> {
-  const db = await openDB();
-  if (!db) {
+  if (typeof localStorage !== "undefined") {
     localStorage.setItem(ERASED_KEY, "1");
-    return;
   }
+  const db = await openDB();
+  if (!db) return;
   return new Promise((resolve) => {
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
@@ -125,7 +124,6 @@ export async function migrateToIDB(): Promise<boolean> {
   if (!db) return false;
   try {
     const key = await getDeviceKey();
-    const { decryptEnvelope, encryptEnvelope } = await import("./crypto");
     const state = await decryptEnvelope<State>(key, raw);
     const encrypted = await encryptEnvelope(key, state);
     return new Promise((resolve) => {

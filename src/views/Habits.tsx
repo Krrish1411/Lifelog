@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, Flame, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { Habit } from "../types";
 import { useApp } from "../store";
-import { addDaysIso, fmtDayShort, fmtNoteName, streakStats, todayIso, uid } from "../utils/core";
+import { addDaysIso, fmtDayShort, fmtNoteName, streakStats, todayIso, uid, weekStartIso } from "../utils/core";
 import { Btn, ColorPicker, EmojiPicker, EmptyState, Labeled, Modal, TextInput, cn } from "../components/ui";
 
 export function HabitsView() {
@@ -16,8 +16,9 @@ export function HabitsView() {
   const [hoverDay, setHoverDay] = useState<string | null>(null);
 
   const weeks = useMemo(() => {
-    const start = addDaysIso(today, -83); // 12 weeks
-    return Array.from({ length: 12 }, (_, w) => Array.from({ length: 7 }, (_, d) => addDaysIso(start, w * 7 + d)));
+    const currentWeekStart = weekStartIso(today);
+    const firstWeekStart = addDaysIso(currentWeekStart, -11 * 7); // 12 calendar weeks starting Monday
+    return Array.from({ length: 12 }, (_, w) => Array.from({ length: 7 }, (_, d) => addDaysIso(firstWeekStart, w * 7 + d)));
   }, [today]);
 
   const openDialog = (h: Habit | null) => {
@@ -104,35 +105,37 @@ export function HabitsView() {
                     )}
                   </div>
                 </div>
-                <div className="ml-auto flex flex-wrap items-center gap-2">
-                  {[
-                    { k: "Current streak", v: st.current > 0 ? `${st.current} days` : "0", strong: true },
-                    { k: "Longest streak", v: `${st.longest} days` },
-                    { k: "Shortest streak", v: `${st.shortest} day${st.shortest === 1 ? "" : "s"}` },
-                    { k: "Longest skip", v: `${st.longestGap} days` },
-                  ].map((x) => (
-                    <div key={x.k} className="rounded-xl border px-2.5 py-1.5 text-center" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                      <div className="font-mono text-[14px] font-bold tnum" style={{ color: x.strong ? "var(--accent)" : "var(--text)" }}>{x.v}</div>
-                      <div className="text-[9px] font-bold uppercase tracking-wider" style={{ color: "var(--mut)" }}>{x.k}</div>
-                    </div>
-                  ))}
-                  <div className="flex flex-col gap-1">
-                    <div className="flex gap-1">
-                      <Btn size="sm" variant="ghost" onClick={() => openDialog(h)}><Pencil size={12} /></Btn>
-                      <Btn size="sm" variant="ghost" onClick={() => remove(h)}><Trash2 size={12} /></Btn>
-                    </div>
+                <div className="flex flex-wrap items-center justify-between gap-2 w-full sm:w-auto sm:ml-auto">
+                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 w-full sm:w-auto">
+                    {[
+                      { k: "Current streak", v: st.current > 0 ? `${st.current} days` : "0", strong: true },
+                      { k: "Longest streak", v: `${st.longest} days` },
+                      { k: "Shortest streak", v: `${st.shortest} day${st.shortest === 1 ? "" : "s"}` },
+                      { k: "Longest skip", v: `${st.longestGap} days` },
+                    ].map((x) => (
+                      <div key={x.k} className="rounded-xl border px-2.5 py-1 text-center min-w-0" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                        <div className="font-mono text-[13px] font-bold tnum truncate" style={{ color: x.strong ? "var(--accent)" : "var(--text)" }}>{x.v}</div>
+                        <div className="text-[8.5px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--mut)" }}>{x.k}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto justify-between sm:justify-start mt-1 sm:mt-0">
                     <Btn size="sm" variant={editing ? "primary" : "outline"} onClick={() => setBackfillId(editing ? null : h.id)}>
                       {editing ? <><X size={11} /> Done editing</> : <><Lock size={11} /> Edit past days</>}
                     </Btn>
+                    <div className="flex gap-1">
+                      <Btn size="sm" variant="ghost" onClick={() => openDialog(h)} title="Edit habit"><Pencil size={12} /></Btn>
+                      <Btn size="sm" variant="ghost" onClick={() => remove(h)} title="Delete habit"><Trash2 size={12} /></Btn>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-4 py-3 min-w-0 overflow-hidden">
                 {/* today toggle */}
                 <button
                   onClick={() => { toggleDay(h, today); toast(doneToday ? `“${h.name}” unchecked for today` : `“${h.name}” done today — streak ${streakStats(doneToday ? h.completions.filter((d) => d !== today) : [...h.completions, today]).current}d`, doneToday ? "warn" : "ok"); }}
-                  className="flex items-center gap-2.5 rounded-2xl border-2 px-4 py-2.5 transition-all hover:scale-[1.03] active:scale-95"
+                  className="flex items-center gap-2.5 rounded-2xl border-2 px-4 py-2.5 transition-all hover:scale-[1.03] active:scale-95 shrink-0"
                   style={{
                     borderColor: doneToday ? h.color : "var(--line)",
                     background: doneToday ? `color-mix(in srgb, ${h.color} 18%, transparent)` : "var(--bg)",
@@ -148,39 +151,41 @@ export function HabitsView() {
                   </span>
                 </button>
 
-                {/* 12-week grid */}
-                <div className="flex flex-wrap gap-1">
-                  {weeks.map((week, wi) => (
-                    <div key={wi} className="flex flex-col gap-1">
-                      {week.map((iso) => {
-                        const done = h.completions.includes(iso);
-                        const future = iso > today;
-                        const locked = future || (!editing && iso !== today);
-                        const isToday = iso === today;
-                        const canClick = !future && (editing || isToday);
-                        return (
-                          <button
-                            key={iso}
-                            onClick={() => canClick && toggleDay(h, iso)}
-                            onMouseEnter={() => setHoverDay(iso)}
-                            onMouseLeave={() => setHoverDay(null)}
-                            disabled={locked}
-                            title={`${fmtDayShort(iso)}${future ? " · future (locked)" : locked ? " · locked — use Edit past days" : done ? " · done" : ""}`}
-                            className="h-[13px] w-[13px] rounded-[3.5px] transition-all"
-                            style={{
-                              background: done ? h.color : "var(--panel2)",
-                              outline: isToday ? `1.5px solid ${done ? "var(--text)" : h.color}` : "none",
-                              outlineOffset: 1.5,
-                              opacity: future ? 0.28 : locked && !done ? 0.75 : 1,
-                              cursor: canClick ? "pointer" : future ? "not-allowed" : "default",
-                              transform: hoverDay === iso && canClick ? "scale(1.35)" : "scale(1)",
-                            }}
-                            aria-label={iso}
-                          />
-                        );
-                      })}
-                    </div>
-                  ))}
+                {/* 12-week grid (horizontally scrollable without expanding card) */}
+                <div className="w-full overflow-x-auto scrollbar-none py-1 min-w-0">
+                  <div className="inline-flex gap-1">
+                    {weeks.map((week, wi) => (
+                      <div key={wi} className="flex flex-col gap-1">
+                        {week.map((iso) => {
+                          const done = h.completions.includes(iso);
+                          const future = iso > today;
+                          const locked = future || (!editing && iso !== today);
+                          const isToday = iso === today;
+                          const canClick = !future && (editing || isToday);
+                          return (
+                            <button
+                              key={iso}
+                              onClick={() => canClick && toggleDay(h, iso)}
+                              onMouseEnter={() => setHoverDay(iso)}
+                              onMouseLeave={() => setHoverDay(null)}
+                              disabled={locked}
+                              title={`${fmtDayShort(iso)}${future ? " · future (locked)" : locked ? " · locked — use Edit past days" : done ? " · done" : ""}`}
+                              className="h-[13px] w-[13px] rounded-[3.5px] transition-all"
+                              style={{
+                                background: done ? h.color : "var(--panel2)",
+                                outline: isToday ? `1.5px solid ${done ? "var(--text)" : h.color}` : "none",
+                                outlineOffset: 1.5,
+                                opacity: future ? 0.28 : locked && !done ? 0.75 : 1,
+                                cursor: canClick ? "pointer" : future ? "not-allowed" : "default",
+                                transform: hoverDay === iso && canClick ? "scale(1.35)" : "scale(1)",
+                              }}
+                              aria-label={iso}
+                            />
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 {hoverDay && hoverDay <= today && (

@@ -107,6 +107,20 @@ export async function decryptEnvelope<T>(key: CryptoKey | null, payload: string)
 }
 
 /* ---------- password-protected backups ---------- */
+export async function exportDeviceKeyRaw(): Promise<string | null> {
+  if (typeof localStorage !== "undefined") {
+    return localStorage.getItem(DEVICE_KEY_LS);
+  }
+  return null;
+}
+
+export async function importDeviceKeyRaw(rawB64: string): Promise<void> {
+  if (typeof localStorage !== "undefined" && rawB64) {
+    localStorage.setItem(DEVICE_KEY_LS, rawB64);
+    deviceKeyPromise = null;
+  }
+}
+
 async function deriveKey(password: string, salt: Uint8Array<ArrayBuffer>): Promise<CryptoKey> {
   const mat = await crypto.subtle.importKey("raw", te.encode(password), "PBKDF2", false, [
     "deriveKey",
@@ -123,7 +137,9 @@ export async function encryptBackup(password: string, obj: unknown): Promise<str
   const salt = crypto.getRandomValues(new Uint8Array(16));
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const key = await deriveKey(password, salt);
-  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, te.encode(JSON.stringify(obj)));
+  const devKeyRaw = await exportDeviceKeyRaw();
+  const payloadToEncrypt = JSON.stringify({ state: obj, devKeyRaw });
+  const ct = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, te.encode(payloadToEncrypt));
   return JSON.stringify({
     v: 1,
     kind: "backup",
@@ -144,7 +160,14 @@ export async function decryptBackup<T>(password: string, payload: string): Promi
       key,
       b64ToBytes(env.d),
     );
-    return JSON.parse(td.decode(pt)) as T;
+    const parsed = JSON.parse(td.decode(pt));
+    if (parsed && typeof parsed === "object" && "devKeyRaw" in parsed && "state" in parsed) {
+      if (parsed.devKeyRaw) {
+        await importDeviceKeyRaw(parsed.devKeyRaw);
+      }
+      return parsed.state as T;
+    }
+    return parsed as T;
   } catch {
     throw new Error("Wrong password — could not decrypt backup");
   }

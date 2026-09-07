@@ -29,7 +29,8 @@ export function addDaysIso(iso: string, n: number): string {
   return isoDate(d);
 }
 export function dayNum(iso: string): number {
-  return Math.round(parseIso(iso).getTime() / 86400000);
+  const [y, m, d] = iso.split("-").map(Number);
+  return Math.floor(Date.UTC(y, (m || 1) - 1, d || 1) / 86400000);
 }
 export function dayDiff(fromIso: string, toIso: string): number {
   return dayNum(toIso) - dayNum(fromIso);
@@ -50,6 +51,12 @@ export function listDates(fromIso: string, toIso: string): string[] {
     guard++;
   }
   return out;
+}
+
+export function safeInt(v: unknown, fallback = 0, min = -Infinity, max = Infinity): number {
+  const n = parseInt(String(v ?? ""), 10);
+  if (isNaN(n)) return fallback;
+  return Math.max(min, Math.min(max, n));
 }
 
 /* ---------------- formatting ---------------- */
@@ -98,8 +105,10 @@ function matchesRecurrence(dIso: string, anchorIso: string, r: Recurrence): bool
   const iv = Math.max(1, r.interval);
   if (r.freq === "daily") return diff % iv === 0;
   if (r.freq === "weekly") {
-    const wk = Math.floor(diff / 7);
-    if (wk % iv !== 0) return false;
+    const anchorMonday = weekStartIso(anchorIso);
+    const targetMonday = weekStartIso(dIso);
+    const weeksDiff = Math.round(dayDiff(anchorMonday, targetMonday) / 7);
+    if (weeksDiff < 0 || weeksDiff % iv !== 0) return false;
     const wd = (d.getDay() + 6) % 7;
     return r.byWeekday.length === 0 || r.byWeekday.includes(wd);
   }

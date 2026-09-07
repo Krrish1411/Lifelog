@@ -1,0 +1,22 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- LifeLog Dark Sanctuary Container Card -->
+    <path
+        android:fillColor="#0D1014"
+        android:strokeColor="#222933"
+        android:strokeWidth="1.5"
+        android:pathData="M31,19 H77 A12,12 0 0,1 89,31 V77 A12,12 0 0,1 77,89 H31 A12,12 0 0,1 19,77 V31 A12,12 0 0,1 31,19 Z" />
+    <!-- Progress Dial Arc (75% circular progression) -->
+    <path
+        android:strokeColor="#4FA3A5"
+        android:strokeWidth="5"
+        android:strokeLineCap="round"
+        android:pathData="M54,34 A20,20 0 1,1 34,54" />
+    <!-- Center Focal Core Dot -->
+    <path
+        android:fillColor="#4FA3A5"
+        android:pathData="M54,48 A6,6 0 1,0 54,60 A6,6 0 1,0 54,48 Z" />
+</vector>

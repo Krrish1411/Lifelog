@@ -1,6 +1,20 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Check, Eye, EyeOff, Lock, Plus, Repeat, Trash2, X } from "lucide-react";
-import type { Priority, Recurrence, Subtask, Task } from "../types";
+import {
+  CalendarDays,
+  Check,
+  Eye,
+  EyeOff,
+  Lock,
+  Plus,
+  Repeat,
+  Trash2,
+  X,
+  Sparkles,
+  Clock,
+  Layers,
+  FileText,
+} from "lucide-react";
+import type { Priority, Recurrence, Subtask, Task, TaskTimeBlock } from "../types";
 import { useApp } from "../store";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
 import {
@@ -12,6 +26,7 @@ import {
   todayIso,
   uid,
 } from "../utils/core";
+import { parseNaturalLanguageTask } from "../utils/nlp";
 import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, TagInput, TextInput, Toggle, cn } from "./ui";
 
 const defaultRec = (dueIso: string): Recurrence => {
@@ -48,12 +63,15 @@ export function TaskDialog() {
   const [rec, setRec] = useState<Recurrence>(defaultRec(todayIso()));
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [newSub, setNewSub] = useState("");
+  const [timeBlocks, setTimeBlocks] = useState<TaskTimeBlock[]>([]);
+  const [linkedNoteIds, setLinkedNoteIds] = useState<string[]>([]);
   const [snooze, setSnooze] = useState("");
   const [newProject, setNewProject] = useState(false);
   const [npName, setNpName] = useState("");
   const [npEmoji, setNpEmoji] = useState("🌐");
   const [npColor, setNpColor] = useState("#4fa3a5");
   const [saving, setSaving] = useState(false);
+  const [splitChunkMin, setSplitChunkMin] = useState<number>(120);
 
   /* hydrate on open */
   useEffect(() => {
@@ -77,10 +95,13 @@ export function TaskDialog() {
       setRepeats(!!editing.recurrence);
       setRec(editing.recurrence ?? defaultRec(editing.due ?? todayIso()));
       setSubtasks(editing.subtasks.map((s) => ({ ...s })));
+      setTimeBlocks(editing.timeBlocks ? editing.timeBlocks.map((b) => ({ ...b })) : []);
+      setLinkedNoteIds(editing.linkedNoteIds ? [...editing.linkedNoteIds] : []);
       setSnooze(toInput(editing.snoozedUntil));
       getDeviceKey().then((k) => decryptText(k, editing.privateNote)).then(setPrivateNote);
     } else {
       const preset = taskDialog.presetDate ?? "";
+      const presetTime = taskDialog.presetTime ?? "";
       setTitle("");
       setProjectId(taskDialog.projectId ?? state.projects[0]?.id ?? "");
       setEmoji("");
@@ -88,13 +109,15 @@ export function TaskDialog() {
       setTags([]);
       setEstimate("30");
       setDue(preset);
-      setDueTime("");
+      setDueTime(presetTime);
       setDuration("60");
       setNotes("");
       setPrivateNote("");
       setRepeats(false);
       setRec(defaultRec(preset || todayIso()));
       setSubtasks([]);
+      setTimeBlocks([]);
+      setLinkedNoteIds([]);
       setSnooze("");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -103,11 +126,96 @@ export function TaskDialog() {
   const projects = state.projects;
   const recSummary = useMemo(() => (repeats ? describeRecurrence(rec) : "Does not repeat"), [repeats, rec]);
 
+  // Natural Language parsing preview
+  const nlpPreview = useMemo(() => {
+    if (!title || editing) return null;
+    const parsed = parseNaturalLanguageTask(title);
+    if (parsed.matchedKeywords.length > 0) return parsed;
+    return null;
+  }, [title, editing]);
+
+  const applyNlp = () => {
+    if (!nlpPreview) return;
+    setTitle(nlpPreview.cleanTitle);
+    if (nlpPreview.due) setDue(nlpPreview.due);
+    if (nlpPreview.dueTime) setDueTime(nlpPreview.dueTime);
+    if (nlpPreview.durationMin) {
+      setDuration(String(nlpPreview.durationMin));
+      setEstimate(String(nlpPreview.durationMin));
+    }
+    if (nlpPreview.priority) setPriority(nlpPreview.priority);
+    if (nlpPreview.project) {
+      const match = projects.find(
+        (p) => p.name.toLowerCase() === nlpPreview.project!.toLowerCase()
+      );
+      if (match) {
+        setProjectId(match.id);
+        setNewProject(false);
+      } else {
+        setNewProject(true);
+        setNpName(nlpPreview.project);
+      }
+    }
+    if (nlpPreview.tags && nlpPreview.tags.length > 0) {
+      setTags((prev) => Array.from(new Set([...prev, ...nlpPreview.tags!])));
+    }
+    toast("Applied smart schedule & tags!", "ok");
+  };
+
   const addSub = () => {
     const v = newSub.trim();
     if (!v) return;
     setSubtasks((s) => [...s, { id: uid(), title: v, done: false, doneAt: null }]);
     setNewSub("");
+  };
+
+  // Calendar Time Block Splitter
+  const generateBlocks = (chunkSize: number) => {
+    const totalMin = Math.max(15, parseInt(estimate || "60", 10) || 60);
+    const count = Math.ceil(totalMin / chunkSize);
+    const blocks: TaskTimeBlock[] = [];
+    let remaining = totalMin;
+
+    for (let i = 0; i < count; i++) {
+      const dur = Math.min(chunkSize, remaining);
+      blocks.push({
+        id: uid(),
+        label: `Block ${i + 1} (${dur}m)`,
+        date: due || todayIso(),
+        time: null,
+        durationMin: dur,
+        done: false,
+        doneAt: null,
+      });
+      remaining -= dur;
+    }
+    setTimeBlocks(blocks);
+    toast(`Split into ${blocks.length} calendar blocks (${chunkSize}m each)`, "ok");
+  };
+
+  const addTimeBlock = () => {
+    const totalMin = parseInt(estimate || "60", 10) || 60;
+    const defDur = Math.min(60, totalMin);
+    setTimeBlocks((prev) => [
+      ...prev,
+      {
+        id: uid(),
+        label: `Block ${prev.length + 1}`,
+        date: due || todayIso(),
+        time: null,
+        durationMin: defDur,
+        done: false,
+        doneAt: null,
+      },
+    ]);
+  };
+
+  const updateTimeBlock = (id: string, patch: Partial<TaskTimeBlock>) => {
+    setTimeBlocks((prev) => prev.map((b) => (b.id === id ? { ...b, ...patch } : b)));
+  };
+
+  const removeTimeBlock = (id: string) => {
+    setTimeBlocks((prev) => prev.filter((b) => b.id !== id));
   };
 
   const del = async () => {
@@ -138,11 +246,12 @@ export function TaskDialog() {
         projects: [...s.projects, { id: pid, name: npName.trim(), emoji: npEmoji, color: npColor, createdAt: Date.now() }],
       }));
     }
-    if (!pid) pid = projects[0]?.id ?? uid();
+    if (!pid || pid === "__new") pid = projects[0]?.id ?? uid();
     const key = await getDeviceKey();
     const encNote = privateNote.trim() ? await encryptText(key, privateNote) : null;
     const dueVal = due || null;
-    const snoozeTs = snooze ? new Date(snooze).getTime() : null;
+    const parsedSnooze = snooze ? new Date(snooze).getTime() : null;
+    const snoozeTs = parsedSnooze && !isNaN(parsedSnooze) ? parsedSnooze : null;
     const base = {
       title: title.trim(),
       projectId: pid,
@@ -156,6 +265,8 @@ export function TaskDialog() {
       notes,
       recurrence: repeats ? rec : null,
       subtasks,
+      timeBlocks: timeBlocks.length > 0 ? timeBlocks : undefined,
+      linkedNoteIds: linkedNoteIds.length > 0 ? linkedNoteIds : undefined,
       snoozedUntil: snoozeTs,
       privateNote: encNote,
     };
@@ -166,6 +277,7 @@ export function TaskDialog() {
       const t: Task = {
         id: uid(),
         ...base,
+        order: Date.now(),
         done: false,
         doneAt: null,
         createdAt: Date.now(),
@@ -202,7 +314,7 @@ export function TaskDialog() {
       open={taskDialog.open}
       onClose={closeTaskDialog}
       title={editing ? "Edit task" : "New task"}
-      width={640}
+      width={680}
       footer={
         <>
           {editing && (
@@ -218,11 +330,39 @@ export function TaskDialog() {
       }
     >
       <div className="flex flex-col gap-4">
-        <Labeled label="Title">
-          <TextInput autoFocus value={title} onChange={(e) => setTitle(e.target.value)} placeholder="What needs doing?" />
-        </Labeled>
+        {/* Title & Natural Language Detection */}
+        <div>
+          <Labeled label="Title">
+            <TextInput
+              autoFocus
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              placeholder='e.g. "Prepare launch report tomorrow at 2pm for 90m #work !urgent"'
+            />
+          </Labeled>
 
-        <div className="grid grid-cols-2 gap-4">
+          {nlpPreview && (
+            <div className="mt-2 flex items-center justify-between rounded-xl border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs">
+              <div className="flex items-center gap-2 flex-wrap">
+                <Sparkles size={13} className="text-amber-500 shrink-0" />
+                <span className="font-semibold text-[var(--color-text)]">Smart schedule detected:</span>
+                <span className="text-[var(--color-mut)]">
+                  {nlpPreview.due && `📅 ${nlpPreview.due}`}
+                  {nlpPreview.dueTime && ` ⏰ ${nlpPreview.dueTime}`}
+                  {nlpPreview.durationMin && ` ⏳ ${nlpPreview.durationMin}m`}
+                  {nlpPreview.priority && ` ⚡ ${nlpPreview.priority}`}
+                  {nlpPreview.project && ` 📁 +${nlpPreview.project}`}
+                  {nlpPreview.tags && ` #${nlpPreview.tags.join(" #")}`}
+                </span>
+              </div>
+              <Btn size="sm" variant="primary" onClick={applyNlp} className="shrink-0 ml-2">
+                Auto-fill
+              </Btn>
+            </div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <Labeled label="Project">
             <div className="flex flex-col gap-2">
               <select className="inp" value={newProject ? "__new" : projectId} onChange={(e) => { setNewProject(e.target.value === "__new"); if (e.target.value !== "__new") setProjectId(e.target.value); }}>
@@ -245,7 +385,7 @@ export function TaskDialog() {
           </Labeled>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3 sm:gap-4">
           <Labeled label="Priority">
             <Seg
               options={[
@@ -258,7 +398,7 @@ export function TaskDialog() {
               onChange={setPriority}
             />
           </Labeled>
-          <Labeled label="Estimate" hint="minutes, feeds estimate-vs-actual">
+          <Labeled label="Estimate (minutes)" hint="feeds calibration">
             <TextInput type="number" min={0} step={5} value={estimate} onChange={(e) => setEstimate(e.target.value)} />
           </Labeled>
         </div>
@@ -267,18 +407,161 @@ export function TaskDialog() {
           <TagInput tags={tags} onChange={setTags} />
         </Labeled>
 
-        <div className="grid grid-cols-3 gap-4">
+        {/* Standard Due Date & Time */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           <Labeled label="Due date">
             <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
           </Labeled>
-          <Labeled label="Time block" hint="start">
-            <TextInput type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} disabled={!due} />
-          </Labeled>
-          <Labeled label="Block length" hint="min">
-            <TextInput type="number" min={15} step={15} value={duration} onChange={(e) => setDuration(e.target.value)} disabled={!dueTime} />
-          </Labeled>
+          <div className="grid grid-cols-2 gap-2 sm:contents">
+            <Labeled label="Time block" hint="start">
+              <TextInput type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} disabled={!due} />
+            </Labeled>
+            <Labeled label="Block length" hint="min">
+              <TextInput type="number" min={15} step={15} value={duration} onChange={(e) => setDuration(e.target.value)} disabled={!dueTime} />
+            </Labeled>
+          </div>
         </div>
 
+        {/* Multi-Block Calendar Scheduling */}
+        <div className="rounded-xl border p-3 sm:p-3.5 space-y-3" style={{ borderColor: "var(--line)", background: "var(--panel2)" }}>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-accent shrink-0" />
+              <span className="text-[13px] font-bold text-[var(--color-text)]">
+                Calendar Time Blocks ({timeBlocks.length})
+              </span>
+            </div>
+            <span className="text-xs text-[var(--color-mut)]">
+              Split large tasks across multiple days or slots
+            </span>
+          </div>
+
+          {/* Quick Generator */}
+          <div className="flex flex-col gap-2 pt-1 text-xs">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[var(--color-mut)] font-medium mr-1">Split estimate into:</span>
+              <Btn size="sm" variant="ghost" onClick={() => generateBlocks(60)}>60m</Btn>
+              <Btn size="sm" variant="ghost" onClick={() => generateBlocks(90)}>90m</Btn>
+              <Btn size="sm" variant="ghost" onClick={() => generateBlocks(120)}>120m</Btn>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="flex items-center gap-1">
+                <TextInput
+                  type="number"
+                  min={15}
+                  step={15}
+                  className="w-20 h-8 text-xs"
+                  value={String(splitChunkMin)}
+                  onChange={(e) => setSplitChunkMin(parseInt(e.target.value, 10) || 60)}
+                />
+                <Btn size="sm" variant="ghost" onClick={() => generateBlocks(splitChunkMin)}>Custom</Btn>
+              </div>
+              <Btn size="sm" variant="primary" onClick={addTimeBlock} className="ml-auto">
+                <Plus size={12} /> Add Block
+              </Btn>
+            </div>
+          </div>
+
+          {/* Blocks List */}
+          {timeBlocks.length > 0 && (
+            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+              {timeBlocks.map((block, idx) => (
+                <div
+                  key={block.id}
+                  className="flex flex-col sm:flex-row sm:items-center gap-2 p-2.5 rounded-lg border bg-[var(--panel)]"
+                  style={{ borderColor: "var(--line)" }}
+                >
+                  <div className="flex items-center gap-2 w-full sm:flex-1">
+                    <span className="text-xs font-mono font-bold text-[var(--color-mut)] w-5 shrink-0">
+                      #{idx + 1}
+                    </span>
+                    <input
+                      type="text"
+                      value={block.label ?? `Block ${idx + 1}`}
+                      onChange={(e) => updateTimeBlock(block.id, { label: e.target.value })}
+                      placeholder="Block label"
+                      className="inp flex-1 h-8 text-xs"
+                    />
+                    <button
+                      onClick={() => removeTimeBlock(block.id)}
+                      className="sm:hidden text-[var(--color-mut)] hover:text-red-500 p-1 cursor-pointer"
+                      title="Remove block"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <input
+                      type="date"
+                      value={block.date ?? ""}
+                      onChange={(e) => updateTimeBlock(block.id, { date: e.target.value || null })}
+                      className="inp flex-1 sm:w-32 h-8 text-xs"
+                    />
+                    <input
+                      type="time"
+                      value={block.time ?? ""}
+                      onChange={(e) => updateTimeBlock(block.id, { time: e.target.value || null })}
+                      className="inp w-24 h-8 text-xs"
+                    />
+                    <div className="flex items-center gap-1 shrink-0">
+                      <input
+                        type="number"
+                        min={15}
+                        step={15}
+                        value={block.durationMin}
+                        onChange={(e) => updateTimeBlock(block.id, { durationMin: parseInt(e.target.value, 10) || 30 })}
+                        className="inp w-16 h-8 text-xs text-center"
+                      />
+                      <span className="text-xs text-[var(--color-mut)]">m</span>
+                    </div>
+                    <button
+                      onClick={() => removeTimeBlock(block.id)}
+                      className="hidden sm:inline-block text-[var(--color-mut)] hover:text-red-500 p-1 cursor-pointer"
+                      title="Remove block"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Bi-directional Linked Notes */}
+        <div className="rounded-xl border p-3.5 space-y-2" style={{ borderColor: "var(--line)" }}>
+          <div className="flex items-center justify-between">
+            <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-text)]">
+              <FileText size={13} className="text-amber-500" /> Linked Notes ({linkedNoteIds.length})
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
+            {state.notes.map((n) => {
+              const selected = linkedNoteIds.includes(n.id);
+              return (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => {
+                    setLinkedNoteIds((prev) =>
+                      selected ? prev.filter((id) => id !== n.id) : [...prev, n.id]
+                    );
+                  }}
+                  className={`chip text-xs transition-all cursor-pointer ${
+                    selected ? "bg-amber-500 text-black border-amber-500" : ""
+                  }`}
+                >
+                  {n.title || "Untitled note"} {selected ? "✓" : "+"}
+                </button>
+              );
+            })}
+            {state.notes.length === 0 && (
+              <span className="text-xs text-[var(--color-mut)]">No notes created yet.</span>
+            )}
+          </div>
+        </div>
+
+        {/* Recurrence */}
         <div className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}>
           <div className="flex items-center justify-between">
             <Toggle checked={repeats} onChange={(v) => { setRepeats(v); if (v) setRec(defaultRec(due || todayIso())); }} label="Repeats" />
@@ -290,7 +573,24 @@ export function TaskDialog() {
             <div className="rise mt-3 flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="text-[12.5px] font-bold" style={{ color: "var(--mut)" }}>Every</span>
-                <TextInput type="number" min={1} max={60} className="w-[64px]" value={String(rec.interval)} onChange={(e) => setRec({ ...rec, interval: Math.max(1, parseInt(e.target.value || "1", 10)) })} />
+                <TextInput
+                  type="number"
+                  min={1}
+                  max={60}
+                  className="w-[64px]"
+                  value={rec.interval ? String(rec.interval) : ""}
+                  onChange={(e) => {
+                    const raw = e.target.value;
+                    if (raw === "") {
+                      setRec({ ...rec, interval: 0 });
+                    } else {
+                      setRec({ ...rec, interval: Math.min(60, parseInt(raw, 10) || 1) });
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!rec.interval || rec.interval < 1) setRec({ ...rec, interval: 1 });
+                  }}
+                />
                 <select className="inp w-[130px]" value={rec.freq} onChange={(e) => setRec({ ...rec, freq: e.target.value as Recurrence["freq"] })}>
                   <option value="daily">day(s)</option>
                   <option value="weekly">week(s)</option>
@@ -340,21 +640,33 @@ export function TaskDialog() {
           )}
         </div>
 
+        {/* Snooze */}
         <div className="rounded-xl border p-3" style={{ borderColor: "var(--line)" }}>
-          <div className="flex items-center justify-between">
-            <span className="lbl mb-0">Snooze until</span>
-            <div className="flex gap-1.5">
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center justify-between">
+              <span className="lbl mb-0 font-bold text-xs">Snooze until</span>
+              {snooze && (
+                <button
+                  type="button"
+                  onClick={() => setSnooze("")}
+                  className="text-xs text-[var(--danger)] font-bold flex items-center gap-1 cursor-pointer"
+                >
+                  <X size={12} /> Clear
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
               <Btn size="sm" variant="ghost" onClick={() => quickSnooze(Date.now() + 3600000)}>+1h</Btn>
               <Btn size="sm" variant="ghost" onClick={() => quickSnooze(tonight())}>Tonight 20:00</Btn>
               <Btn size="sm" variant="ghost" onClick={() => quickSnooze(tomorrow9())}>Tomorrow 09:00</Btn>
-              {snooze && <Btn size="sm" variant="danger" onClick={() => setSnooze("")}><X size={11} /> Clear</Btn>}
             </div>
           </div>
-          <div className="mt-2">
+          <div className="mt-2.5">
             <TextInput type="datetime-local" value={snooze} onChange={(e) => setSnooze(e.target.value)} />
           </div>
         </div>
 
+        {/* Subtasks */}
         <Labeled label="Subtasks" hint="trackable individually in Focus">
           <div className="flex flex-col gap-1.5">
             {subtasks.map((st) => (
@@ -380,10 +692,12 @@ export function TaskDialog() {
           </div>
         </Labeled>
 
+        {/* Notes */}
         <Labeled label="Notes">
           <textarea className="inp min-h-[64px] resize-y" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Context, links, acceptance criteria…" />
         </Labeled>
 
+        {/* Encrypted Private Note */}
         <div className="rounded-xl border p-3" style={{ borderColor: "color-mix(in srgb, var(--accent) 35%, var(--line))" }}>
           <div className="flex items-center justify-between">
             <span className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: "var(--accent)" }}>
@@ -411,4 +725,3 @@ export function TaskDialog() {
     </Modal>
   );
 }
-

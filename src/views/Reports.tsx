@@ -95,6 +95,7 @@ export function ReportsView() {
     for (const s of workSessions) if (s.taskId) inRange.add(s.taskId);
     for (const t of state.tasks) {
       if (t.done && t.doneAt) { const d = isoDate(new Date(t.doneAt)); if (d >= from && d <= to) inRange.add(t.id); }
+      for (const c of t.completions) { const d = isoDate(new Date(c.at)); if (d >= from && d <= to) inRange.add(t.id); }
     }
     type Row = { key: string; name: string; emoji?: string; color?: string; planned: number; actual: number };
     const rows = new Map<string, Row>();
@@ -104,7 +105,7 @@ export function ReportsView() {
       r.actual += actual;
       rows.set(key, r);
     };
-    const trackedFor = (tid: string) => state.sessions.filter((s) => s.taskId === tid).reduce((a, s) => a + sessionMinutes(s), 0);
+    const trackedFor = (tid: string) => workSessions.filter((s) => s.taskId === tid).reduce((a, s) => a + sessionMinutes(s), 0);
     for (const t of state.tasks) {
       if (!inRange.has(t.id) || t.estimateMin <= 0) continue;
       const actual = trackedFor(t.id);
@@ -235,44 +236,44 @@ export function ReportsView() {
 
   const maxHour = Math.max(1, ...hourBuckets);
   const widgetCard = (title: string, sub: string, body: React.ReactNode, span = false) => (
-    <div className={cn("card card-hover engine-panel p-4", span && "lg:col-span-2")}>
-      <div className="flex items-baseline justify-between">
-        <div className="font-display text-[14.5px] font-bold tracking-tight">{title}</div>
-        <div className="text-[10.5px] font-bold uppercase tracking-wider" style={{ color: "var(--mut)" }}>{sub}</div>
+    <div className={cn("card card-hover engine-panel p-4 w-full min-w-0 overflow-hidden", span && "lg:col-span-2")}>
+      <div className="flex items-baseline justify-between min-w-0 gap-2">
+        <div className="font-display text-[14.5px] font-bold tracking-tight truncate">{title}</div>
+        <div className="text-[10.5px] font-bold uppercase tracking-wider shrink-0" style={{ color: "var(--mut)" }}>{sub}</div>
       </div>
-      <div className="mt-3">{body}</div>
+      <div className="mt-3 min-w-0 w-full overflow-hidden">{body}</div>
     </div>
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight">Reports</h1>
-          <p className="text-[13px] font-semibold" style={{ color: "var(--mut)" }}>
+    <div className="flex flex-col gap-4 w-full max-w-full min-w-0 overflow-x-hidden">
+      <div className="flex flex-wrap items-end justify-between gap-3 min-w-0 w-full">
+        <div className="min-w-0 flex-1">
+          <h1 className="font-display text-[24px] font-bold tracking-tight truncate">Reports</h1>
+          <p className="text-[13px] font-semibold truncate" style={{ color: "var(--mut)" }}>
             Look back at any stretch — every number is computed from your local history. Day-by-day detail lives in the Day Log.
           </p>
         </div>
-        <Btn variant="outline" onClick={() => setView("settings")}><Settings2 size={13} /> Choose widgets</Btn>
+        <Btn variant="outline" onClick={() => setView("settings")} className="shrink-0"><Settings2 size={13} /> Choose widgets</Btn>
       </div>
 
       {/* range bar */}
-      <div className="card engine-panel flex flex-wrap items-center gap-2 p-3">
+      <div className="card engine-panel flex flex-wrap items-center gap-2 p-3 w-full min-w-0 overflow-hidden">
         {([["week", "This week"], ["last7", "Last 7 days"], ["month", "This month"], ["last30", "Last 30 days"], ["all", "All time"]] as [Preset, string][]).map(([p, l]) => (
           <button key={p} onClick={() => applyPreset(p)} className="rounded-lg px-2.5 py-1 text-[12px] font-bold transition-all"
             style={preset === p ? { background: "var(--accent)", color: "var(--on-accent)", cursor: "pointer" } : { color: "var(--mut)", background: "var(--bg)", cursor: "pointer" }}>
             {l}
           </button>
         ))}
-        <div className="ml-auto flex items-center gap-2 text-[12px] font-bold" style={{ color: "var(--mut)" }}>
-          <input type="date" className="inp w-[140px]" value={from} max={to} onChange={(e) => { setFrom(e.target.value); setPreset("custom"); }} />
-          →
-          <input type="date" className="inp w-[140px]" value={to} min={from} onChange={(e) => { setTo(e.target.value); setPreset("custom"); }} />
+        <div className="flex items-center gap-2 text-[12px] font-bold sm:ml-auto shrink-0 flex-nowrap" style={{ color: "var(--mut)" }}>
+          <input type="date" className="inp !w-[130px] sm:!w-[138px] shrink-0 text-center text-xs" value={from} max={to} onChange={(e) => { setFrom(e.target.value); setPreset("custom"); }} />
+          <span className="shrink-0">→</span>
+          <input type="date" className="inp !w-[130px] sm:!w-[138px] shrink-0 text-center text-xs" value={to} min={from} onChange={(e) => { setTo(e.target.value); setPreset("custom"); }} />
         </div>
       </div>
 
       {/* summary strip */}
-      <div className="stagger grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="stagger grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 w-full min-w-0">
         {[
           { k: "Tracked", v: fmtDur(totalMin), sub: `${workSessions.length} sessions` },
           { k: "Completed", v: String(completedIn.length), sub: "tasks & recurrences" },
@@ -281,21 +282,21 @@ export function ReportsView() {
           { k: "Peak hour", v: hourBuckets.some((x) => x > 0) ? `${String(peakHour).padStart(2, "0")}:00` : "—", sub: "most-worked hour" },
           { k: "Avg energy", v: energies.length ? `${(Math.round((energies.reduce((a, x) => a + (x.log?.energy ?? 0), 0) / energies.length) * 10) / 10)}/5` : "—", sub: "from check-ins" },
         ].map((x) => (
-          <div key={x.k} className="card card-hover engine-panel p-3.5">
-            <div className="font-mono text-[21px] font-bold tnum" style={{ color: "var(--accent)" }}>{x.v}</div>
-            <div className="mt-0.5 text-[10.5px] font-bold uppercase tracking-wider" style={{ color: "var(--mut)" }}>{x.k}</div>
-            <div className="text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>{x.sub}</div>
+          <div key={x.k} className="card card-hover engine-panel p-3 min-w-0 overflow-hidden">
+            <div className="font-mono text-[20px] font-bold tnum truncate" style={{ color: "var(--accent)" }}>{x.v}</div>
+            <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--mut)" }}>{x.k}</div>
+            <div className="text-[10px] font-semibold truncate" style={{ color: "var(--mut)" }}>{x.sub}</div>
           </div>
         ))}
       </div>
 
       {!anyWidget && (
-        <div className="card">
+        <div className="card w-full min-w-0 overflow-hidden">
           <EmptyState icon={Settings2} title="All report widgets are hidden" body="Open Settings → Report widgets and switch some on — the grid reflows automatically." />
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div className="grid gap-4 lg:grid-cols-2 w-full min-w-0">
         {w.insights && widgetCard("Productivity insights", "auto-generated", (
           insights.length === 0 ? (
             <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>Log some focused time and insights will appear here.</div>
@@ -320,29 +321,47 @@ export function ReportsView() {
                 {weeklyTrend[7].active}/7 active days this week
               </span>
             </div>
-            <div className="mt-4 flex h-[130px] items-end gap-2">
+            {/* Weekly trend chart with fixed baseline */}
+            <div className="mt-4 flex h-[92px] w-full items-end gap-1.5 sm:gap-2 border-b border-[var(--line)] pb-0.5">
               {weeklyTrend.map((wk, i) => {
                 const isCur = i === weeklyTrend.length - 1;
                 const max = Math.max(1, ...weeklyTrend.map((x) => x.min));
-                const d = parseIso(wk.ws);
                 return (
                   <div
                     key={wk.ws}
-                    className="group flex h-full flex-1 cursor-default flex-col items-center gap-1.5"
+                    className="group relative flex h-full flex-1 items-end justify-center cursor-default"
                     title={`${fmtDayShort(wk.ws)} week — ${fmtDur(wk.min)} focused · ${wk.done} completed · ${wk.active} active day(s)`}
                   >
-                    <div className="flex w-full flex-1 items-end">
-                      <div
-                        className="w-full rounded-t-lg transition-all duration-500 group-hover:brightness-125"
-                        style={{
-                          height: `${Math.max(4, (wk.min / max) * 100)}%`,
-                          background: isCur ? "var(--accent)" : "color-mix(in srgb, var(--accent) 40%, var(--panel2))",
-                          boxShadow: isCur ? "0 0 0 1.5px color-mix(in srgb, var(--accent) 55%, transparent)" : undefined,
-                        }}
-                      />
-                    </div>
-                    <span className="text-[9px] font-bold tnum" style={{ color: isCur ? "var(--accent)" : "var(--mut)" }}>
-                      {MONTHS[d.getMonth()].slice(0, 3)} {d.getDate()}
+                    <div
+                      className="w-full max-w-[28px] rounded-t-md transition-all duration-300 group-hover:brightness-125"
+                      style={{
+                        height: wk.min > 0 ? `${Math.max(8, (wk.min / max) * 100)}%` : "3px",
+                        background: isCur
+                          ? "var(--accent)"
+                          : wk.min > 0
+                          ? "color-mix(in srgb, var(--accent) 45%, var(--panel2))"
+                          : "var(--panel2)",
+                        boxShadow: isCur && wk.min > 0 ? "0 0 10px -2px var(--accent)" : undefined,
+                        opacity: wk.min > 0 || isCur ? 1 : 0.6,
+                      }}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Uniform date labels beneath baseline */}
+            <div className="mt-1.5 flex items-start justify-between gap-1.5 sm:gap-2 w-full select-none">
+              {weeklyTrend.map((wk, i) => {
+                const isCur = i === weeklyTrend.length - 1;
+                const d = parseIso(wk.ws);
+                return (
+                  <div key={wk.ws} className="flex flex-1 flex-col items-center justify-start text-center">
+                    <span className="text-[9px] font-bold uppercase tracking-wider" style={{ color: isCur ? "var(--accent)" : "var(--mut)" }}>
+                      {MONTHS[d.getMonth()].slice(0, 3)}
+                    </span>
+                    <span className="text-[9.5px] font-extrabold tnum -mt-0.5" style={{ color: isCur ? "var(--accent)" : "var(--text)" }}>
+                      {d.getDate()}
                     </span>
                   </div>
                 );

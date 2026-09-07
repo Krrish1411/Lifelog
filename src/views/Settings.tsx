@@ -1,15 +1,24 @@
 import { useEffect, useState } from "react";
-import { Bell, Download, Keyboard, Lock, Palette, Quote, RotateCcw, Trash2, Upload } from "lucide-react";
+import { Bell, Download, Lock, Palette, Quote, RotateCcw, Sparkles, Trash2, Upload, Volume2, Radio, Layers, SlidersHorizontal, LayoutDashboard, Compass } from "lucide-react";
 import type { LayoutMode, State, ThemeMode, TokenKey } from "../types";
 import {
-  DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, FONT_PAIRS, QUOTES, REPORT_WIDGETS, SHORTCUT_ACTIONS, STATE_VERSION,
+  DEFAULT_SETTINGS, FONT_PAIRS, QUOTES, REPORT_WIDGETS, STATE_VERSION,
 } from "../types";
 import { ERASED_KEY, useApp } from "../store";
-import { decryptBackup, decryptEnvelope, encryptBackup, getDeviceKey } from "../utils/crypto";
+import { decryptBackup, decryptEnvelope, decryptText, encryptBackup, getDeviceKey } from "../utils/crypto";
 import { contrast, download, ensureContrast, normalizeHex, todayIso } from "../utils/core";
 import { CUSTOM_FONT_FAMILY, readFileAsDataUrl, saveCustomFont } from "../utils/fonts";
 import { clearIDB, saveErasedFlag } from "../utils/idb";
 import { Btn, ColorPicker, Labeled, Modal, Seg, TextInput, Toggle, cn } from "../components/ui";
+import { playTimerFinishSound, playTimerStartSound } from "../utils/audio";
+import {
+  checkNativeNotificationPermission,
+  isNative,
+  playChimeSound,
+  requestNativeNotificationPermission,
+  sendNativeTestNotification,
+  triggerHaptic,
+} from "../utils/native";
 
 const LS_KEY = "lifelog.state.v1";
 
@@ -26,7 +35,7 @@ const TOKEN_ROWS: { key: TokenKey; label: string; desc: string }[] = [
 
 export function SettingsView() {
   const app = useApp();
-  const { state, set, toast, confirm } = app;
+  const { state, set, toast, confirm, openSyncDialog } = app;
   const s = state.settings;
   const [pw1, setPw1] = useState("");
   const [pw2, setPw2] = useState("");
@@ -37,7 +46,40 @@ export function SettingsView() {
   const [quotesDraft, setQuotesDraft] = useState(s.customQuotes.join("\n"));
   useEffect(() => setQuotesDraft(s.customQuotes.join("\n")), [s.customQuotes]);
 
+  // Local draft states to prevent number inputs jumping while typing digits
+  const [pomodoroDraft, setPomodoroDraft] = useState(String(s.pomodoroMin));
+  const [breakDraft, setBreakDraft] = useState(String(s.breakMin));
+  const [countdownDraft, setCountdownDraft] = useState(String(s.countdownMin));
+  const [reminderDraft, setReminderDraft] = useState(String(s.reminderLeadMin));
+
+  useEffect(() => { setPomodoroDraft(String(s.pomodoroMin)); }, [s.pomodoroMin]);
+  useEffect(() => { setBreakDraft(String(s.breakMin)); }, [s.breakMin]);
+  useEffect(() => { setCountdownDraft(String(s.countdownMin)); }, [s.countdownMin]);
+  useEffect(() => { setReminderDraft(String(s.reminderLeadMin)); }, [s.reminderLeadMin]);
+
   const patch = (p: Partial<typeof s>) => set((st) => ({ ...st, settings: { ...st.settings, ...p } }));
+
+  const commitPomodoro = () => {
+    const val = Math.max(1, Math.min(180, parseInt(pomodoroDraft || "25", 10)));
+    patch({ pomodoroMin: val });
+    setPomodoroDraft(String(val));
+  };
+  const commitBreak = () => {
+    const val = Math.max(1, Math.min(60, parseInt(breakDraft || "5", 10)));
+    patch({ breakMin: val });
+    setBreakDraft(String(val));
+  };
+  const commitCountdown = () => {
+    const val = Math.max(1, Math.min(480, parseInt(countdownDraft || "45", 10)));
+    patch({ countdownMin: val });
+    setCountdownDraft(String(val));
+  };
+  const commitReminder = () => {
+    const val = Math.max(0, Math.min(180, parseInt(reminderDraft || "0", 10)));
+    patch({ reminderLeadMin: val });
+    setReminderDraft(String(val));
+  };
+
   const setToken = (k: TokenKey, hex: string | null) => {
     set((st) => {
       const tokens = { ...st.settings.tokens };
@@ -48,32 +90,68 @@ export function SettingsView() {
   };
 
   const dark = s.themeMode === "dark";
-  const bgNow = normalizeHex(dark ? s.bgDark : s.bgLight) ?? (dark ? "#0f1714" : "#eef1ee");
+  const bgNow = normalizeHex(dark ? s.bgDark : s.bgLight) ?? (dark ? "#000000" : "#ffffff");
   const tokenDefault = (k: TokenKey): string => {
-    if (k === "text") return dark ? "#e8efe9" : "#182019";
-    if (k === "mut") return dark ? "#8fa396" : "#5c6a60";
-    if (k === "panel") return dark ? "#16211c" : "#ffffff";
-    if (k === "panel2") return dark ? "#1d2b24" : "#f7faf7";
-    if (k === "line") return dark ? "#26382f" : "#d7ded8";
+    if (k === "text") return dark ? "#f3f4f6" : "#182019";
+    if (k === "mut") return dark ? "#9ca3af" : "#5c6a60";
+    if (k === "panel") return dark ? "#080808" : "#ffffff";
+    if (k === "panel2") return dark ? "#121212" : "#f7faf7";
+    if (k === "line") return dark ? "#1f1f1f" : "#d7ded8";
     if (k === "ok") return dark ? "#6fbf8e" : "#3e8f60";
     if (k === "warn") return dark ? "#e0b457" : "#a67c1f";
     return dark ? "#d66853" : "#b23c28";
   };
   const accentRatio = contrast(ensureContrast(normalizeHex(s.accent) ?? s.accent, bgNow, 4.5), bgNow).toFixed(1);
 
-  /* ---------------- layout engines ---------------- */
-  const engines: { id: LayoutMode; name: string; desc: string }[] = [
-    { id: "glass", name: "Liquid Glass", desc: "Blurred translucent panels over a slow liquid colour field." },
-    { id: "planify", name: "Planify", desc: "Slim icon rail, airy single column, minimal chrome." },
-    { id: "desk", name: "Desk", desc: "Classic labelled workspace sidebar plus a live status bar." },
-    { id: "control", name: "Control", desc: "Dense command bar up top, tabular numbers, status strip." },
-    { id: "zen", name: "Zen", desc: "Edge-to-edge cockpit home with customisable panels." },
+  /* ---------------- mobile accent presets ---------------- */
+  const ACCENT_PRESETS = [
+    { name: "Crimson Red", hex: "#dc2626" },
+    { name: "Emerald", hex: "#10b981" },
+    { name: "Amber", hex: "#f59e0b" },
+    { name: "Indigo", hex: "#6366f1" },
+    { name: "Violet", hex: "#8b5cf6" },
+    { name: "Rose", hex: "#f43f5e" },
+    { name: "Sky", hex: "#0ea5e9" },
+    { name: "Cyan", hex: "#06b6d4" },
   ];
 
   /* ---------------- data ---------------- */
-  const exportPlain = () => {
-    download(`lifelog-export-${todayIso()}.json`, JSON.stringify(state, null, 2));
-    toast("Plain JSON exported — full history included", "ok");
+  const exportPlain = async () => {
+    try {
+      const key = await getDeviceKey();
+      const decryptedNotes = await Promise.all(
+        state.notes.map(async (n) => {
+          if (!n.blob) return n;
+          try {
+            const body = await decryptText(key, n.blob);
+            return { ...n, body };
+          } catch {
+            return n;
+          }
+        })
+      );
+      const decryptedTasks = await Promise.all(
+        state.tasks.map(async (t) => {
+          if (!t.privateNote) return t;
+          try {
+            const privateNotePlain = await decryptText(key, t.privateNote);
+            return { ...t, privateNotePlain };
+          } catch {
+            return t;
+          }
+        })
+      );
+      const plainExport = {
+        ...state,
+        notes: decryptedNotes,
+        tasks: decryptedTasks,
+      };
+      download(`lifelog-export-${todayIso()}.json`, JSON.stringify(plainExport, null, 2));
+      toast("Plain JSON exported — readable history included", "ok");
+    } catch {
+      download(`lifelog-export-${todayIso()}.json`, JSON.stringify(state, null, 2));
+      toast("Plain JSON exported", "ok");
+    }
   };
   const makeBackup = async () => {
     if (pw1.length < 4) return toast("Master password needs at least 4 characters", "err");
@@ -156,23 +234,34 @@ export function SettingsView() {
       confirmLabel: "Erase everything", danger: true, requireText: "DELETE",
     });
     if (!ok) return;
-    // Set erased flag in both IDB and localStorage for compatibility
-    await saveErasedFlag();
-    // Clear IndexedDB
+    // Clear IndexedDB first
     await clearIDB();
+    // Then set erased flag in both IDB and localStorage for compatibility
+    await saveErasedFlag();
     // Clear localStorage as well
     localStorage.removeItem(LS_KEY);
     window.location.reload();
   };
 
-  const notifStatus = !("Notification" in window) ? "unsupported"
-    : Notification.permission === "granted" ? "granted"
-    : Notification.permission === "denied" ? "denied" : "default";
+  const [nativePerm, setNativePerm] = useState(false);
+  useEffect(() => {
+    checkNativeNotificationPermission().then(setNativePerm);
+  }, []);
+
   const enableNotifs = async () => {
-    if (!("Notification" in window)) return toast("This browser has no Notification API", "err");
-    const perm = await Notification.requestPermission();
-    if (perm === "granted") { patch({ notifyEnabled: true }); toast("Desktop notifications on — reminders fire while LifeLog is open", "ok"); }
-    else toast("Permission denied — in-app toasts will still appear", "warn");
+    const granted = await requestNativeNotificationPermission();
+    setNativePerm(granted);
+    if (granted) {
+      patch({ notifyEnabled: true });
+      toast(
+        isNative
+          ? "Android notifications enabled — exact alarms will fire in background & even if app is closed!"
+          : "Notifications enabled — reminders will fire when due!",
+        "ok"
+      );
+    } else {
+      toast("Notification permission was denied or dismissed.", "warn");
+    }
   };
 
   const saveQuotes = () => {
@@ -199,21 +288,102 @@ export function SettingsView() {
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
-        {section("Interface engine", "Five genuinely different structures — switch any time, content is preserved.", (
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
-            {engines.map((l) => (
-              <button key={l.id} onClick={() => { patch({ layout: l.id }); toast(`Interface switched to ${l.name}`, "ok"); }}
-                className="rounded-xl border p-3 text-left transition-all hover:-translate-y-0.5"
-                style={s.layout === l.id ? { borderColor: "var(--accent)", background: "var(--accent-soft)", cursor: "pointer" } : { borderColor: "var(--line)", cursor: "pointer" }}>
-                <div className="flex items-center gap-1.5 text-[12.5px] font-bold">
-                  {l.name}
-                  {s.layout === l.id && <span className="ml-auto h-[7px] w-[7px] rounded-full" style={{ background: "var(--accent)" }} />}
-                </div>
-                <div className="mt-1 text-[10.5px] font-semibold leading-snug" style={{ color: "var(--mut)" }}>{l.desc}</div>
-              </button>
-            ))}
-          </div>
-        ), true)}
+        {section(
+          "Desktop Interface Engine",
+          "Choose your preferred layout on tablets, laptops, and desktop displays (≥ 768px). Mobile phones automatically use the ergonomic bottom dock & drawer.",
+          (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {[
+                {
+                  id: "glass",
+                  name: "Liquid Glass",
+                  tag: "Default · Aesthetic",
+                  desc: "Floating frosted glass sidebar with dynamic ambient color glow mesh backdrop.",
+                  icon: Sparkles,
+                },
+                {
+                  id: "planify",
+                  name: "Planify Rail",
+                  tag: "Compact · Modern",
+                  desc: "Ultra-clean vertical icon rail with tooltips, maximizing horizontal canvas space.",
+                  icon: Layers,
+                },
+                {
+                  id: "control",
+                  name: "Control Bar",
+                  tag: "Horizontal · Edge-to-Edge",
+                  desc: "Top navigation bar with quick search, clock, and full-width edge-to-edge view layout.",
+                  icon: SlidersHorizontal,
+                },
+                {
+                  id: "desk",
+                  name: "Desk Suite",
+                  tag: "Pro · Workstation",
+                  desc: "Fixed full-height workspace sidebar with docked system status bar and timer controls.",
+                  icon: LayoutDashboard,
+                },
+                {
+                  id: "zen",
+                  name: "Zen Cockpit",
+                  tag: "Minimal · Focus",
+                  desc: "Distraction-free cockpit with customizable modular panels and ambient grid.",
+                  icon: Compass,
+                },
+              ].map((eng) => {
+                const active = (s.layout ?? "glass") === eng.id;
+                const Icon = eng.icon;
+                return (
+                  <button
+                    key={eng.id}
+                    type="button"
+                    onClick={() => {
+                      patch({ layout: eng.id as LayoutMode });
+                      triggerHaptic("medium");
+                      toast(`Interface engine switched to ${eng.name}`, "ok");
+                    }}
+                    className={cn(
+                      "flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all cursor-pointer relative",
+                      active
+                        ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)]"
+                        : "border-[var(--line)] bg-[var(--bg)] hover:bg-[var(--panel2)]"
+                    )}
+                  >
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="flex h-8 w-8 items-center justify-center rounded-xl shrink-0"
+                          style={{
+                            background: active ? "var(--accent)" : "var(--panel2)",
+                            color: active ? "var(--on-accent)" : "var(--text)",
+                          }}
+                        >
+                          <Icon size={16} />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="font-display text-[14px] font-bold tracking-tight truncate">
+                            {eng.name}
+                          </div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)] truncate">
+                            {eng.tag}
+                          </div>
+                        </div>
+                      </div>
+                      {active && (
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[10px] font-bold shrink-0">
+                          ✓
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11.5px] leading-relaxed text-[var(--mut)] mt-1">
+                      {eng.desc}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+          ),
+          true
+        )}
 
         {section("Profile", "Used in greetings across the app.", (
           <div className="flex items-end gap-3">
@@ -234,7 +404,40 @@ export function SettingsView() {
                 <Palette size={10} /> accent contrast {accentRatio}:1
               </span>
             </div>
-            <Labeled label="Accent colour" hint="custom hex always available"><ColorPicker value={s.accent} onChange={(hex) => patch({ accent: hex })} /></Labeled>
+
+            {/* Quick Accent Presets */}
+            <div>
+              <div className="mb-2 text-xs font-bold text-[var(--mut)] uppercase tracking-wider">
+                Accent Palette Presets
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {ACCENT_PRESETS.map((p) => {
+                  const active = (s.accent ?? "").toLowerCase() === p.hex.toLowerCase();
+                  return (
+                    <button
+                      key={p.hex}
+                      type="button"
+                      onClick={() => {
+                        patch({ accent: p.hex });
+                        triggerHaptic("light");
+                        toast(`Accent changed to ${p.name}`, "ok");
+                      }}
+                      className={cn(
+                        "flex items-center gap-2 rounded-xl border p-2.5 text-xs font-bold transition-all cursor-pointer",
+                        active
+                          ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)] text-[var(--accent)]"
+                          : "border-[var(--line)] bg-[var(--bg)] text-[var(--text)] hover:bg-[var(--panel2)]"
+                      )}
+                    >
+                      <span className="h-4 w-4 rounded-full shrink-0 shadow-xs" style={{ background: p.hex }} />
+                      <span className="truncate">{p.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <Labeled label="Custom Accent Hex" hint="custom hex always available"><ColorPicker value={s.accent} onChange={(hex) => patch({ accent: hex })} /></Labeled>
             <div className="grid grid-cols-2 gap-3">
               <Labeled label="Background — dark mode">
                 <ColorPicker value={s.bgDark} onChange={(hex) => patch({ bgDark: hex })} />
@@ -354,56 +557,184 @@ export function SettingsView() {
           </div>
         ))}
 
-        {section("Keyboard shortcuts", "Work without touching the mouse. Click a key, then press the new one (Esc cancels).", (
-          <div className="flex flex-col gap-1.5">
-            {SHORTCUT_ACTIONS.map((a) => (
-              <div key={a.action} className="flex items-center justify-between rounded-xl border px-3 py-1.5" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                <span className="text-[12.5px] font-bold">{a.label}</span>
-                <ShortcutKey k={s.shortcuts[a.action] ?? ""} onChange={(k) => {
-                  patch({ shortcuts: { ...s.shortcuts, [a.action]: k } });
-                  toast(`“${a.label}” → ${k === " " ? "space" : k}`, "ok");
-                }} />
+        {section("Android Mobile Experience", "Mobile-optimized architecture with local-only storage and native system bars.", (
+          <div className="flex flex-col gap-2.5">
+            <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+              <div>
+                <div className="text-[13px] font-bold">Native Safe Area Insets</div>
+                <div className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>Status bar and notch collision avoidance enabled</div>
               </div>
-            ))}
-            <Btn size="sm" variant="ghost" className="self-start" onClick={() => { patch({ shortcuts: { ...DEFAULT_SHORTCUTS } }); toast("Shortcuts reset", "ok"); }}>
-              <RotateCcw size={12} /> Reset defaults
-            </Btn>
+              <span className="chip !py-0.5 text-[11px] font-mono" style={{ color: "var(--ok)", borderColor: "var(--ok)" }}>Active</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+              <div>
+                <div className="text-[13px] font-bold">Tactile Touch Feedback</div>
+                <div className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>Haptic feedback on task completion & reordering</div>
+              </div>
+              <span className="chip !py-0.5 text-[11px] font-mono" style={{ color: "var(--ok)", borderColor: "var(--ok)" }}>Enabled</span>
+            </div>
+            <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+              <div>
+                <div className="text-[13px] font-bold">Local Encrypted Vault</div>
+                <div className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>AES-256 zero-server storage on device</div>
+              </div>
+              <span className="chip !py-0.5 text-[11px] font-mono" style={{ color: "var(--accent)" }}>Offline Only</span>
+            </div>
           </div>
         ))}
 
-        {section("Reminders & notifications", "Lead time applies to time-blocks and snoozed tasks, and fires while LifeLog is open.", (
-          <div className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <Labeled label="Remind me … minutes before">
-                <TextInput type="number" min={0} max={180} className="w-[110px]" value={String(s.reminderLeadMin)}
-                  onChange={(e) => patch({ reminderLeadMin: Math.max(0, Math.min(180, parseInt(e.target.value || "0", 10))) })} />
-              </Labeled>
-              <span className="chip text-[10.5px]" style={{ color: notifStatus === "granted" ? "var(--ok)" : notifStatus === "denied" ? "var(--danger)" : "var(--mut)" }}>
-                <Bell size={10} /> browser permission: {notifStatus}
-              </span>
+        {section(
+          "Reminders & notifications",
+          "Background alarms for tasks and focus sessions with exact wakeup and in-app chime sound.",
+          (
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-end gap-3">
+                <Labeled label="Remind me … minutes before">
+                  <TextInput
+                    type="number"
+                    min={0}
+                    max={180}
+                    className="w-[110px]"
+                    value={reminderDraft}
+                    onChange={(e) => setReminderDraft(e.target.value)}
+                    onBlur={commitReminder}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") commitReminder();
+                    }}
+                  />
+                </Labeled>
+                <span
+                  className="chip text-[10.5px]"
+                  style={{
+                    color: nativePerm ? "var(--ok)" : "var(--mut)",
+                  }}
+                >
+                  <Bell size={10} /> {isNative ? "Android permission" : "Browser permission"}:{" "}
+                  {nativePerm ? "Granted" : "Not enabled"}
+                </span>
+              </div>
+
+              <div
+                className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-xl border p-3"
+                style={{ borderColor: "var(--line)", background: "var(--bg)" }}
+              >
+                <div className="flex flex-col gap-1">
+                  <Toggle
+                    checked={s.notifyEnabled}
+                    onChange={(v) => {
+                      if (v && !nativePerm) enableNotifs();
+                      else patch({ notifyEnabled: v });
+                    }}
+                    label="Enable notifications (Background & Exact Alarms)"
+                  />
+                  <span className="text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>
+                    {isNative
+                      ? "Uses Android AlarmManager to trigger alarms even if the app is killed or device reboots."
+                      : "Fires desktop notifications and browser alerts."}
+                  </span>
+                </div>
+                {!s.notifyEnabled && (
+                  <Btn size="sm" variant="primary" onClick={enableNotifs}>
+                    <Bell size={12} /> Enable
+                  </Btn>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 pt-1">
+                <Btn
+                  size="sm"
+                  variant="outline"
+                  onClick={async () => {
+                    await sendNativeTestNotification();
+                    toast("Test notification sent & bell chime played!", "ok");
+                  }}
+                  className="gap-1.5 text-[11.5px]"
+                >
+                  <Volume2 size={13} /> Test Notification
+                </Btn>
+                <Btn
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    playTimerStartSound();
+                    toast("Played start chime", "ok");
+                  }}
+                  className="gap-1.5 text-[11.5px]"
+                >
+                  <Volume2 size={13} /> Test Start Chime
+                </Btn>
+                <Btn
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    playTimerFinishSound();
+                    toast("Played finish chime", "ok");
+                  }}
+                  className="gap-1.5 text-[11.5px]"
+                >
+                  <Volume2 size={13} /> Test Finish Chime
+                </Btn>
+              </div>
             </div>
-            <div className="flex flex-wrap items-center gap-3 rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-              <Toggle checked={s.notifyEnabled} onChange={(v) => { if (v && notifStatus !== "granted") enableNotifs(); else patch({ notifyEnabled: v }); }} label="Native desktop notifications" />
-              {!s.notifyEnabled && <Btn size="sm" variant="primary" onClick={enableNotifs}><Bell size={12} /> Enable</Btn>}
-              <span className="text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>In-app toasts always appear, with or without permission.</span>
-            </div>
-          </div>
-        ))}
+          )
+        )}
 
         {section("Timer defaults", "Used by the Focus stage — pomodoro length, break length, countdown default.", (
           <div className="flex flex-wrap items-end gap-4">
             <Labeled label="Pomodoro (min)">
-              <TextInput type="number" min={5} max={120} className="w-[92px]" value={String(s.pomodoroMin)}
-                onChange={(e) => patch({ pomodoroMin: Math.max(5, Math.min(120, parseInt(e.target.value || "25", 10))) })} />
+              <TextInput
+                type="number"
+                min={1}
+                max={180}
+                className="w-[92px]"
+                value={pomodoroDraft}
+                onChange={(e) => setPomodoroDraft(e.target.value)}
+                onBlur={commitPomodoro}
+                onKeyDown={(e) => { if (e.key === "Enter") commitPomodoro(); }}
+              />
             </Labeled>
             <Labeled label="Break (min)">
-              <TextInput type="number" min={1} max={60} className="w-[92px]" value={String(s.breakMin)}
-                onChange={(e) => patch({ breakMin: Math.max(1, Math.min(60, parseInt(e.target.value || "5", 10))) })} />
+              <TextInput
+                type="number"
+                min={1}
+                max={60}
+                className="w-[92px]"
+                value={breakDraft}
+                onChange={(e) => setBreakDraft(e.target.value)}
+                onBlur={commitBreak}
+                onKeyDown={(e) => { if (e.key === "Enter") commitBreak(); }}
+              />
             </Labeled>
             <Labeled label="Countdown default (min)">
-              <TextInput type="number" min={1} max={480} className="w-[92px]" value={String(s.countdownMin)}
-                onChange={(e) => patch({ countdownMin: Math.max(1, Math.min(480, parseInt(e.target.value || "45", 10))) })} />
+              <TextInput
+                type="number"
+                min={1}
+                max={480}
+                className="w-[92px]"
+                value={countdownDraft}
+                onChange={(e) => setCountdownDraft(e.target.value)}
+                onBlur={commitCountdown}
+                onKeyDown={(e) => { if (e.key === "Enter") commitCountdown(); }}
+              />
             </Labeled>
+          </div>
+        ))}
+
+        {section("Welcome guide & product tour", "Explore LifeLog's architecture, 7 core feature pillars, and honest day workflow anytime.", (
+          <div className="flex flex-col gap-2.5">
+            <Btn
+              variant="soft"
+              className="self-start"
+              onClick={() => {
+                set((st) => ({ ...st, meta: { ...st.meta, hasSeenWelcome: false } }));
+                toast("Opening Welcome Guide", "ok");
+              }}
+            >
+              <Sparkles size={13} style={{ color: "var(--accent)" }} /> View Welcome & Feature Guide
+            </Btn>
+            <span className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
+              Opens the full product introduction website with feature breakdowns and step-by-step guidance.
+            </span>
           </div>
         ))}
 
@@ -418,6 +749,25 @@ export function SettingsView() {
                 <Toggle checked={!!s.reportWidgets[rw.key]} onChange={(v) => patch({ reportWidgets: { ...s.reportWidgets, [rw.key]: v } })} />
               </div>
             ))}
+          </div>
+        ), true)}
+
+        {section("Device-to-Device Sync (P2P)", "End-to-end encrypted (AES-256-GCM) direct synchronization between your phone and computer without any cloud servers.", (
+          <div className="flex flex-col gap-3">
+            <div className="rounded-xl border p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 font-bold text-[13px] text-[var(--text)]">
+                  <Radio size={15} className="text-emerald-500 animate-pulse" />
+                  <span>Zero-Cloud Peer-to-Peer Pairing</span>
+                </div>
+                <div className="text-[11.5px] text-[var(--mut)]">
+                  Pair with QR code or session ticket. Once paired, tasks, notes, habits, and focus logs sync continuously in real-time.
+                </div>
+              </div>
+              <Btn variant="primary" onClick={openSyncDialog} className="shrink-0">
+                <Radio size={13} /> Open P2P Sync Pair
+              </Btn>
+            </div>
           </div>
         ), true)}
 
@@ -446,6 +796,31 @@ export function SettingsView() {
             </div>
           </div>
         ), true)}
+
+        {section(
+          "About LifeLog",
+          "Personal, offline-first productivity system designed for daily clarity and deep work flow.",
+          (
+            <div className="flex flex-col gap-3">
+              <div
+                className="flex items-center justify-between p-3.5 rounded-xl border"
+                style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
+              >
+                <div>
+                  <div className="text-[14.5px] font-bold">LifeLog</div>
+                  <div className="text-[12px] font-semibold mt-0.5" style={{ color: "var(--mut)" }}>
+                    Crafted with precision by <span className="font-bold text-accent">Krish Patel</span>
+                  </div>
+                </div>
+                <span className="chip text-[11px] font-mono">v{STATE_VERSION}.0</span>
+              </div>
+              <div className="text-[11px] font-medium" style={{ color: "var(--mut)" }}>
+                Zero telemetry · 100% offline-first · Local IndexedDB storage · AES-256-GCM encryption · Tailored for Android & Desktop
+              </div>
+            </div>
+          ),
+          true
+        )}
 
         {section(
           "Danger zone",
@@ -480,34 +855,6 @@ export function SettingsView() {
         {importErr && <div className="mt-2 text-[12px] font-bold" style={{ color: "var(--danger)" }}>{importErr}</div>}
       </Modal>
 
-      <span className="hidden"><Keyboard size={1} /></span>
     </div>
-  );
-}
-
-/* ---------------- key-capture control ---------------- */
-function ShortcutKey({ k, onChange }: { k: string; onChange: (key: string) => void }) {
-  const [capturing, setCapturing] = useState(false);
-  useEffect(() => {
-    if (!capturing) return;
-    const h = (e: KeyboardEvent) => {
-      e.preventDefault();
-      e.stopPropagation();
-      if (e.key === "Escape") { setCapturing(false); return; }
-      if (e.key === "Shift" || e.key === "Control" || e.key === "Alt" || e.key === "Meta") return;
-      onChange(e.key === " " ? "space" : e.key.toLowerCase());
-      setCapturing(false);
-    };
-    window.addEventListener("keydown", h, true);
-    return () => window.removeEventListener("keydown", h, true);
-  }, [capturing, onChange]);
-  return (
-    <button onClick={() => setCapturing((v) => !v)}
-      className={cn("min-w-[64px] rounded-lg border px-2.5 py-1 font-mono text-[12px] font-bold transition-all")}
-      style={capturing
-        ? { borderColor: "var(--accent)", color: "var(--accent)", background: "var(--accent-soft)", cursor: "pointer" }
-        : { borderColor: "var(--line)", background: "var(--panel2)", color: "var(--text)", cursor: "pointer" }}>
-      {capturing ? "press a key…" : k === "space" ? "␣ space" : k || "—"}
-    </button>
   );
 }
