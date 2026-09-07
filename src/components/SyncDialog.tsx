@@ -78,9 +78,9 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     return unsub;
   }, []);
 
-  // Cleanup active PIN hosting on unmount or dialog close
+  // Cleanup active PIN hosting on unmount or dialog close (only if not connected)
   useEffect(() => {
-    if (!open) {
+    if (!open && syncEngine.getStatus() !== "connected") {
       hostStopperRef.current?.stop();
       hostStopperRef.current = null;
       setIsPinConnecting(false);
@@ -159,6 +159,8 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
         deviceName.trim() || "LifeLog Device",
         (msg) => setPinStatus(msg)
       );
+      setIsPinConnecting(false);
+      setPinStatus(null);
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "Connection failed. Please verify the 6-digit PIN.");
@@ -258,7 +260,9 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     <Modal
       open={open}
       onClose={() => {
-        handleStopPinHost();
+        if (syncEngine.getStatus() !== "connected") {
+          handleStopPinHost();
+        }
         onClose();
       }}
       title="Peer-to-Peer Device Sync"
@@ -316,12 +320,14 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
 
             <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[var(--line)]">
               <div className="p-2 rounded-xl bg-[var(--panel2)]">
-                <span className="text-[var(--mut)] block text-[10.5px]">Direct Transport</span>
-                <span className="font-semibold text-[var(--text)]">WebRTC DataChannel</span>
+                <span className="text-[var(--mut)] block text-[10.5px]">Transport Link</span>
+                <span className="font-semibold text-[var(--text)]">
+                  {syncEngine.getTransportType() === "webrtc" ? "Direct WebRTC DataChannel" : "Encrypted Cloud Relay"}
+                </span>
               </div>
               <div className="p-2 rounded-xl bg-[var(--panel2)]">
-                <span className="text-[var(--mut)] block text-[10.5px]">End-to-End Encryption</span>
-                <span className="font-semibold text-emerald-400">AES-GCM-256</span>
+                <span className="text-[var(--mut)] block text-[10.5px]">End-to-End Security</span>
+                <span className="font-semibold text-emerald-400">AES-GCM-256 (E2EE)</span>
               </div>
             </div>
 

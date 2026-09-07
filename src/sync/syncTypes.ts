@@ -10,13 +10,16 @@ export interface SyncPeerInfo {
   connectedAt: number;
 }
 
+export type SyncTransport = "relay" | "webrtc";
+
 export type SyncMessage =
   | { type: "HANDSHAKE"; peer: SyncPeerInfo; lastSyncTs: number }
   | { type: "HANDSHAKE_ACK"; peer: SyncPeerInfo; lastSyncTs: number }
   | { type: "FULL_STATE"; state: State; timestamp: number }
   | { type: "DELTA_STATE"; delta: PartialStateDelta; timestamp: number }
   | { type: "PING"; timestamp: number }
-  | { type: "PONG"; timestamp: number };
+  | { type: "PONG"; timestamp: number }
+  | { type: "DISCONNECT"; timestamp: number };
 
 export interface PartialStateDelta {
   tasks?: Task[];

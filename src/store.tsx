@@ -167,12 +167,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const confirmResolve = useRef<((v: boolean) => void) | null>(null);
   const warnedCrypto = useRef(false);
 
+  const isRemoteSyncRef = useRef(false);
+
   /* ----- sync engine listener for incoming remote changes ----- */
   useEffect(() => {
     return syncEngine.onStateApply((updater) => {
+      isRemoteSyncRef.current = true;
       setState((prev) => (prev ? updater(prev) : prev));
     });
   }, []);
+
+  /* ----- register local state getter for sync engine ----- */
+  useEffect(() => {
+    syncEngine.registerLocalStateGetter(() => state);
+  }, [state]);
 
   /* ----- boot: decrypt at-rest state, or seed on first run ----- */
   useEffect(() => {
@@ -240,6 +248,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
     }, 400);
     return () => clearTimeout(t);
+  }, [state]);
+
+  /* ----- live broadcast to connected peer ("Always Sync") ----- */
+  useEffect(() => {
+    if (!state) return;
+    if (isRemoteSyncRef.current) {
+      isRemoteSyncRef.current = false;
+      return;
+    }
+    if (syncEngine.getStatus() === "connected") {
+      const t = setTimeout(() => {
+        syncEngine.broadcastFullState(state).catch(console.error);
+      }, 350);
+      return () => clearTimeout(t);
+    }
   }, [state]);
 
   const set = useCallback((fn: (s: State) => State) => setState((s) => (s ? fn(s) : s)), []);

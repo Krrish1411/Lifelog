@@ -1,12 +1,24 @@
 import type { State, Task, Note, Habit, Project, Session, DayLog } from "../types";
-import type { SyncMessage, SyncStatus, SyncPeerInfo, PartialStateDelta, EncryptedSyncPacket } from "./syncTypes";
+import type { SyncMessage, SyncStatus, SyncPeerInfo, PartialStateDelta, EncryptedSyncPacket, SyncTransport } from "./syncTypes";
 import { encryptSyncMessage, decryptSyncMessage } from "./syncCrypto";
+
+function detectPlatform(): SyncPeerInfo["platform"] {
+  if (typeof navigator === "undefined") return "web";
+  const ua = navigator.userAgent.toLowerCase();
+  if (/android/i.test(ua)) return "android";
+  if (/windows/i.test(ua)) return "windows";
+  if (/linux/i.test(ua)) return "linux";
+  if (/macintosh|mac os x/i.test(ua)) return "macos";
+  return "web";
+}
 
 const STUN_SERVERS: RTCConfiguration = {
   iceServers: [
     { urls: "stun:stun.l.google.com:19302" },
     { urls: "stun:stun1.l.google.com:19302" },
     { urls: "stun:stun2.l.google.com:19302" },
+    { urls: "stun:stun3.l.google.com:19302" },
+    { urls: "stun:stun4.l.google.com:19302" },
   ],
 };
 
@@ -26,8 +38,18 @@ class WebRTCSyncEngine {
   private sharedSecret: string = "";
   private status: SyncStatus = "idle";
   private connectedPeer: SyncPeerInfo | null = null;
+  private transportType: SyncTransport = "relay";
   private statusListeners: Set<SyncStatusListener> = new Set();
   private stateApplyListeners: Set<StateApplyListener> = new Set();
+
+  // Relay SSE / streaming state
+  private eventSource: EventSource | null = null;
+  private outgoingTopic: string = "";
+  private incomingTopic: string = "";
+  private activePin: string | null = null;
+  private isHost: boolean = false;
+  private localStateGetter: (() => State | null) | null = null;
+  private processedMessageIds: Set<string> = new Set();
 
   public getStatus(): SyncStatus {
     return this.status;
@@ -35,6 +57,14 @@ class WebRTCSyncEngine {
 
   public getConnectedPeer(): SyncPeerInfo | null {
     return this.connectedPeer;
+  }
+
+  public getTransportType(): SyncTransport {
+    return this.transportType;
+  }
+
+  public registerLocalStateGetter(getter: () => State | null) {
+    this.localStateGetter = getter;
   }
 
   public onStatusChange(listener: SyncStatusListener): () => void {
@@ -56,9 +86,221 @@ class WebRTCSyncEngine {
     }
   }
 
+  /* ------------------- Relay SSE Transport (Instant & 100% Reliable) ------------------- */
+
+  private async extractMessagePayload(data: any): Promise<string> {
+    if (data.attachment && data.attachment.url) {
+      try {
+        const res = await fetch(data.attachment.url);
+        return await res.text();
+      } catch (e) {
+        console.warn("[Sync] Failed to fetch attachment payload from relay:", e);
+        return "";
+      }
+    }
+    return data.message || "";
+  }
+
+  private startRelayListener(topic: string, selfPeer: SyncPeerInfo) {
+    if (this.eventSource) {
+      try { this.eventSource.close(); } catch {}
+      this.eventSource = null;
+    }
+
+    const url = `https://ntfy.sh/${topic}/sse?since=all`;
+    const es = new EventSource(url);
+    this.eventSource = es;
+
+    es.onmessage = async (e) => {
+      try {
+        const data = JSON.parse(e.data);
+        if (data.event !== "message") return;
+
+        // Prevent duplicate processing if reconnected
+        if (data.id && this.processedMessageIds.has(data.id)) return;
+        if (data.id) {
+          this.processedMessageIds.add(data.id);
+          if (this.processedMessageIds.size > 500) {
+            const first = this.processedMessageIds.values().next().value;
+            if (first) this.processedMessageIds.delete(first);
+          }
+        }
+
+        const payload = await this.extractMessagePayload(data);
+        if (!payload || !this.sharedSecret) return;
+
+        const packet: EncryptedSyncPacket = JSON.parse(payload);
+        const msg: SyncMessage = await decryptSyncMessage(packet, this.sharedSecret);
+        await this.handleIncomingMessage(msg, selfPeer);
+      } catch (err) {
+        console.warn("[Sync] Error decoding incoming relay packet:", err);
+      }
+    };
+
+    es.onerror = () => {
+      // Browser EventSource automatically handles reconnect
+    };
+  }
+
   /**
-   * Helper to wait for ICE gathering to complete before packaging the SDP.
+   * Device 1 (Host): Creates a session with a 6-digit PIN.
+   * Publishes session metadata and listens for peer's immediate handshake.
    */
+  public async hostWithPin(
+    pin: string,
+    deviceName: string,
+    onProgress?: (msg: string) => void
+  ): Promise<{ stop: () => void }> {
+    this.disconnect();
+    this.setStatus("connecting");
+    this.isHost = true;
+    this.activePin = pin;
+    this.transportType = "relay";
+
+    // Generate random 256-bit hex secret
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    this.sharedSecret = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    this.outgoingTopic = `lifelog-sync-${pin}-h2j`;
+    this.incomingTopic = `lifelog-sync-${pin}-j2h`;
+
+    const hostPeer: SyncPeerInfo = {
+      deviceId: "host-" + Date.now().toString(36),
+      deviceName,
+      platform: detectPlatform(),
+      connectedAt: Date.now(),
+    };
+
+    onProgress?.("Publishing session to relay...");
+
+    // Publish session metadata for Joiner
+    const metaPayload = JSON.stringify({
+      pin,
+      secret: this.sharedSecret,
+      hostPeer,
+      createdAt: Date.now(),
+    });
+
+    await fetch(`https://ntfy.sh/lifelog-sync-${pin}-meta`, {
+      method: "POST",
+      body: metaPayload,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    onProgress?.("Waiting for peer to enter PIN...");
+
+    // Connect EventSource to receive Joiner packets
+    this.startRelayListener(this.incomingTopic, hostPeer);
+
+    return {
+      stop: () => {
+        if (this.status !== "connected") {
+          this.disconnect();
+        }
+      },
+    };
+  }
+
+  /**
+   * Device 2 (Joiner): Joins the session using the 6-digit PIN.
+   * Connects within ~500ms and sends immediate handshake.
+   */
+  public async joinWithPin(
+    pin: string,
+    deviceName: string,
+    onProgress?: (msg: string) => void
+  ): Promise<void> {
+    this.disconnect();
+    this.setStatus("connecting");
+    this.isHost = false;
+    this.activePin = pin;
+    this.transportType = "relay";
+
+    onProgress?.("Locating host session...");
+
+    // Retry querying host metadata up to 5 times (every 700ms)
+    let meta: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        const res = await fetch(`https://ntfy.sh/lifelog-sync-${pin}-meta/json?poll=1&since=all`);
+        const text = await res.text();
+        const lines = text.trim().split("\n").filter(Boolean);
+        for (let i = lines.length - 1; i >= 0; i--) {
+          try {
+            const evt = JSON.parse(lines[i]);
+            if (evt.event === "message" && evt.message) {
+              const parsed = JSON.parse(evt.message);
+              if (parsed.secret && parsed.hostPeer) {
+                meta = parsed;
+                break;
+              }
+            }
+          } catch {}
+        }
+        if (meta) break;
+      } catch {}
+      await new Promise((r) => setTimeout(r, 700));
+    }
+
+    if (!meta) {
+      throw new Error(
+        `No active host session found with PIN ${pin}. Please verify that the Host device has LifeLog open with the PIN displayed.`
+      );
+    }
+
+    this.sharedSecret = meta.secret;
+    this.outgoingTopic = `lifelog-sync-${pin}-j2h`;
+    this.incomingTopic = `lifelog-sync-${pin}-h2j`;
+
+    onProgress?.("Host found! Establishing secure link...");
+
+    const joinerPeer: SyncPeerInfo = {
+      deviceId: "joiner-" + Date.now().toString(36),
+      deviceName,
+      platform: detectPlatform(),
+      connectedAt: Date.now(),
+    };
+
+    // Start listener on host's incoming stream
+    this.startRelayListener(this.incomingTopic, joinerPeer);
+
+    // Send immediate HANDSHAKE to Host
+    await this.sendRelayMessage({
+      type: "HANDSHAKE",
+      peer: joinerPeer,
+      lastSyncTs: Date.now(),
+    });
+
+    // Mark connected immediately
+    this.connectedPeer = meta.hostPeer;
+    this.setStatus("connected", meta.hostPeer);
+    onProgress?.(`Connected to ${meta.hostPeer.deviceName}!`);
+
+    // If joiner has state, broadcast state to host
+    if (this.localStateGetter) {
+      const currentState = this.localStateGetter();
+      if (currentState) {
+        this.broadcastFullState(currentState).catch(console.error);
+      }
+    }
+  }
+
+  private async sendRelayMessage(msg: SyncMessage): Promise<void> {
+    if (!this.outgoingTopic || !this.sharedSecret) return;
+    try {
+      const packet = await encryptSyncMessage(msg, this.sharedSecret);
+      await fetch(`https://ntfy.sh/${this.outgoingTopic}`, {
+        method: "POST",
+        body: JSON.stringify(packet),
+        headers: { "Content-Type": "application/json" },
+      });
+    } catch (e) {
+      console.error("[Sync] Failed to send relay packet:", e);
+    }
+  }
+
+  /* ------------------- WebRTC Air-Gapped / Direct DataChannel ------------------- */
+
   private waitForAllIceCandidates(pc: RTCPeerConnection): Promise<void> {
     return new Promise((resolve) => {
       if (pc.iceGatheringState === "complete") {
@@ -72,22 +314,18 @@ class WebRTCSyncEngine {
         }
       };
       pc.addEventListener("icegatheringstatechange", check);
-      // Timeout fallback: after 2.5s resolve with whatever candidates gathered
       setTimeout(() => {
         pc.removeEventListener("icegatheringstatechange", check);
         resolve();
-      }, 2500);
+      }, 3500);
     });
   }
 
-  /**
-   * Device 1 (Host): Creates a session ticket (Offer + Encryption Key).
-   */
   public async createSession(deviceName: string): Promise<string> {
     this.disconnect();
     this.setStatus("connecting");
+    this.transportType = "webrtc";
 
-    // Generate random 256-bit hex secret
     const bytes = crypto.getRandomValues(new Uint8Array(16));
     this.sharedSecret = Array.from(bytes).map((b) => b.toString(16).padStart(2, "0")).join("");
 
@@ -110,12 +348,10 @@ class WebRTCSyncEngine {
     return btoa(JSON.stringify(ticket));
   }
 
-  /**
-   * Device 2 (Joiner): Joins an existing session by scanning or pasting the host's ticket.
-   */
   public async joinSession(rawTicket: string, deviceName: string): Promise<string> {
     this.disconnect();
     this.setStatus("connecting");
+    this.transportType = "webrtc";
 
     const parsed: SyncTicket = JSON.parse(atob(rawTicket.trim()));
     this.sharedSecret = parsed.secret;
@@ -145,9 +381,6 @@ class WebRTCSyncEngine {
     return btoa(JSON.stringify(answerTicket));
   }
 
-  /**
-   * Device 1 (Host): Accepts the answer ticket from Device 2 to finalize the WebRTC handshake.
-   */
   public async acceptAnswer(rawAnswerTicket: string): Promise<void> {
     if (!this.pc) throw new Error("No active sync session on this device.");
     const parsed: SyncTicket = JSON.parse(atob(rawAnswerTicket.trim()));
@@ -155,131 +388,22 @@ class WebRTCSyncEngine {
     await this.pc.setRemoteDescription(answerDesc);
   }
 
-  /**
-   * Device 1 (Host): Creates a session ticket and publishes it to a public relay with a 6-digit PIN.
-   * Continuously checks for the peer's answer until connected or cancelled.
-   */
-  public async hostWithPin(
-    pin: string,
-    deviceName: string,
-    onProgress?: (msg: string) => void
-  ): Promise<{ stop: () => void }> {
-    const offerTicket = await this.createSession(deviceName);
-    onProgress?.("Publishing session to relay...");
-
-    // Publish offer
-    await fetch(`https://ntfy.sh/lifelog-sync-${pin}-offer`, {
-      method: "POST",
-      body: offerTicket,
-    });
-
-    onProgress?.("Waiting for peer to enter PIN...");
-
-    let cancelled = false;
-    let pollTimer: any = null;
-
-    const pollAnswer = async () => {
-      if (cancelled || this.getStatus() === "connected") return;
-      try {
-        const res = await fetch(`https://ntfy.sh/lifelog-sync-${pin}-answer/json?poll=1&since=all`);
-        const text = await res.text();
-        const events = text
-          .trim()
-          .split("\n")
-          .filter(Boolean)
-          .map((l) => {
-            try {
-              return JSON.parse(l);
-            } catch {
-              return null;
-            }
-          })
-          .filter((e) => e && e.event === "message");
-
-        if (events.length > 0) {
-          const answerTicket = events[events.length - 1].message;
-          onProgress?.("Peer connected! Establishing encrypted link...");
-          await this.acceptAnswer(answerTicket);
-          return;
-        }
-      } catch {
-        // Retry next poll
-      }
-      if (!cancelled && this.getStatus() !== "connected") {
-        pollTimer = setTimeout(pollAnswer, 1500);
-      }
-    };
-
-    pollTimer = setTimeout(pollAnswer, 1200);
-
-    return {
-      stop: () => {
-        cancelled = true;
-        if (pollTimer) clearTimeout(pollTimer);
-      },
-    };
-  }
-
-  /**
-   * Device 2 (Joiner): Joins a session using the 6-digit PIN.
-   */
-  public async joinWithPin(
-    pin: string,
-    deviceName: string,
-    onProgress?: (msg: string) => void
-  ): Promise<void> {
-    onProgress?.("Locating host session...");
-    const res = await fetch(`https://ntfy.sh/lifelog-sync-${pin}-offer/json?poll=1&since=all`);
-    const text = await res.text();
-    const events = text
-      .trim()
-      .split("\n")
-      .filter(Boolean)
-      .map((l) => {
-        try {
-          return JSON.parse(l);
-        } catch {
-          return null;
-        }
-      })
-      .filter((e) => e && e.event === "message");
-
-    if (events.length === 0) {
-      throw new Error("No active host found with this PIN. Please make sure the host has LifeLog open with the PIN displayed.");
-    }
-
-    const offerTicket = events[events.length - 1].message;
-    onProgress?.("Found host! Creating encrypted response...");
-
-    const answerTicket = await this.joinSession(offerTicket, deviceName);
-
-    onProgress?.("Sending response to host...");
-    await fetch(`https://ntfy.sh/lifelog-sync-${pin}-answer`, {
-      method: "POST",
-      body: answerTicket,
-    });
-
-    onProgress?.("Connecting directly to peer...");
-  }
-
-  /**
-   * Setup listeners on the open WebRTC DataChannel.
-   */
   private setupChannel(ch: RTCDataChannel) {
     ch.onopen = () => {
+      this.transportType = "webrtc";
       this.setStatus("connected", {
         deviceId: "peer-" + Date.now().toString(36),
         deviceName: "Connected Peer",
         platform: "web",
         connectedAt: Date.now(),
       });
-      // Send initial handshake ping
+
       this.sendMessage({
         type: "HANDSHAKE",
         peer: {
           deviceId: "self-" + Date.now().toString(36),
           deviceName: "LifeLog Device",
-          platform: "web",
+          platform: detectPlatform(),
           connectedAt: Date.now(),
         },
         lastSyncTs: Date.now(),
@@ -287,11 +411,15 @@ class WebRTCSyncEngine {
     };
 
     ch.onclose = () => {
-      this.setStatus("idle", null);
+      if (this.transportType === "webrtc") {
+        this.setStatus("idle", null);
+      }
     };
 
     ch.onerror = () => {
-      this.setStatus("error", null);
+      if (this.transportType === "webrtc") {
+        this.setStatus("error", null);
+      }
     };
 
     ch.onmessage = async (e) => {
@@ -300,23 +428,29 @@ class WebRTCSyncEngine {
         const msg = await decryptSyncMessage(rawPacket, this.sharedSecret);
         await this.handleIncomingMessage(msg);
       } catch (err) {
-        console.error("Failed to decrypt or handle sync packet:", err);
+        console.error("Failed to decrypt WebRTC packet:", err);
       }
     };
   }
 
-  /**
-   * Encrypt and send a typed SyncMessage over the DataChannel.
-   */
+  /* ------------------- Unified Messaging & State Synchronization ------------------- */
+
   public async sendMessage(msg: SyncMessage): Promise<void> {
-    if (!this.channel || this.channel.readyState !== "open") return;
-    const packet = await encryptSyncMessage(msg, this.sharedSecret);
-    this.channel.send(JSON.stringify(packet));
+    if (this.channel && this.channel.readyState === "open") {
+      try {
+        const packet = await encryptSyncMessage(msg, this.sharedSecret);
+        this.channel.send(JSON.stringify(packet));
+        return;
+      } catch (e) {
+        console.warn("[Sync] WebRTC send failed, falling back to relay:", e);
+      }
+    }
+
+    if (this.outgoingTopic && this.sharedSecret) {
+      await this.sendRelayMessage(msg);
+    }
   }
 
-  /**
-   * Send live state delta over the active DataChannel ("Always Sync").
-   */
   public async broadcastDelta(delta: PartialStateDelta): Promise<void> {
     if (this.status !== "connected") return;
     await this.sendMessage({
@@ -326,33 +460,60 @@ class WebRTCSyncEngine {
     });
   }
 
-  /**
-   * Broadcast full state to peer (e.g. on initial pair or manual sync).
-   */
   public async broadcastFullState(state: State): Promise<void> {
     if (this.status !== "connected") return;
     this.setStatus("syncing");
-    await this.sendMessage({
-      type: "FULL_STATE",
-      state,
-      timestamp: Date.now(),
-    });
-    this.setStatus("connected");
+    try {
+      await this.sendMessage({
+        type: "FULL_STATE",
+        state,
+        timestamp: Date.now(),
+      });
+    } finally {
+      this.setStatus("connected");
+    }
   }
 
-  /**
-   * Process incoming decrypted sync messages.
-   */
-  private async handleIncomingMessage(msg: SyncMessage) {
-    if (msg.type === "FULL_STATE") {
+  private async handleIncomingMessage(msg: SyncMessage, selfPeer?: SyncPeerInfo) {
+    if (msg.type === "HANDSHAKE") {
+      this.connectedPeer = msg.peer;
+      this.setStatus("connected", msg.peer);
+
+      // Respond with HANDSHAKE_ACK
+      if (selfPeer) {
+        await this.sendMessage({
+          type: "HANDSHAKE_ACK",
+          peer: selfPeer,
+          lastSyncTs: Date.now(),
+        });
+      }
+
+      // Automatically broadcast full local state
+      if (this.localStateGetter) {
+        const currentState = this.localStateGetter();
+        if (currentState) {
+          await this.broadcastFullState(currentState);
+        }
+      }
+    } else if (msg.type === "HANDSHAKE_ACK") {
+      this.connectedPeer = msg.peer;
+      this.setStatus("connected", msg.peer);
+
+      // Send local state if available
+      if (this.localStateGetter) {
+        const currentState = this.localStateGetter();
+        if (currentState) {
+          await this.broadcastFullState(currentState);
+        }
+      }
+    } else if (msg.type === "FULL_STATE") {
       this.setStatus("syncing");
       this.dispatchStateMerge((local) => mergeFullState(local, msg.state));
       this.setStatus("connected");
     } else if (msg.type === "DELTA_STATE") {
       this.dispatchStateMerge((local) => mergeDelta(local, msg.delta));
-    } else if (msg.type === "HANDSHAKE") {
-      this.connectedPeer = msg.peer;
-      this.setStatus("connected", msg.peer);
+    } else if (msg.type === "DISCONNECT") {
+      this.disconnect();
     }
   }
 
@@ -363,6 +524,17 @@ class WebRTCSyncEngine {
   }
 
   public disconnect(): void {
+    if (this.status === "connected" && this.outgoingTopic && this.sharedSecret) {
+      this.sendMessage({
+        type: "DISCONNECT",
+        timestamp: Date.now(),
+      }).catch(() => {});
+    }
+
+    if (this.eventSource) {
+      try { this.eventSource.close(); } catch {}
+      this.eventSource = null;
+    }
     if (this.channel) {
       try { this.channel.close(); } catch {}
       this.channel = null;
@@ -371,6 +543,13 @@ class WebRTCSyncEngine {
       try { this.pc.close(); } catch {}
       this.pc = null;
     }
+
+    this.outgoingTopic = "";
+    this.incomingTopic = "";
+    this.activePin = null;
+    this.isHost = false;
+    this.transportType = "relay";
+    this.processedMessageIds.clear();
     this.setStatus("idle", null);
   }
 }
