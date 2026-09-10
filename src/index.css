@@ -127,9 +127,12 @@ body {
   content: "";
   position: absolute;
   border-radius: 50%;
-  filter: blur(85px);
+  filter: blur(42px);
   will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
   pointer-events: none;
+  contain: strict;
 }
 .ambient::before {
   width: 52vw;
@@ -525,9 +528,12 @@ html[data-engine="zen"] .card {
 .liquid-field .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(85px);
+  filter: blur(44px);
   will-change: transform;
+  transform: translate3d(0, 0, 0);
+  backface-visibility: hidden;
   pointer-events: none;
+  contain: strict;
 }
 
 /* Dark Mode Liquid Blobs (Rich, vibrant fluid luminescence behind glass) */
@@ -579,7 +585,7 @@ html:not([data-theme="dark"]) .liquid-field .blob.b1 {
   top: -10vw;
   background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 65%);
   opacity: 0.55;
-  filter: blur(95px);
+  filter: blur(48px);
   animation: liquid-a 28s ease-in-out infinite alternate;
 }
 
@@ -590,7 +596,7 @@ html:not([data-theme="dark"]) .liquid-field .blob.b2 {
   top: 18vh;
   background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, transparent 65%);
   opacity: 0.48;
-  filter: blur(95px);
+  filter: blur(48px);
   animation: liquid-b 34s ease-in-out infinite alternate;
 }
 
@@ -601,7 +607,7 @@ html:not([data-theme="dark"]) .liquid-field .blob.b3 {
   bottom: -8vw;
   background: radial-gradient(circle, rgba(232, 121, 249, 0.18) 0%, transparent 65%);
   opacity: 0.42;
-  filter: blur(95px);
+  filter: blur(48px);
   animation: liquid-c 40s ease-in-out infinite alternate;
 }
 
@@ -612,7 +618,7 @@ html:not([data-theme="dark"]) .liquid-field .blob.b4 {
   bottom: 8vh;
   background: radial-gradient(circle, rgba(251, 191, 36, 0.18) 0%, transparent 65%);
   opacity: 0.42;
-  filter: blur(95px);
+  filter: blur(48px);
   animation: liquid-d 44s ease-in-out infinite alternate;
 }
 
@@ -638,8 +644,10 @@ html:not([data-theme="dark"]) .liquid-field .blob.b4 {
 /* TIER 1: Glass Regular (Navigation sidebars, toolbars, main control bars) */
 .glass-regular {
   position: relative;
-  backdrop-filter: blur(32px) saturate(210%) contrast(104%);
-  -webkit-backdrop-filter: blur(32px) saturate(210%) contrast(104%);
+  backdrop-filter: blur(24px) saturate(190%);
+  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  transform: translateZ(0);
+  backface-visibility: hidden;
   background: color-mix(in srgb, var(--panel) 72%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
   box-shadow:
@@ -660,8 +668,10 @@ html[data-theme="dark"] .glass-regular {
 /* TIER 2: Glass Elevated (Floating pill bars, modals, mini-timer, palette) */
 .glass-elevated {
   position: relative;
-  backdrop-filter: blur(40px) saturate(230%) contrast(108%);
-  -webkit-backdrop-filter: blur(40px) saturate(230%) contrast(108%);
+  backdrop-filter: blur(28px) saturate(200%);
+  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  transform: translateZ(0);
+  backface-visibility: hidden;
   background: color-mix(in srgb, var(--panel) 80%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--line) 90%, transparent) !important;
   box-shadow:

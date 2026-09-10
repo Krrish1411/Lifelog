@@ -23,7 +23,10 @@ export function openDB(): Promise<IDBDatabase | null> {
       return;
     }
     const request = indexedDB.open(DB_NAME, DB_VERSION);
-    request.onerror = () => resolve(null);
+    request.onerror = () => {
+      dbPromise = null; // Allow future retry
+      resolve(null);
+    };
     request.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result;
       if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -39,38 +42,54 @@ export async function loadStateFromIDB(): Promise<State | null> {
   const db = await openDB();
   if (!db) return null;
   return new Promise((resolve) => {
-    const tx = db.transaction(STORE_NAME, "readonly");
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.get(LS_KEY);
-    req.onerror = () => resolve(null);
-    req.onsuccess = async () => {
-      const encrypted = req.result as string | undefined;
-      if (!encrypted) {
-        resolve(null);
-        return;
-      }
-      try {
-        const key = await getDeviceKey();
-        const state = await decryptEnvelope<State>(key, encrypted);
-        resolve(state);
-      } catch {
-        resolve(null);
-      }
-    };
+    try {
+      const tx = db.transaction(STORE_NAME, "readonly");
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(LS_KEY);
+      req.onerror = () => resolve(null);
+      req.onsuccess = async () => {
+        const encrypted = req.result as string | undefined;
+        if (!encrypted) {
+          resolve(null);
+          return;
+        }
+        try {
+          const key = await getDeviceKey();
+          const state = await decryptEnvelope<State>(key, encrypted);
+          resolve(state);
+        } catch {
+          resolve(null);
+        }
+      };
+    } catch {
+      resolve(null);
+    }
   });
 }
 
 export async function saveStateToIDB(state: State): Promise<void> {
-  const db = await openDB();
-  if (!db) throw new Error("IndexedDB unavailable");
   const key = await getDeviceKey();
   const encrypted = await encryptEnvelope(key, state);
+
+  // Synchronously backup to localStorage so any window can immediately access latest state
+  try {
+    if (typeof localStorage !== "undefined") {
+      localStorage.setItem(LS_KEY, encrypted);
+    }
+  } catch {}
+
+  const db = await openDB();
+  if (!db) return;
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, "readwrite");
-    const store = tx.objectStore(STORE_NAME);
-    store.put(encrypted, LS_KEY);
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error || new Error("IDB transaction failed"));
+    try {
+      const tx = db.transaction(STORE_NAME, "readwrite");
+      const store = tx.objectStore(STORE_NAME);
+      store.put(encrypted, LS_KEY);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error || new Error("IDB transaction failed"));
+    } catch (e) {
+      reject(e);
+    }
   });
 }
 

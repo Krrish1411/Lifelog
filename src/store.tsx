@@ -34,6 +34,7 @@ import {
 } from "./utils/native";
 import { playNotificationAlarmSound, playTaskDoneSound } from "./utils/audio";
 import { syncEngine } from "./sync/syncEngine";
+import { broadcastWindowState, onWindowStateSync, requestLatestState } from "./utils/windowSync";
 import { X } from "lucide-react";
 import { cn } from "./components/ui";
 
@@ -175,6 +176,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const warnedCrypto = useRef(false);
 
   const isRemoteSyncRef = useRef(false);
+  const isWindowSyncRef = useRef(false);
+  const stateRef = useRef<State | null>(null);
+  stateRef.current = state;
   const firedRemindersRef = useRef<Set<string>>(new Set());
 
   /* ----- sync engine listener for incoming remote changes ----- */
@@ -183,6 +187,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
       isRemoteSyncRef.current = true;
       setState((prev) => (prev ? updater(prev) : prev));
     });
+  }, []);
+
+  /* ----- real-time cross-window synchronization (Popout <-> Main window) ----- */
+  useEffect(() => {
+    const unsub = onWindowStateSync(
+      (incomingState) => {
+        isWindowSyncRef.current = true;
+        setState(incomingState);
+      },
+      () => stateRef.current
+    );
+    requestLatestState();
+    return unsub;
   }, []);
 
   /* ----- register local state getter for sync engine ----- */
@@ -271,6 +288,16 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }, 350);
       return () => clearTimeout(t);
     }
+  }, [state]);
+
+  /* ----- broadcast local changes to other windows immediately ----- */
+  useEffect(() => {
+    if (!state) return;
+    if (isWindowSyncRef.current) {
+      isWindowSyncRef.current = false;
+      return;
+    }
+    broadcastWindowState(state);
   }, [state]);
 
   const set = useCallback((fn: (s: State) => State) => setState((s) => (s ? fn(s) : s)), []);
