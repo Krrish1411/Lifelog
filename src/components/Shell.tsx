@@ -290,20 +290,23 @@ export function Shell() {
   useEffect(() => {
     const s = state.settings;
     const dark = s.themeMode === "dark";
-    let bg = normalizeHex(dark ? s.bgDark : s.bgLight) ?? (dark ? "#000000" : "#ffffff");
+    let bg = normalizeHex(dark ? s.bgDark : s.bgLight) ?? (dark ? "#000000" : "#f8fafc");
     if (dark && (bg === "#0f1714" || !bg)) bg = "#000000";
+    if (!dark && (!bg || bg === "#ffffff")) bg = "#f8fafc";
     const isOled = dark && bg === "#000000";
     const derived: Record<TokenKey, string> = {
-      text: dark ? "#f3f4f6" : "#182019",
-      mut: "",
-      panel: isOled ? "#080808" : dark ? mix(bg, "#ffffff", 0.045) : mix(bg, "#ffffff", 0.6),
-      panel2: isOled ? "#121212" : dark ? mix(bg, "#ffffff", 0.09) : mix(bg, "#ffffff", 0.92),
-      line: isOled ? "#1f1f1f" : dark ? mix(bg, "#ffffff", 0.14) : mix(bg, "#000000", 0.13),
-      ok: dark ? "#6fbf8e" : "#3e8f60",
-      warn: dark ? "#e0b457" : "#a67c1f",
-      danger: dark ? "#ef4444" : "#b23c28",
+      text: dark ? "#f3f4f6" : "#0f172a",
+      mut: dark ? "" : "#64748b",
+      panel: isOled ? "#080808" : dark ? mix(bg, "#ffffff", 0.045) : "#ffffff",
+      panel2: isOled ? "#121212" : dark ? mix(bg, "#ffffff", 0.09) : mix(bg, "#000000", 0.04),
+      line: isOled ? "#1f1f1f" : dark ? mix(bg, "#ffffff", 0.14) : mix(bg, "#000000", 0.10),
+      ok: dark ? "#6fbf8e" : "#16a34a",
+      warn: dark ? "#e0b457" : "#d97706",
+      danger: dark ? "#ef4444" : "#dc2626",
     };
-    derived.mut = mix(derived.text, bg, 0.45);
+    if (dark) {
+      derived.mut = mix(derived.text, bg, 0.45);
+    }
     (Object.keys(derived) as TokenKey[]).forEach((k) => {
       const o = s.tokens[k];
       if (o && normalizeHex(o)) derived[k] = normalizeHex(o)!;
@@ -313,7 +316,8 @@ export function Shell() {
     derived.ok = ensureContrast(derived.ok, bg, 3);
     derived.warn = ensureContrast(derived.warn, bg, 3);
     derived.danger = ensureContrast(derived.danger, bg, 3);
-    const accent = ensureContrast(normalizeHex(s.accent) ?? "#e8a33d", bg, 4.5);
+    const rawAccent = normalizeHex(s.accent) ?? (dark ? "#e8a33d" : "#d97706");
+    const accent = ensureContrast(rawAccent, bg, 4.2);
     const root = document.documentElement;
     root.style.setProperty("--bg", bg);
     (Object.keys(derived) as TokenKey[]).forEach((k) => root.style.setProperty(`--${k}`, derived[k]));

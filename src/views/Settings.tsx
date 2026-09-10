@@ -5,6 +5,7 @@ import {
   Check,
   Compass,
   Download,
+  FileText,
   Flame,
   Layers,
   LayoutDashboard,
@@ -342,8 +343,11 @@ export function SettingsView() {
     e.target.value = "";
     if (!f) return;
     const reader = new FileReader();
+    reader.onerror = () => {
+      toast("Error reading the selected file from your device", "err");
+    };
     reader.onload = async () => {
-      const text = String(reader.result ?? "");
+      const text = String(reader.result ?? "").trim();
       try {
         const env = JSON.parse(text) as { kind?: string };
         if (env?.kind === "backup") {
@@ -352,7 +356,7 @@ export function SettingsView() {
         }
         await finishImport(text, null);
       } catch {
-        toast("Could not read that file — not valid JSON", "err");
+        toast("Could not read that file — not valid LifeLog or JSON data", "err");
       }
     };
     reader.readAsText(f);
@@ -943,7 +947,7 @@ export function SettingsView() {
                         <Upload size={12} /> {s.customFontName ? `Custom: ${CUSTOM_FONT_FAMILY}` : "Upload font (.ttf/.otf/.woff2)"}
                         <input
                           type="file"
-                          accept=".ttf,.otf,.woff,.woff2"
+                          accept=".ttf,.otf,.woff,.woff2,font/*,application/octet-stream,*/*"
                           className="hidden"
                           onChange={async (e) => {
                             const f = e.target.files?.[0];
@@ -1293,14 +1297,34 @@ export function SettingsView() {
                         color: "var(--text)",
                       }}
                     >
-                      <Upload size={13} /> Import file
+                      <Upload size={13} /> Import file (.lifelog / .json)
                       <input
                         type="file"
-                        accept=".json,.lifelog,application/json"
+                        accept="*/*,.json,.lifelog,application/json,text/plain,application/octet-stream"
                         className="hidden"
                         onChange={onImportFile}
                       />
                     </label>
+
+                    <Btn
+                      variant="soft"
+                      onClick={() => {
+                        const pasted = prompt("Paste your LifeLog backup or export JSON here:");
+                        if (!pasted || !pasted.trim()) return;
+                        try {
+                          const env = JSON.parse(pasted.trim()) as { kind?: string };
+                          if (env?.kind === "backup") {
+                            setImportPayload(pasted.trim()); setImportPw(""); setImportErr(""); setImportPwOpen(true);
+                            return;
+                          }
+                          finishImport(pasted.trim(), null);
+                        } catch {
+                          toast("Invalid data — must be valid LifeLog JSON", "err");
+                        }
+                      }}
+                    >
+                      <FileText size={13} /> Paste backup
+                    </Btn>
                   </div>
 
                   <div className="rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>

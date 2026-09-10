@@ -249,9 +249,9 @@ export const REPORT_WIDGETS: { key: string; label: string; desc: string }[] = [
 export const DEFAULT_SETTINGS: Settings = {
   layout: "glass",
   themeMode: "light",
-  accent: "#dc2626",
+  accent: "#d97706",
   bgDark: "#000000",
-  bgLight: "#ffffff",
+  bgLight: "#f8fafc",
   tokens: {},
   greeting: "daily",
   profileName: "",

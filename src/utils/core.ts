@@ -295,6 +295,21 @@ export function clamp(v: number, lo: number, hi: number): number {
 }
 export function download(filename: string, content: string, mime = "application/json"): void {
   const blob = new Blob([content], { type: mime });
+
+  // On native mobile platforms (Android WebView), support system share/save sheet
+  if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
+    try {
+      const file = new File([blob], filename, { type: mime });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: filename,
+        }).catch(() => {});
+        return;
+      }
+    } catch {}
+  }
+
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;

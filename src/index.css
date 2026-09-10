@@ -155,9 +155,15 @@ body {
   min-width: 0;
   box-sizing: border-box;
 }
+html:not([data-theme="dark"]) .card {
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
+}
 .card-hover:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
   box-shadow: 0 6px 24px -12px rgba(0, 0, 0, 0.5);
+}
+html:not([data-theme="dark"]) .card-hover:hover {
+  box-shadow: 0 8px 24px -6px rgba(0, 0, 0, 0.08);
 }
 .inp {
   width: 100%;
@@ -506,8 +512,12 @@ html[data-engine="glass"] .card:hover::after {
   position: absolute;
   border-radius: 50%;
   filter: blur(70px);
-  opacity: 0.3;
+  opacity: 0.28;
   will-change: transform;
+}
+html:not([data-theme="dark"]) .liquid-field .blob {
+  opacity: 0.08;
+  filter: blur(100px);
 }
 .liquid-field .blob.b1 {
   width: 46vw; height: 46vw; left: -10vw; top: -14vw;
