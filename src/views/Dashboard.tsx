@@ -614,37 +614,36 @@ export function Dashboard() {
 
       {/* ------- weighted stat strip ------- */}
       {widgets.focusMetric !== false && (
-        <div className="stagger grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-[1.55fr_1fr_1fr_1fr] w-full min-w-0">
+        <div className="stagger grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-[1.55fr_1fr_1fr_1fr] w-full min-w-0">
           <div
-            className="card card-hover relative overflow-hidden p-3.5 sm:p-4 min-w-0 w-full"
-            style={{ borderColor: "color-mix(in srgb, var(--accent) 40%, var(--line))", boxShadow: "0 8px 30px -18px var(--accent)" }}
+            className="card-primary card-hover relative overflow-hidden p-4 sm:p-5 min-w-0 w-full"
           >
             <div className="flex items-center justify-between gap-2 min-w-0">
-              <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] truncate" style={{ color: "var(--mut)" }}>Focused today</span>
+              <span className="text-[11px] font-bold uppercase tracking-[0.14em] truncate" style={{ color: "var(--mut)" }}>Focused today</span>
               {anyRunning ? (
-                <span className="chip !py-0 text-[9.5px] shrink-0" style={{ color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 50%, var(--line))" }}>
-                  <span className="inline-block h-[6px] w-[6px] rounded-full" style={{ background: "var(--danger)", animation: "nowpulse 1.4s infinite" }} /> recording
+                <span className="chip !py-0 text-[10px] shrink-0 font-bold" style={{ color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 50%, var(--line))" }}>
+                  <span className="inline-block h-[6.5px] w-[6.5px] rounded-full mr-1" style={{ background: "var(--danger)", animation: "nowpulse 1.4s infinite" }} /> Live
                 </span>
               ) : (
-                <Timer size={13} className="shrink-0" style={{ color: "var(--mut)" }} />
+                <Timer size={14} className="shrink-0" style={{ color: "var(--mut)" }} />
               )}
             </div>
-            <div className="mt-1 font-mono text-[28px] sm:text-[30px] font-bold leading-none tnum" style={{ color: "var(--accent)" }}>
+            <div className="mt-1.5 font-mono text-[32px] sm:text-[36px] font-extrabold leading-none tnum" style={{ color: "var(--accent)" }}>
               {fmtDur(todayMin)}
             </div>
-            <div className="mt-3 flex h-[38px] items-end gap-1.5 w-full min-w-0" aria-hidden>
+            <div className="mt-3.5 flex h-[42px] items-end gap-1.5 w-full min-w-0" aria-hidden>
               {weekBars.map((b, i) => (
                 <div key={b.iso} className="group/bar relative flex-1 min-w-0">
                   <div
-                    className="w-full rounded-t-[4px] transition-all duration-500"
+                    className="w-full rounded-t-[5px] transition-all duration-500"
                     style={{
-                      height: Math.max(4, (b.min / weekMax) * 38),
+                      height: Math.max(5, (b.min / weekMax) * 42),
                       background: i === 6 ? "var(--accent)" : `color-mix(in srgb, var(--accent) ${18 + (i / 6) * 22}%, var(--line))`,
                       animation: `rise 0.4s ${0.05 * i}s cubic-bezier(0.2,0.7,0.3,1) both`,
                     }}
                   />
                   <span
-                    className="pointer-events-none absolute -top-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-md border px-1.5 py-0.5 text-[9.5px] font-bold opacity-0 transition-opacity group-hover/bar:opacity-100"
+                    className="pointer-events-none absolute -top-7 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-lg border px-2 py-0.5 text-[10px] font-bold opacity-0 transition-opacity group-hover/bar:opacity-100 shadow-lg"
                     style={{ background: "var(--panel2)", borderColor: "var(--line)", color: "var(--text)" }}
                   >
                     {fmtDayShort(b.iso)} · {fmtDur(b.min)}
@@ -652,58 +651,59 @@ export function Dashboard() {
                 </div>
               ))}
             </div>
-            <div className="mt-1 flex justify-between text-[9px] font-bold uppercase tracking-wider min-w-0" style={{ color: "var(--mut)" }}>
+            <div className="mt-1.5 flex justify-between text-[9.5px] font-bold uppercase tracking-wider min-w-0" style={{ color: "var(--mut)" }}>
               <span>last 7 days</span><span>today</span>
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-2 sm:col-span-2 lg:col-span-3 lg:grid-cols-3 w-full min-w-0">
-            <div className="card card-hover flex flex-col justify-between p-3 min-w-0 overflow-hidden">
+          <div className="grid grid-cols-3 gap-2.5 sm:col-span-2 lg:col-span-3 lg:grid-cols-3 w-full min-w-0">
+            <div className="card-secondary card-hover flex flex-col justify-between p-3.5 sm:p-4 min-w-0 overflow-hidden">
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-[0.1em] truncate" style={{ color: "var(--mut)" }}>Sessions</span>
-                <Timer size={12} className="shrink-0" style={{ color: "var(--mut)" }} />
+                <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] truncate" style={{ color: "var(--mut)" }}>Sessions</span>
+                <Timer size={13} className="shrink-0" style={{ color: "var(--mut)" }} />
               </div>
-              <div className="mt-1 min-w-0">
-                <div className="font-mono text-[22px] sm:text-[26px] font-bold leading-none tnum">{sessionsToday.length}</div>
-                <div className="mt-1 text-[10px] font-semibold truncate" style={{ color: "var(--mut)" }}>
+              <div className="mt-2 min-w-0">
+                <div className="font-mono text-[24px] sm:text-[28px] font-extrabold leading-none tnum">{sessionsToday.length}</div>
+                <div className="mt-1.5 text-[11px] font-semibold truncate" style={{ color: "var(--mut)" }}>
                   {sessionsToday.length === 0 ? "none yet" : <>last {lastSessionAt ? fmtClock(lastSessionAt) : "—"}</>}
                 </div>
               </div>
             </div>
 
-            <div className="card card-hover flex flex-col justify-between p-3 min-w-0 overflow-hidden">
+            <div className="card-secondary card-hover flex flex-col justify-between p-3.5 sm:p-4 min-w-0 overflow-hidden">
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-[0.1em] truncate" style={{ color: "var(--mut)" }}>Done</span>
-                <Check size={12} className="shrink-0" style={{ color: "var(--ok)" }} />
+                <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] truncate" style={{ color: "var(--mut)" }}>Done</span>
+                <Check size={13} className="shrink-0" style={{ color: "var(--ok)" }} />
               </div>
-              <div className="mt-1 min-w-0">
-                <div className="font-mono text-[22px] sm:text-[26px] font-bold leading-none tnum">
+              <div className="mt-2 min-w-0">
+                <div className="font-mono text-[24px] sm:text-[28px] font-extrabold leading-none tnum">
                   {doneToday.length}
-                  <span className="text-[12px] font-semibold" style={{ color: "var(--mut)" }}>/{doneToday.length + dueTasks.length}</span>
+                  <span className="text-[13px] font-semibold opacity-70" style={{ color: "var(--mut)" }}>/{doneToday.length + dueTasks.length}</span>
                 </div>
-                <div className="mt-1.5 h-[4px] overflow-hidden rounded-full w-full" style={{ background: "var(--bg)" }}>
+                <div className="mt-2 h-[5px] overflow-hidden rounded-full w-full" style={{ background: "color-mix(in srgb, var(--panel) 40%, var(--bg))" }}>
                   <div
                     className="h-full rounded-full transition-all duration-500"
                     style={{
                       width: `${doneToday.length + dueTasks.length > 0 ? (doneToday.length / (doneToday.length + dueTasks.length)) * 100 : 0}%`,
                       background: "var(--ok)",
+                      boxShadow: "0 0 8px var(--ok)",
                     }}
                   />
                 </div>
               </div>
             </div>
 
-            <div className="card card-hover flex flex-col justify-between p-3 min-w-0 overflow-hidden">
+            <div className="card-secondary card-hover flex flex-col justify-between p-3.5 sm:p-4 min-w-0 overflow-hidden">
               <div className="flex items-center justify-between gap-1">
-                <span className="text-[10px] font-bold uppercase tracking-[0.1em] truncate" style={{ color: "var(--mut)" }}>Streak</span>
-                <Flame size={12} className="shrink-0" style={{ color: bestHabit && bestHabit.cur > 0 ? "var(--warn)" : "var(--mut)" }} />
+                <span className="text-[10.5px] font-bold uppercase tracking-[0.12em] truncate" style={{ color: "var(--mut)" }}>Streak</span>
+                <Flame size={13} className="shrink-0" style={{ color: bestHabit && bestHabit.cur > 0 ? "var(--warn)" : "var(--mut)" }} />
               </div>
-              <div className="mt-1 min-w-0">
-                <div className="font-mono text-[22px] sm:text-[26px] font-bold leading-none tnum">
+              <div className="mt-2 min-w-0">
+                <div className="font-mono text-[24px] sm:text-[28px] font-extrabold leading-none tnum">
                   {bestHabit ? bestHabit.cur : 0}
-                  <span className="text-[12px] font-semibold" style={{ color: "var(--mut)" }}>d</span>
+                  <span className="text-[13px] font-semibold opacity-70" style={{ color: "var(--mut)" }}>d</span>
                 </div>
-                <div className="mt-1 text-[10px] font-semibold truncate" style={{ color: "var(--mut)" }}>
+                <div className="mt-1.5 text-[11px] font-semibold truncate" style={{ color: "var(--mut)" }}>
                   {bestHabit ? `${bestHabit.emoji} ${bestHabit.name}` : "no habits"}
                 </div>
               </div>

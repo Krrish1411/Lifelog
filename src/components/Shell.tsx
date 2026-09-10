@@ -280,10 +280,10 @@ export function Shell() {
   useEffect(() => {
     const s = state.settings;
     const dark = s.themeMode === "dark";
-    let bg = normalizeHex(dark ? s.bgDark : s.bgLight) ?? (dark ? "#000000" : "#f8fafc");
-    if (dark && (bg === "#0f1714" || !bg)) bg = "#000000";
+    let bg = normalizeHex(dark ? s.bgDark : s.bgLight) ?? (dark ? "#07090e" : "#f8fafc");
+    if (dark && (bg === "#0f1714" || bg === "#000000" || !bg)) bg = "#07090e";
     if (!dark && (!bg || bg === "#ffffff")) bg = "#f8fafc";
-    const isOled = dark && bg === "#000000";
+    const isOled = dark && s.bgDark === "#000000";
     const derived: Record<TokenKey, string> = {
       text: dark ? "#f3f4f6" : "#0f172a",
       mut: dark ? "" : "#64748b",
@@ -325,6 +325,7 @@ export function Shell() {
     document.body.style.fontFamily = fam;
     root.dataset.theme = dark ? "dark" : "light";
     root.dataset.engine = s.layout;
+    root.dataset.mobileEngine = s.mobileLayout ?? "classic";
     root.style.background = bg;
     root.style.color = derived.text;
     document.body.style.background = bg;
@@ -556,19 +557,28 @@ export function Shell() {
 
 
   /* Mobile Top App Bar (< md) */
+  const isLiquidMobile = (state.settings.mobileLayout ?? "classic") === "liquid";
   const mobileBar = (
     <header
-      className="fixed top-0 inset-x-0 z-40 flex flex-col border-b backdrop-blur-2xl select-none transition-colors md:hidden"
+      className="fixed top-0 inset-x-0 z-40 flex flex-col border-b select-none transition-colors md:hidden"
       style={{
-        background: state.settings.themeMode === "dark"
-          ? "color-mix(in srgb, var(--panel) 75%, transparent)"
-          : "color-mix(in srgb, var(--panel) 82%, transparent)",
-        borderColor: state.settings.themeMode === "dark"
-          ? "color-mix(in srgb, var(--text) 12%, transparent)"
-          : "color-mix(in srgb, var(--line) 85%, transparent)",
-        boxShadow: state.settings.themeMode === "dark"
-          ? "inset 0 -1px 0 color-mix(in srgb, var(--accent) 15%, transparent), 0 8px 24px -10px rgba(0,0,0,0.5)"
-          : "inset 0 -1px 0 rgba(255,255,255,0.7), 0 6px 20px -10px rgba(0,0,0,0.06)",
+        background: isLiquidMobile
+          ? (state.settings.themeMode === "dark"
+              ? "color-mix(in srgb, var(--panel) 75%, transparent)"
+              : "color-mix(in srgb, var(--panel) 82%, transparent)")
+          : "var(--panel)",
+        backdropFilter: isLiquidMobile ? "blur(28px) saturate(200%)" : "none",
+        WebkitBackdropFilter: isLiquidMobile ? "blur(28px) saturate(200%)" : "none",
+        borderColor: isLiquidMobile
+          ? (state.settings.themeMode === "dark"
+              ? "color-mix(in srgb, var(--text) 12%, transparent)"
+              : "color-mix(in srgb, var(--line) 85%, transparent)")
+          : "var(--line)",
+        boxShadow: isLiquidMobile
+          ? (state.settings.themeMode === "dark"
+              ? "inset 0 -1px 0 color-mix(in srgb, var(--accent) 15%, transparent), 0 8px 24px -10px rgba(0,0,0,0.5)"
+              : "inset 0 -1px 0 rgba(255,255,255,0.7), 0 6px 20px -10px rgba(0,0,0,0.06)")
+          : "0 1px 3px rgba(0,0,0,0.05)",
         paddingTop: "var(--safe-top)",
       }}
     >
@@ -2090,6 +2100,7 @@ function Overlays({
         onOpenNewTask={() => openTaskDialog()}
         onOpenMore={() => setMoreSheetOpen((o) => !o)}
         moreOpen={moreSheetOpen}
+        mobileLayout={state.settings.mobileLayout ?? "classic"}
       />
 
       <MobileMoreSheet

@@ -58,19 +58,19 @@ html {
 }
 html[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #000000;
-  --panel: #080808;
-  --panel2: #121212;
+  --bg: #07090e;
+  --panel: #0e121a;
+  --panel2: #141a24;
   --text: #f8fafc;
   --mut: #94a3b8;
-  --line: #1e1e1e;
+  --line: rgba(255, 255, 255, 0.10);
   --accent: #ef4444;
-  --accent-soft: rgba(239, 68, 68, 0.15);
+  --accent-soft: rgba(239, 68, 68, 0.18);
   --on-accent: #ffffff;
   --ok: #34d399;
   --warn: #fbbf24;
   --danger: #f87171;
-  --ring: rgba(239, 68, 68, 0.3);
+  --ring: rgba(239, 68, 68, 0.35);
 }
 
 body {
@@ -498,10 +498,10 @@ html[data-engine="zen"] .card {
 }
 
 /* ==========================================================================
-   ENHANCED LIQUID GLASS 2.0 ENGINE (VisionOS & macOS Liquid Glass Fidelity)
+   APPLE LIQUID GLASS SPECIFICATION (iOS 26 / macOS / visionOS Fidelity)
    ========================================================================== */
 
-/* ---------- Fluid Background Field with 4 Chromatic Blobs ---------- */
+/* ---------- 1. Spatial Background Lighting & Fluid Luminescence ---------- */
 .liquid-field {
   position: fixed;
   inset: 0;
@@ -509,138 +509,235 @@ html[data-engine="zen"] .card {
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(ellipse 65% 55% at 5% 5%, color-mix(in srgb, var(--accent) 9%, transparent) 0%, transparent 65%),
-    radial-gradient(ellipse 55% 45% at 95% 85%, rgba(56, 189, 248, 0.07) 0%, transparent 60%),
-    radial-gradient(ellipse 40% 40% at 50% 50%, rgba(192, 132, 252, 0.04) 0%, transparent 70%);
+    radial-gradient(ellipse 75% 60% at 50% 30%, color-mix(in srgb, var(--accent) 14%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 50% at 10% 15%, rgba(56, 189, 248, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 55% at 90% 80%, rgba(192, 132, 252, 0.1) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 50% at 50% 85%, rgba(245, 158, 11, 0.08) 0%, transparent 60%);
+}
+
+/* On mobile screens (< 768px), disable liquid mesh in Classic mode to conserve GPU & battery */
+@media (max-width: 767px) {
+  html[data-mobile-engine="classic"] .liquid-field {
+    display: none !important;
+  }
 }
 
 .liquid-field .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(80px);
+  filter: blur(85px);
   will-change: transform;
   pointer-events: none;
 }
 
-/* Dark Mode Liquid Blobs (Luminescent fluid refraction) */
+/* Dark Mode Liquid Blobs (Rich, vibrant fluid luminescence behind glass) */
 html[data-theme="dark"] .liquid-field .blob.b1 {
-  width: 52vw;
-  height: 52vw;
-  left: -12vw;
-  top: -14vw;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 32%, transparent) 0%, transparent 68%);
-  opacity: 0.58;
-  animation: liquid-a 28s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  width: 58vw;
+  height: 58vw;
+  left: -10vw;
+  top: -12vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 45%, transparent) 0%, transparent 68%);
+  opacity: 0.75;
+  animation: liquid-a 26s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
 html[data-theme="dark"] .liquid-field .blob.b2 {
-  width: 44vw;
-  height: 44vw;
-  right: -10vw;
-  top: 15vh;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.24) 0%, transparent 65%);
-  opacity: 0.52;
-  animation: liquid-b 34s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  width: 50vw;
+  height: 50vw;
+  right: -8vw;
+  top: 12vh;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 65%);
+  opacity: 0.68;
+  animation: liquid-b 32s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
 html[data-theme="dark"] .liquid-field .blob.b3 {
-  width: 38vw;
-  height: 38vw;
-  left: 20vw;
-  bottom: -14vw;
-  background: radial-gradient(circle, rgba(192, 132, 252, 0.22) 0%, transparent 65%);
-  opacity: 0.48;
-  animation: liquid-c 40s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  width: 44vw;
+  height: 44vw;
+  left: 18vw;
+  bottom: -10vw;
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.32) 0%, transparent 65%);
+  opacity: 0.62;
+  animation: liquid-c 38s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
 html[data-theme="dark"] .liquid-field .blob.b4 {
-  width: 34vw;
-  height: 34vw;
-  right: 15vw;
-  bottom: 8vh;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 20%, rgba(245, 158, 11, 0.2)) 0%, transparent 65%);
-  opacity: 0.42;
-  animation: liquid-d 44s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+  width: 40vw;
+  height: 40vw;
+  right: 18vw;
+  bottom: 12vh;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, rgba(245, 158, 11, 0.3)) 0%, transparent 65%);
+  opacity: 0.55;
+  animation: liquid-d 42s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
-/* Light Mode Liquid Blobs (Fresh, crystalline pastel prismatic glow) */
+/* Light Mode Liquid Blobs (Fresh crystalline prismatic refraction) */
 html:not([data-theme="dark"]) .liquid-field .blob.b1 {
-  width: 52vw;
-  height: 52vw;
-  left: -10vw;
-  top: -12vw;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 65%);
-  opacity: 0.42;
+  width: 55vw;
+  height: 55vw;
+  left: -8vw;
+  top: -10vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 65%);
+  opacity: 0.55;
   filter: blur(95px);
-  animation: liquid-a 30s ease-in-out infinite alternate;
+  animation: liquid-a 28s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b2 {
-  width: 42vw;
-  height: 42vw;
-  right: -8vw;
-  top: 20vh;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.14) 0%, transparent 65%);
-  opacity: 0.38;
+  width: 46vw;
+  height: 46vw;
+  right: -6vw;
+  top: 18vh;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, transparent 65%);
+  opacity: 0.48;
   filter: blur(95px);
-  animation: liquid-b 36s ease-in-out infinite alternate;
+  animation: liquid-b 34s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b3 {
-  width: 36vw;
-  height: 36vw;
-  left: 25vw;
-  bottom: -10vw;
-  background: radial-gradient(circle, rgba(232, 121, 249, 0.12) 0%, transparent 65%);
-  opacity: 0.32;
+  width: 40vw;
+  height: 40vw;
+  left: 22vw;
+  bottom: -8vw;
+  background: radial-gradient(circle, rgba(232, 121, 249, 0.18) 0%, transparent 65%);
+  opacity: 0.42;
   filter: blur(95px);
-  animation: liquid-c 42s ease-in-out infinite alternate;
+  animation: liquid-c 40s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b4 {
-  width: 32vw;
-  height: 32vw;
-  right: 18vw;
-  bottom: 10vh;
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.12) 0%, transparent 65%);
-  opacity: 0.32;
+  width: 36vw;
+  height: 36vw;
+  right: 20vw;
+  bottom: 8vh;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.18) 0%, transparent 65%);
+  opacity: 0.42;
   filter: blur(95px);
-  animation: liquid-d 46s ease-in-out infinite alternate;
+  animation: liquid-d 44s ease-in-out infinite alternate;
 }
 
 @keyframes liquid-a {
   from { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
-  to { transform: translate3d(12vw, 8vh, 0) scale(1.22) rotate(15deg); }
+  to { transform: translate3d(10vw, 7vh, 0) scale(1.18) rotate(12deg); }
 }
-
 @keyframes liquid-b {
-  from { transform: translate3d(0, 0, 0) scale(1.15) rotate(0deg); }
-  to { transform: translate3d(-10vw, 12vh, 0) scale(0.92) rotate(-20deg); }
+  from { transform: translate3d(0, 0, 0) scale(1.12) rotate(0deg); }
+  to { transform: translate3d(-8vw, 10vh, 0) scale(0.94) rotate(-16deg); }
 }
-
 @keyframes liquid-c {
-  from { transform: translate3d(0, 0, 0) scale(0.95) rotate(0deg); }
-  to { transform: translate3d(9vw, -10vh, 0) scale(1.18) rotate(25deg); }
+  from { transform: translate3d(0, 0, 0) scale(0.96) rotate(0deg); }
+  to { transform: translate3d(8vw, -8vh, 0) scale(1.14) rotate(20deg); }
 }
-
 @keyframes liquid-d {
-  from { transform: translate3d(0, 0, 0) scale(1.05) rotate(0deg); }
-  to { transform: translate3d(-11vw, -8vh, 0) scale(0.9) rotate(-15deg); }
+  from { transform: translate3d(0, 0, 0) scale(1.04) rotate(0deg); }
+  to { transform: translate3d(-9vw, -7vh, 0) scale(0.92) rotate(-12deg); }
 }
 
-/* ---------- Enhanced Liquid Glass Cards & Surfaces ---------- */
+/* ---------- 2. Multi-Tier Liquid Glass Material System ---------- */
+
+/* TIER 1: Glass Regular (Navigation sidebars, toolbars, main control bars) */
+.glass-regular {
+  position: relative;
+  backdrop-filter: blur(32px) saturate(210%) contrast(104%);
+  -webkit-backdrop-filter: blur(32px) saturate(210%) contrast(104%);
+  background: color-mix(in srgb, var(--panel) 72%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.85),
+    0 14px 34px -10px rgba(0, 0, 0, 0.08),
+    0 1px 3px 0 rgba(0, 0, 0, 0.03);
+}
+html[data-theme="dark"] .glass-regular {
+  background: color-mix(in srgb, var(--panel) 52%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 18%, transparent),
+    0 24px 55px -16px rgba(0, 0, 0, 0.75),
+    0 1px 3px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* TIER 2: Glass Elevated (Floating pill bars, modals, mini-timer, palette) */
+.glass-elevated {
+  position: relative;
+  backdrop-filter: blur(40px) saturate(230%) contrast(108%);
+  -webkit-backdrop-filter: blur(40px) saturate(230%) contrast(108%);
+  background: color-mix(in srgb, var(--panel) 80%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent) !important;
+  box-shadow:
+    inset 0 1.25px 0 0 rgba(255, 255, 255, 0.95),
+    0 24px 60px -16px rgba(0, 0, 0, 0.12),
+    0 2px 8px 0 rgba(0, 0, 0, 0.04);
+}
+html[data-theme="dark"] .glass-elevated {
+  background: color-mix(in srgb, var(--panel) 62%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--text) 16%, transparent) !important;
+  box-shadow:
+    inset 0 1.25px 0 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 26%, transparent),
+    0 32px 70px -18px rgba(0, 0, 0, 0.85),
+    0 2px 8px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* TIER 3: Glass Clear (Pill buttons, chips, filter tabs, secondary controls) */
+.glass-clear {
+  position: relative;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  background: color-mix(in srgb, var(--panel) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.glass-clear:hover {
+  background: color-mix(in srgb, var(--panel) 65%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  transform: translateY(-1px);
+}
+html[data-theme="dark"] .glass-clear {
+  background: color-mix(in srgb, var(--panel2) 42%, transparent);
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+}
+html[data-theme="dark"] .glass-clear:hover {
+  background: color-mix(in srgb, var(--panel2) 70%, transparent);
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--text));
+}
+
+/* TIER 4: Glass Prominent (Primary CTA buttons, active nav indicators, hero highlights) */
+.glass-prominent {
+  position: relative;
+  backdrop-filter: blur(32px) saturate(220%);
+  -webkit-backdrop-filter: blur(32px) saturate(220%);
+  background: color-mix(in srgb, var(--accent) 22%, color-mix(in srgb, var(--panel) 75%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.5),
+    0 12px 28px -8px color-mix(in srgb, var(--accent) 35%, transparent);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+html[data-theme="dark"] .glass-prominent {
+  background: color-mix(in srgb, var(--accent) 26%, color-mix(in srgb, var(--panel) 58%, transparent));
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--text));
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.32),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 38%, transparent),
+    0 18px 44px -12px color-mix(in srgb, var(--accent) 45%, rgba(0, 0, 0, 0.7));
+}
+
+/* ---------- 3. Card Hierarchy System ---------- */
+
+/* Default Engine Glass Cards */
 html[data-engine="glass"] .glass-card,
 html[data-engine="glass"] .card {
   position: relative;
-  backdrop-filter: blur(26px) saturate(180%) contrast(104%);
-  -webkit-backdrop-filter: blur(26px) saturate(180%) contrast(104%);
-  background: color-mix(in srgb, var(--panel) 75%, transparent) !important;
+  backdrop-filter: blur(30px) saturate(190%) contrast(104%);
+  -webkit-backdrop-filter: blur(30px) saturate(190%) contrast(104%);
+  background: color-mix(in srgb, var(--panel) 70%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
-  border-radius: 18px;
+  border-radius: 20px;
   box-shadow:
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.85),
-    0 8px 32px -12px rgba(0, 0, 0, 0.08),
-    0 1px 3px 0 rgba(0, 0, 0, 0.04);
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.9),
+    0 10px 36px -12px rgba(0, 0, 0, 0.08),
+    0 1px 3px 0 rgba(0, 0, 0, 0.03);
   overflow: hidden;
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
               box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
@@ -649,14 +746,61 @@ html[data-engine="glass"] .card {
 
 html[data-theme="dark"][data-engine="glass"] .glass-card,
 html[data-theme="dark"][data-engine="glass"] .card {
-  background: color-mix(in srgb, var(--panel) 60%, transparent) !important;
+  background: color-mix(in srgb, var(--panel) 52%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--text) 14%, transparent) !important;
   box-shadow:
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.16),
-    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 18%, transparent),
-    inset 0 -22px 42px -28px color-mix(in srgb, var(--accent) 24%, transparent),
-    0 20px 48px -22px rgba(0, 0, 0, 0.7),
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.18),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 20%, transparent),
+    inset 0 -24px 44px -28px color-mix(in srgb, var(--accent) 26%, transparent),
+    0 22px 52px -20px rgba(0, 0, 0, 0.75),
     0 1px 3px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Mobile Classic Engine: Clean native solid cards with no blur overhead */
+@media (max-width: 767px) {
+  html[data-mobile-engine="classic"] .card:not(.card-primary):not(.glass-card),
+  html[data-mobile-engine="classic"] .card-secondary {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    background: var(--panel) !important;
+    border: 1px solid var(--line) !important;
+    border-radius: 14px !important;
+    box-shadow: none !important;
+  }
+}
+
+/* Primary Hero Card: Stronger glass, larger radius, elevated depth */
+.card-primary {
+  border-radius: 24px !important;
+  backdrop-filter: blur(36px) saturate(210%) contrast(106%) !important;
+  -webkit-backdrop-filter: blur(36px) saturate(210%) contrast(106%) !important;
+  background: color-mix(in srgb, var(--panel) 65%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)) !important;
+  box-shadow:
+    inset 0 1.25px 0 0 rgba(255, 255, 255, 0.95),
+    0 18px 46px -16px color-mix(in srgb, var(--accent) 22%, rgba(0, 0, 0, 0.1)) !important;
+}
+html[data-theme="dark"] .card-primary {
+  background: color-mix(in srgb, var(--panel) 48%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--text)) !important;
+  box-shadow:
+    inset 0 1.25px 0 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 32%, transparent),
+    inset 0 -26px 48px -24px color-mix(in srgb, var(--accent) 35%, transparent),
+    0 28px 64px -18px rgba(0, 0, 0, 0.85) !important;
+}
+
+/* Secondary Content Card: Grounded readability, flatter surface */
+.card-secondary {
+  border-radius: 18px !important;
+  background: color-mix(in srgb, var(--panel) 82%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
+  box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.05) !important;
+}
+html[data-theme="dark"] .card-secondary {
+  background: color-mix(in srgb, var(--panel) 68%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent) !important;
+  box-shadow: 0 12px 32px -15px rgba(0, 0, 0, 0.6) !important;
 }
 
 /* Card Hover Elevation & Light Refraction */
@@ -665,18 +809,18 @@ html[data-engine="glass"] .card-hover:hover {
   border-color: color-mix(in srgb, var(--accent) 45%, var(--line)) !important;
   box-shadow:
     inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.95),
-    0 16px 40px -16px color-mix(in srgb, var(--accent) 18%, rgba(0, 0, 0, 0.15)),
+    0 18px 44px -15px color-mix(in srgb, var(--accent) 20%, rgba(0, 0, 0, 0.15)),
     0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent) !important;
 }
 
 html[data-theme="dark"][data-engine="glass"] .card-hover:hover {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--text)) !important;
   box-shadow:
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.24),
-    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 35%, transparent),
-    inset 0 -24px 44px -24px color-mix(in srgb, var(--accent) 32%, transparent),
-    0 24px 56px -20px rgba(0, 0, 0, 0.85),
-    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent) !important;
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.26),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 38%, transparent),
+    inset 0 -26px 48px -24px color-mix(in srgb, var(--accent) 36%, transparent),
+    0 28px 60px -18px rgba(0, 0, 0, 0.9),
+    0 0 0 1px color-mix(in srgb, var(--accent) 38%, transparent) !important;
 }
 
 /* Crystalline Light Sheen Reflection Sweep */
@@ -688,35 +832,32 @@ html[data-engine="glass"] .card::after {
   background: linear-gradient(
     115deg,
     transparent 28%,
-    color-mix(in srgb, var(--text) 5%, rgba(255, 255, 255, 0.12)) 46%,
+    color-mix(in srgb, var(--text) 6%, rgba(255, 255, 255, 0.14)) 46%,
     transparent 62%
   );
   transform: translateX(-130%);
   transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
   z-index: 1;
 }
-
 html[data-engine="glass"] .card:hover::after {
   transform: translateX(130%);
 }
 
 /* Glass Inputs & Textareas */
 html[data-engine="glass"] .inp {
-  background: color-mix(in srgb, var(--bg) 70%, transparent) !important;
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--bg) 65%, transparent) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
 }
-
 html[data-theme="dark"][data-engine="glass"] .inp {
-  background: color-mix(in srgb, var(--bg) 55%, transparent) !important;
+  background: color-mix(in srgb, var(--bg) 48%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
-
 html[data-engine="glass"] .inp:focus {
-  background: color-mix(in srgb, var(--panel) 85%, transparent) !important;
+  background: color-mix(in srgb, var(--panel) 82%, transparent) !important;
   border-color: var(--accent) !important;
   box-shadow:
     0 0 0 3px var(--ring),

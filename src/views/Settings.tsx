@@ -25,7 +25,7 @@ import {
   Upload,
   Volume2,
 } from "lucide-react";
-import type { LayoutMode, State, ThemeMode, TokenKey } from "../types";
+import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey } from "../types";
 import {
   DEFAULT_SETTINGS,
   FONT_PAIRS,
@@ -797,10 +797,89 @@ export function SettingsView() {
               )
             )}
 
+            {/* Mobile Interface Engine */}
+            {section(
+              "Mobile Interface Engine (Phones & Small Screens)",
+              "Choose your navigation and shell style on mobile devices. Classic Native is the default engine for maximum battery life and fluid ergonomics.",
+              (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {[
+                    {
+                      id: "classic",
+                      name: "Classic Native",
+                      tag: "Default · Ergonomic & Fast",
+                      desc: "Edge-to-edge grounded bottom dock with elevated action button and native header. High performance & battery-optimized.",
+                      icon: Smartphone,
+                    },
+                    {
+                      id: "liquid",
+                      name: "Liquid Glass",
+                      tag: "VisionOS · Floating Pill",
+                      desc: "Floating pill dock with frosted multi-tier glass materials, ambient liquid illumination, and spatial Apple-style depth.",
+                      icon: Sparkles,
+                    },
+                  ].map((eng) => {
+                    const active = (s.mobileLayout ?? "classic") === eng.id;
+                    const Icon = eng.icon;
+                    return (
+                      <button
+                        key={eng.id}
+                        type="button"
+                        onClick={() => {
+                          patch({ mobileLayout: eng.id as MobileLayoutMode });
+                          triggerHaptic("medium");
+                          toast(`Mobile engine switched to ${eng.name}`, "ok");
+                        }}
+                        className={cn(
+                          "flex flex-col items-start gap-2 rounded-2xl border p-4 text-left transition-all cursor-pointer relative",
+                          active
+                            ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)]"
+                            : "border-[var(--line)] bg-[var(--bg)] hover:bg-[var(--panel2)]"
+                        )}
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-2">
+                            <div
+                              className="flex h-8 w-8 items-center justify-center rounded-xl shrink-0"
+                              style={{
+                                background: active ? "var(--accent)" : "var(--panel2)",
+                                color: active ? "var(--on-accent)" : "var(--text)",
+                              }}
+                            >
+                              <Icon size={16} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-display text-[14px] font-bold tracking-tight truncate">
+                                {eng.name}
+                              </div>
+                              <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)] truncate">
+                                {eng.tag}
+                              </div>
+                            </div>
+                          </div>
+                          {active && (
+                            <span
+                              className="flex h-5 w-5 items-center justify-center rounded-full text-white shrink-0"
+                              style={{ background: "var(--accent)" }}
+                            >
+                              <Check size={12} strokeWidth={3} />
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[12px] leading-relaxed text-[var(--mut)]">
+                          {eng.desc}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )
+            )}
+
             {/* Desktop Interface Engine (hidden on phones) */}
             {section(
               "Desktop Interface Engine (Screens ≥ 768px)",
-              "Choose your preferred navigation shell on laptops & desktop displays. Mobile phones automatically use the ergonomic bottom dock.",
+              "Choose your preferred navigation shell on laptops & desktop displays.",
               (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {[

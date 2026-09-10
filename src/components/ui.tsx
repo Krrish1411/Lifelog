@@ -17,32 +17,54 @@ interface BtnProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 export function Btn({ variant = "soft", size = "md", className, style, ...rest }: BtnProps) {
   const base: React.CSSProperties = {
-    borderRadius: 10,
-    fontWeight: 700,
+    borderRadius: 12,
+    fontWeight: 650,
     display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     gap: 6,
     cursor: "pointer",
-    transition: "all .15s ease",
+    transition: "all .2s cubic-bezier(0.16, 1, 0.3, 1)",
     border: "1px solid transparent",
     whiteSpace: "nowrap",
     ...(size === "sm"
-      ? { padding: "4px 10px", fontSize: 12 }
+      ? { padding: "5px 12px", fontSize: 12 }
       : size === "lg"
-        ? { padding: "10px 18px", fontSize: 14 }
-        : { padding: "7px 13px", fontSize: 13 }),
+        ? { padding: "11px 20px", fontSize: 14 }
+        : { padding: "8px 15px", fontSize: 13 }),
   };
   const variants: Record<BtnVariant, React.CSSProperties> = {
-    primary: { background: "var(--accent)", color: "var(--on-accent)" },
-    soft: { background: "var(--panel2)", color: "var(--text)", borderColor: "var(--line)" },
+    primary: {
+      background: "linear-gradient(180deg, color-mix(in srgb, var(--accent) 92%, white 8%) 0%, var(--accent) 100%)",
+      color: "var(--on-accent)",
+      borderColor: "color-mix(in srgb, var(--accent) 80%, black 20%)",
+      boxShadow: "inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.35), 0 6px 18px -4px color-mix(in srgb, var(--accent) 45%, transparent)",
+    },
+    soft: {
+      background: "color-mix(in srgb, var(--panel2) 65%, transparent)",
+      backdropFilter: "blur(14px)",
+      WebkitBackdropFilter: "blur(14px)",
+      color: "var(--text)",
+      borderColor: "color-mix(in srgb, var(--line) 85%, transparent)",
+      boxShadow: "inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.08)",
+    },
     ghost: { background: "transparent", color: "var(--mut)" },
-    outline: { background: "transparent", color: "var(--text)", borderColor: "var(--line)" },
-    danger: { background: "transparent", color: "var(--danger)", borderColor: "color-mix(in srgb, var(--danger) 45%, transparent)" },
+    outline: {
+      background: "color-mix(in srgb, var(--panel) 40%, transparent)",
+      color: "var(--text)",
+      borderColor: "color-mix(in srgb, var(--line) 90%, transparent)",
+      backdropFilter: "blur(12px)",
+      WebkitBackdropFilter: "blur(12px)",
+    },
+    danger: {
+      background: "color-mix(in srgb, var(--danger) 12%, transparent)",
+      color: "var(--danger)",
+      borderColor: "color-mix(in srgb, var(--danger) 35%, transparent)",
+    },
   };
   return (
     <button
-      className={cn("select-none active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-45", className)}
+      className={cn("select-none active:scale-[0.96] hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-45", className)}
       style={{ ...base, ...variants[variant], ...style }}
       {...rest}
     />
@@ -81,26 +103,33 @@ export function Modal({
     <div
       role="dialog"
       aria-modal="true"
-      className="fadein fixed inset-0 flex items-start justify-center overflow-y-auto p-2 sm:p-4 overscroll-contain"
+      className="fadein fixed inset-0 flex items-start justify-center overflow-y-auto p-3 sm:p-5 overscroll-contain"
       style={{
-        background: "rgba(4,8,6,0.66)",
-        backdropFilter: "blur(3px)",
-        WebkitBackdropFilter: "blur(3px)",
+        background: "rgba(0, 0, 0, 0.62)",
+        backdropFilter: "blur(24px) saturate(160%)",
+        WebkitBackdropFilter: "blur(24px) saturate(160%)",
         zIndex,
-        paddingTop: "max(calc(var(--safe-top, 0px) + 8px), 2vh)",
-        paddingBottom: "max(calc(var(--safe-bottom, 0px) + 12px), 16px)",
+        paddingTop: "max(calc(var(--safe-top, 0px) + 12px), 3vh)",
+        paddingBottom: "max(calc(var(--safe-bottom, 0px) + 16px), 24px)",
       }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="pop w-full max-w-[calc(100vw-16px)] rounded-2xl border shadow-2xl flex flex-col max-h-[92vh] overflow-hidden"
-        style={{ maxWidth: `min(${typeof width === "number" ? `${width}px` : width}, calc(100vw - 16px))`, background: "var(--panel)", borderColor: "var(--line)" }}
+        className="pop w-full max-w-[calc(100vw-24px)] rounded-3xl border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        style={{
+          maxWidth: `min(${typeof width === "number" ? `${width}px` : width}, calc(100vw - 24px))`,
+          background: "color-mix(in srgb, var(--panel) 82%, transparent)",
+          borderColor: "color-mix(in srgb, var(--line) 85%, transparent)",
+          backdropFilter: "blur(36px) saturate(200%)",
+          WebkitBackdropFilter: "blur(36px) saturate(200%)",
+          boxShadow: "0 32px 80px -20px rgba(0,0,0,0.85), inset 0 1.25px 0.5px 0 rgba(255,255,255,0.22)",
+        }}
       >
         <div
-          className="flex items-center justify-between border-b px-4 py-3 sm:px-5 sm:py-3.5 shrink-0"
-          style={{ borderColor: "var(--line)" }}
+          className="flex items-center justify-between border-b px-5 py-4 shrink-0"
+          style={{ borderColor: "color-mix(in srgb, var(--line) 80%, transparent)" }}
         >
-          <div className="font-display text-[15px] font-bold tracking-tight">{title}</div>
+          <div className="font-display text-[16px] font-bold tracking-tight">{title}</div>
           <button
             onClick={onClose}
             className="rounded-lg p-1.5 transition-colors hover:opacity-75 cursor-pointer"

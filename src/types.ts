@@ -5,6 +5,7 @@
 
 export type Priority = "low" | "medium" | "high" | "urgent";
 export type LayoutMode = "planify" | "control" | "glass" | "zen" | "desk";
+export type MobileLayoutMode = "classic" | "liquid";
 export type ThemeMode = "dark" | "light";
 export type FontPair = "manrope" | "sora" | "outfit" | "plex" | "jakarta" | "nunito";
 export type TimerMode = "pomodoro" | "countdown" | "flow";
@@ -155,6 +156,7 @@ export type TokenKey = "text" | "mut" | "panel" | "panel2" | "line" | "ok" | "wa
 
 export interface Settings {
   layout: LayoutMode;
+  mobileLayout?: MobileLayoutMode;
   themeMode: ThemeMode;
   designerTheme?: string;
   accent: string;
@@ -248,6 +250,7 @@ export const REPORT_WIDGETS: { key: string; label: string; desc: string }[] = [
 
 export const DEFAULT_SETTINGS: Settings = {
   layout: "glass",
+  mobileLayout: "classic",
   themeMode: "light",
   accent: "#dc2626",
   bgDark: "#000000",
