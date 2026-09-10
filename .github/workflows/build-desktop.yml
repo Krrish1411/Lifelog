@@ -68,8 +68,8 @@ jobs:
           # Allow native Wayland with automatic X11 fallback
           sed -i 's/export GDK_BACKEND=x11/export GDK_BACKEND="${GDK_BACKEND:-wayland,x11}"/g' squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh 2>/dev/null || true
 
-          # Enforce hardware rendering safety fallback (prevents black screen on DMABUF)
-          sed -i '2i export WEBKIT_DISABLE_DMABUF_RENDERER=1' squashfs-root/AppRun
+          # Enable GNOME window controls (minimize, maximize, close)
+          sed -i '2i gsettings set org.gnome.desktop.wm.preferences button-layout "appmenu:minimize,maximize,close" 2>/dev/null || true' squashfs-root/AppRun
 
           # Configure GTK window controls (minimize, maximize, close) for Linux environments
           mkdir -p squashfs-root/etc/xdg/gtk-3.0
@@ -88,7 +88,9 @@ jobs:
           cat << 'EOF' > "$GITHUB_WORKSPACE/lifelog-linux-portable/run.sh"
           #!/bin/sh
           DIR="$(cd "$(dirname "$0")" && pwd)"
-          export WEBKIT_DISABLE_DMABUF_RENDERER=1
+          gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close' 2>/dev/null || true
+          # Enable hardware acceleration by default, allow user override if needed
+          export WEBKIT_DISABLE_DMABUF_RENDERER="${WEBKIT_DISABLE_DMABUF_RENDERER:-0}"
           exec "$DIR/AppRun" "$@"
           EOF
 
@@ -102,6 +104,7 @@ jobs:
           ICONS_DIR="$HOME/.local/share/icons/hicolor/512x512/apps"
 
           echo "Installing LifeLog to $DEST..."
+          gsettings set org.gnome.desktop.wm.preferences button-layout 'appmenu:minimize,maximize,close' 2>/dev/null || true
           mkdir -p "$DEST" "$BIN_DIR" "$APPS_DIR" "$ICONS_DIR"
           cp -r "$DIR"/* "$DEST/"
           chmod +x "$DEST/AppRun" "$DEST/run.sh"

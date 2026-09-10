@@ -1,9 +1,9 @@
 @import "tailwindcss";
 
 @theme {
-  --font-display: "Plus Jakarta Sans", "Space Grotesk", "Manrope", sans-serif;
-  --font-body: "Plus Jakarta Sans", "Manrope", "Segoe UI", sans-serif;
-  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+  --font-display: "Plus Jakarta Sans", "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Ubuntu", "Cantarell", sans-serif;
+  --font-body: "Plus Jakarta Sans", "Manrope", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Ubuntu", "Cantarell", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
   --color-on-accent: var(--on-accent);
@@ -23,6 +23,15 @@
 *::after {
   font-feature-settings: "locl" 0;
   font-variant-ligatures: normal;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+body, input, textarea, select, button {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* ---------- Theme variables (set by JS, contrast-checked) ---------- */
@@ -106,38 +115,20 @@ body {
   color: var(--on-accent);
 }
 
-/* ---------- Ambient layered background ---------- */
+/* ---------- Ambient layered background (Ultra-lightweight GPU-friendly) ---------- */
 .ambient {
   position: fixed;
   inset: 0;
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  background:
+    radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--accent) 6%, transparent) 0%, transparent 60%),
+    radial-gradient(circle at 90% 90%, rgba(79, 163, 165, 0.04) 0%, transparent 60%);
 }
 .ambient::before,
 .ambient::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(90px);
-  opacity: 0.16;
-  will-change: transform;
-}
-.ambient::before {
-  width: 55vw;
-  height: 55vw;
-  left: -12vw;
-  top: -18vw;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 65%);
-  animation: drift-a 46s ease-in-out infinite alternate;
-}
-.ambient::after {
-  width: 48vw;
-  height: 48vw;
-  right: -14vw;
-  bottom: -16vw;
-  background: radial-gradient(circle, #4fa3a5 0%, transparent 65%);
-  animation: drift-b 58s ease-in-out infinite alternate;
+  display: none;
 }
 .ambient .grid-lines {
   position: absolute;
@@ -146,15 +137,7 @@ body {
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 0%, transparent 78%);
-  opacity: 0.22;
-}
-@keyframes drift-a {
-  from { transform: translate3d(0, 0, 0) scale(1); }
-  to { transform: translate3d(9vw, 7vh, 0) scale(1.18); }
-}
-@keyframes drift-b {
-  from { transform: translate3d(0, 0, 0) scale(1.1); }
-  to { transform: translate3d(-8vw, -6vh, 0) scale(0.94); }
+  opacity: 0.18;
 }
 
 /* ---------- Reusable surfaces ---------- */
@@ -487,40 +470,21 @@ html[data-engine="zen"] .card {
   background: var(--accent-soft);
 }
 
-/* ---------- Liquid glass engine ---------- */
+/* ---------- Liquid glass engine (Hardware accelerated, 60+ FPS) ---------- */
 html[data-engine="glass"] .glass-card,
 html[data-engine="glass"] .card {
   position: relative;
-  backdrop-filter: blur(22px) saturate(1.45);
-  -webkit-backdrop-filter: blur(22px) saturate(1.45);
-  background: color-mix(in srgb, var(--panel) 82%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
+  background: var(--panel) !important;
+  border: 1px solid var(--line) !important;
   border-radius: 18px;
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.7),
-    0 4px 20px -8px rgba(0, 0, 0, 0.06);
+  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
   overflow: hidden;
 }
 html[data-theme="dark"][data-engine="glass"] .glass-card,
 html[data-theme="dark"][data-engine="glass"] .card {
-  background: color-mix(in srgb, var(--panel) 62%, transparent) !important;
+  background: color-mix(in srgb, var(--panel) 92%, transparent) !important;
   border: 1px solid color-mix(in srgb, var(--text) 13%, transparent) !important;
-  box-shadow:
-    inset 0 1px 0 color-mix(in srgb, var(--text) 12%, transparent),
-    inset 0 -18px 34px -26px color-mix(in srgb, var(--accent) 22%, transparent),
-    0 18px 44px -24px rgba(0, 0, 0, 0.55);
-}
-html[data-engine="glass"] .card::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  background: linear-gradient(115deg, transparent 30%, color-mix(in srgb, var(--text) 7%, transparent) 46%, transparent 60%);
-  transform: translateX(-120%);
-  transition: transform 0.9s ease;
-}
-html[data-engine="glass"] .card:hover::after {
-  transform: translateX(120%);
+  box-shadow: 0 8px 30px -18px rgba(0, 0, 0, 0.5);
 }
 .liquid-field {
   position: fixed;
@@ -528,36 +492,13 @@ html[data-engine="glass"] .card:hover::after {
   z-index: 0;
   pointer-events: none;
   overflow: hidden;
+  background:
+    radial-gradient(ellipse 60% 50% at 10% 0%, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 40% at 90% 85%, rgba(79, 163, 165, 0.04) 0%, transparent 70%);
 }
 .liquid-field .blob {
-  position: absolute;
-  border-radius: 50%;
-  filter: blur(70px);
-  opacity: 0.28;
-  will-change: transform;
+  display: none;
 }
-html:not([data-theme="dark"]) .liquid-field .blob {
-  opacity: 0.08;
-  filter: blur(100px);
-}
-.liquid-field .blob.b1 {
-  width: 46vw; height: 46vw; left: -10vw; top: -14vw;
-  background: radial-gradient(circle, var(--accent) 0%, transparent 62%);
-  animation: liquid-a 26s ease-in-out infinite alternate;
-}
-.liquid-field .blob.b2 {
-  width: 40vw; height: 40vw; right: -12vw; top: 18vh;
-  background: radial-gradient(circle, #4fa3a5 0%, transparent 62%);
-  animation: liquid-b 32s ease-in-out infinite alternate;
-}
-.liquid-field .blob.b3 {
-  width: 36vw; height: 36vw; left: 24vw; bottom: -16vw;
-  background: radial-gradient(circle, #c079b8 0%, transparent 62%);
-  animation: liquid-c 38s ease-in-out infinite alternate;
-}
-@keyframes liquid-a { from { transform: translate3d(0,0,0) scale(1); } to { transform: translate3d(14vw,10vh,0) scale(1.25); } }
-@keyframes liquid-b { from { transform: translate3d(0,0,0) scale(1.15); } to { transform: translate3d(-12vw,14vh,0) scale(0.9); } }
-@keyframes liquid-c { from { transform: translate3d(0,0,0) scale(0.95); } to { transform: translate3d(10vw,-12vh,0) scale(1.2); } }
 
 /* ---------- Focus stage (full-screen session) ---------- */
 .stage-num {

@@ -69,7 +69,6 @@ import {
   sendDesktopNotification,
   initDesktopQuickAdd,
 } from "../utils/native";
-import { WindowControls } from "./WindowControls";
 import { Dashboard } from "../views/Dashboard";
 import { TasksView } from "../views/Tasks";
 import { FocusView } from "../views/Focus";
@@ -543,18 +542,7 @@ export function Shell() {
     );
   };
 
-  /* Desktop Window Controls (Minimize, Maximize, Close for Tauri) */
-  const desktopControls = isTauri ? (
-    <div
-      className="fixed top-3 right-4 z-50 hidden md:flex items-center rounded-xl border p-0.5 backdrop-blur-xl shadow-xs select-none transition-all"
-      style={{
-        background: "color-mix(in srgb, var(--panel) 88%, transparent)",
-        borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
-      }}
-    >
-      <WindowControls />
-    </div>
-  ) : null;
+
 
   /* Mobile Top App Bar (< md) */
   const mobileBar = (
@@ -693,7 +681,6 @@ export function Shell() {
   if (layout === "planify") {
     return (
       <div className="relative min-h-screen">
-        {desktopControls}
         {mobileBar}
         {mobileDrawer}
         <aside
@@ -833,8 +820,6 @@ export function Shell() {
             <Btn variant="primary" size="sm" onClick={() => openTaskDialog()}>
               <Plus size={13} /> Task
             </Btn>
-
-            <WindowControls />
           </div>
         </header>
 
@@ -865,7 +850,6 @@ export function Shell() {
   if (layout === "desk") {
     return (
       <div className="relative min-h-screen">
-        {desktopControls}
         {mobileBar}
         {mobileDrawer}
         <aside
@@ -960,7 +944,6 @@ export function Shell() {
   if (layout === "zen") {
     return (
       <div className="relative flex min-h-screen flex-col md:flex-row">
-        {desktopControls}
         {mobileBar}
         {mobileDrawer}
         <div className="ambient" style={{ opacity: 0.5 }}>
@@ -1071,7 +1054,6 @@ export function Shell() {
   /* ============================ 5. LIQUID GLASS ENGINE (Default) ============================ */
   return (
     <div className="relative min-h-screen">
-      {desktopControls}
       {mobileBar}
       {mobileDrawer}
       <div className="liquid-field">
@@ -1081,17 +1063,13 @@ export function Shell() {
       </div>
 
       <aside
-        className="fixed inset-y-4 left-4 z-40 hidden w-[256px] flex-col rounded-3xl border p-4 backdrop-blur-2xl md:flex select-none"
+        className="fixed inset-y-4 left-4 z-40 hidden w-[256px] flex-col rounded-3xl border p-4 md:flex select-none"
         style={{
-          background: state.settings.themeMode === "dark"
-            ? "color-mix(in srgb, var(--panel) 62%, transparent)"
-            : "color-mix(in srgb, var(--panel) 82%, transparent)",
-          borderColor: state.settings.themeMode === "dark"
-            ? "color-mix(in srgb, var(--text) 13%, transparent)"
-            : "var(--line)",
+          background: "var(--panel)",
+          borderColor: "var(--line)",
           boxShadow: state.settings.themeMode === "dark"
-            ? "inset 0 1px 0 color-mix(in srgb, var(--text) 14%, transparent), 0 24px 60px -30px rgba(0,0,0,0.6)"
-            : "inset 0 1px 0 rgba(255,255,255,0.8), 0 16px 40px -20px rgba(0,0,0,0.08)",
+            ? "0 24px 60px -30px rgba(0,0,0,0.6)"
+            : "0 8px 30px -10px rgba(0,0,0,0.06)",
         }}
       >
         <Logo />
