@@ -22,6 +22,21 @@
         "decorations": true,
         "transparent": false,
         "resizable": true
+      },
+      {
+        "title": "LifeLog Timer",
+        "label": "timer-popout",
+        "url": "index.html#timer-popout",
+        "width": 360,
+        "height": 480,
+        "minWidth": 300,
+        "minHeight": 380,
+        "center": true,
+        "decorations": true,
+        "transparent": false,
+        "resizable": true,
+        "alwaysOnTop": true,
+        "visible": false
       }
     ],
     "security": {

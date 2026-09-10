@@ -537,8 +537,7 @@ export function TasksView({
     <div className="flex w-full max-w-full items-start gap-4">
       {/* Desktop Docked Sidebar (hidden on mobile, visible on lg+) */}
       <aside
-        className="hidden lg:flex w-[230px] shrink-0 flex-col gap-3 sticky top-4 self-start rounded-2xl border bg-[var(--panel)] p-3 select-none"
-        style={{ borderColor: "var(--line)" }}
+        className="hidden lg:flex w-[230px] shrink-0 flex-col gap-3 sticky top-4 self-start rounded-2xl glass-regular p-3 select-none"
       >
         {/* Smart Views */}
         <div className="flex flex-col gap-0.5">

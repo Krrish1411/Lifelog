@@ -1015,7 +1015,7 @@ export function NotesView() {
 
           {/* Drawer content */}
           <aside
-            className="relative z-10 flex h-full w-[310px] max-w-[86vw] flex-col border-r bg-[var(--panel)] shadow-2xl transition-transform animate-in slide-in-from-left duration-250 select-none overscroll-contain"
+            className="relative z-10 flex h-full w-[310px] max-w-[86vw] flex-col glass-regular border-r shadow-2xl transition-transform animate-in slide-in-from-left duration-250 select-none overscroll-contain"
             style={{
               borderColor: "var(--line)",
               paddingTop: "max(calc(var(--safe-top) + 8px), 16px)",
@@ -1056,8 +1056,7 @@ export function NotesView() {
       <div className="flex min-h-0 flex-1 w-full min-w-0 gap-3">
         {/* Desktop Docked Sidebar (>= md) */}
         <aside
-          className="hidden md:flex md:w-[270px] lg:w-[310px] shrink-0 flex-col rounded-2xl border bg-[var(--panel)] shadow-sm select-none overflow-hidden"
-          style={{ borderColor: "var(--line)" }}
+          className="hidden md:flex md:w-[270px] lg:w-[310px] shrink-0 flex-col rounded-2xl glass-regular select-none overflow-hidden"
         >
           {/* Search Input */}
           <div className="p-3 border-b border-[var(--line)] shrink-0">

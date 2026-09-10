@@ -96,6 +96,59 @@ export async function closeDesktopWindow(): Promise<void> {
 }
 
 /**
+ * Opens the compact floating always-on-top Timer Popout window.
+ * In desktop (Tauri):
+ *   Uses native WebviewWindow IPC to summon or instantiate the dedicated popout window.
+ * In web / browser:
+ *   Opens a centered popup window with window.open.
+ */
+export async function openTimerPopout(): Promise<void> {
+  if (isTauri) {
+    try {
+      await invoke("open_timer_popout");
+      return;
+    } catch {
+      try {
+        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
+        const existing = await WebviewWindow.getByLabel("timer-popout");
+        if (existing) {
+          await existing.show();
+          await existing.unminimize();
+          await existing.setFocus();
+          return;
+        }
+        const win = new WebviewWindow("timer-popout", {
+          url: "index.html#timer-popout",
+          title: "LifeLog Timer",
+          width: 360,
+          height: 480,
+          minWidth: 300,
+          minHeight: 380,
+          resizable: true,
+          alwaysOnTop: true,
+        });
+        return;
+      } catch (err) {
+        console.warn("Tauri openTimerPopout error, falling back to window.open", err);
+      }
+    }
+  }
+
+  // Web & mobile fallback
+  if (typeof window !== "undefined") {
+    const w = 360;
+    const h = 480;
+    const left = Math.max(0, Math.round((window.screen.width - w) / 2));
+    const top = Math.max(0, Math.round((window.screen.height - h) / 2));
+    window.open(
+      `${window.location.origin}${window.location.pathname}#timer-popout`,
+      "LifeLogTimerPopout",
+      `width=${w},height=${h},top=${top},left=${left},resizable=yes,scrollbars=no,status=no`
+    );
+  }
+}
+
+/**
  * Tactile physical haptics for Android and mobile.
  * Falls back seamlessly to navigator.vibrate on mobile browsers.
  */

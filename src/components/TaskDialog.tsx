@@ -13,6 +13,7 @@ import {
   Clock,
   Layers,
   FileText,
+  Search,
 } from "lucide-react";
 import type { Priority, Recurrence, Subtask, Task, TaskTimeBlock } from "../types";
 import { useApp } from "../store";
@@ -65,6 +66,8 @@ export function TaskDialog() {
   const [newSub, setNewSub] = useState("");
   const [timeBlocks, setTimeBlocks] = useState<TaskTimeBlock[]>([]);
   const [linkedNoteIds, setLinkedNoteIds] = useState<string[]>([]);
+  const [noteSearch, setNoteSearch] = useState("");
+  const [showNoteSearch, setShowNoteSearch] = useState(false);
   const [snooze, setSnooze] = useState("");
   const [newProject, setNewProject] = useState(false);
   const [npName, setNpName] = useState("");
@@ -133,6 +136,14 @@ export function TaskDialog() {
     if (parsed.matchedKeywords.length > 0) return parsed;
     return null;
   }, [title, editing]);
+
+  const filteredNotes = useMemo(() => {
+    if (!noteSearch.trim()) return state.notes;
+    const q = noteSearch.toLowerCase();
+    return state.notes.filter(
+      (n) => n.title && n.title.toLowerCase().includes(q)
+    );
+  }, [state.notes, noteSearch]);
 
   const applyNlp = () => {
     if (!nlpPreview) return;
@@ -537,14 +548,91 @@ export function TaskDialog() {
         </div>
 
         {/* Bi-directional Linked Notes */}
-        <div className="rounded-xl border p-3.5 space-y-2" style={{ borderColor: "var(--line)" }}>
+        <div className="rounded-xl border p-3.5 space-y-2.5" style={{ borderColor: "var(--line)" }}>
           <div className="flex items-center justify-between">
-            <span className="flex items-center gap-1.5 text-xs font-bold text-[var(--color-text)]">
+            <span className="flex items-center gap-1.5 text-xs font-bold" style={{ color: "var(--text)" }}>
               <FileText size={13} className="text-amber-500" /> Linked Notes ({linkedNoteIds.length})
             </span>
+            {state.notes.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setShowNoteSearch((prev) => !prev);
+                  if (showNoteSearch) setNoteSearch("");
+                }}
+                className={cn(
+                  "flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-all cursor-pointer",
+                  showNoteSearch || noteSearch
+                    ? "bg-[var(--accent)] text-[var(--on-accent)]"
+                    : "text-[var(--mut)] hover:bg-[var(--panel2)] hover:text-[var(--text)]"
+                )}
+                title="Search notes to link"
+              >
+                <Search size={12} />
+                <span>{showNoteSearch ? "Hide search" : "Search notes"}</span>
+              </button>
+            )}
           </div>
-          <div className="flex flex-wrap gap-1.5 max-h-28 overflow-y-auto">
-            {state.notes.map((n) => {
+
+          {/* Search Input Bar */}
+          {(showNoteSearch || noteSearch) && (
+            <div className="relative flex items-center">
+              <Search size={13} className="absolute left-2.5 text-[var(--mut)] pointer-events-none" />
+              <input
+                type="text"
+                value={noteSearch}
+                onChange={(e) => setNoteSearch(e.target.value)}
+                placeholder="Search notes by title or content…"
+                className="inp !pl-8 !pr-8 !py-1.5 text-xs"
+                autoFocus
+              />
+              {noteSearch && (
+                <button
+                  type="button"
+                  onClick={() => setNoteSearch("")}
+                  className="absolute right-2 text-[var(--mut)] hover:text-[var(--text)] p-0.5 cursor-pointer"
+                  title="Clear search"
+                >
+                  <X size={13} />
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Pinned Selected Notes */}
+          {linkedNoteIds.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 pt-0.5">
+              {linkedNoteIds.map((id) => {
+                const n = state.notes.find((x) => x.id === id);
+                return (
+                  <span
+                    key={id}
+                    className="chip !py-0.5 !px-2 text-[11px] font-semibold flex items-center gap-1.5"
+                    style={{
+                      background: "color-mix(in srgb, var(--accent) 18%, var(--panel2))",
+                      borderColor: "color-mix(in srgb, var(--accent) 55%, var(--line))",
+                      color: "var(--text)",
+                    }}
+                  >
+                    <FileText size={10} style={{ color: "var(--accent)" }} />
+                    <span className="truncate max-w-[160px]">{n ? n.title || "Untitled note" : "Unknown note"}</span>
+                    <button
+                      type="button"
+                      onClick={() => setLinkedNoteIds((prev) => prev.filter((x) => x !== id))}
+                      className="hover:opacity-75 cursor-pointer ml-0.5"
+                      title="Unlink note"
+                    >
+                      <X size={11} />
+                    </button>
+                  </span>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Available Notes Chips */}
+          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+            {filteredNotes.map((n) => {
               const selected = linkedNoteIds.includes(n.id);
               return (
                 <button
@@ -555,16 +643,25 @@ export function TaskDialog() {
                       selected ? prev.filter((id) => id !== n.id) : [...prev, n.id]
                     );
                   }}
-                  className={`chip text-xs transition-all cursor-pointer ${
-                    selected ? "bg-amber-500 text-black border-amber-500" : ""
-                  }`}
+                  className={cn(
+                    "chip text-[11.5px] transition-all cursor-pointer select-none",
+                    selected
+                      ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] font-bold shadow-xs"
+                      : "hover:border-[var(--accent)] text-[var(--text)] hover:bg-[var(--panel2)]"
+                  )}
                 >
-                  {n.title || "Untitled note"} {selected ? "✓" : "+"}
+                  <span className="truncate max-w-[180px]">{n.title || "Untitled note"}</span>
+                  <span className="ml-1 opacity-80">{selected ? "✓" : "+"}</span>
                 </button>
               );
             })}
+            {state.notes.length > 0 && filteredNotes.length === 0 && (
+              <span className="text-xs text-[var(--mut)] py-1">
+                No notes match "{noteSearch}".
+              </span>
+            )}
             {state.notes.length === 0 && (
-              <span className="text-xs text-[var(--color-mut)]">No notes created yet.</span>
+              <span className="text-xs text-[var(--mut)]">No notes created yet.</span>
             )}
           </div>
         </div>

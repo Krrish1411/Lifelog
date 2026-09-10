@@ -35,6 +35,16 @@ fn show_window(app: tauri::AppHandle) -> Result<(), String> {
     Ok(())
 }
 
+#[tauri::command]
+fn open_timer_popout(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window("timer-popout") {
+        let _ = window.show();
+        let _ = window.unminimize();
+        let _ = window.set_focus();
+    }
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -56,7 +66,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             update_tray_status,
             hide_to_tray,
-            show_window
+            show_window,
+            open_timer_popout
         ])
         .setup(|app| {
             // Setup System Tray
@@ -137,9 +148,11 @@ pub fn run() {
         })
         .on_window_event(|window, event| {
             if let WindowEvent::CloseRequested { api, .. } = event {
-                // Intercept window close button: hide to tray instead of quitting!
-                api.prevent_close();
-                let _ = window.hide();
+                // Intercept close button: hide instead of killing the app
+                if window.label() == "main" || window.label() == "timer-popout" {
+                    api.prevent_close();
+                    let _ = window.hide();
+                }
             }
         })
         .run(tauri::generate_context!())

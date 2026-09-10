@@ -29,6 +29,7 @@ import {
   playChimeSound,
   scheduleTimerEndNotification,
   triggerHaptic,
+  openTimerPopout,
 } from "../utils/native";
 
 function elapsedMsOf(s: Session, now: number): number {
@@ -187,15 +188,7 @@ export function FocusView() {
   }, [now, live?.id, paused]);
 
   const popOutDesktopTimer = () => {
-    const w = 360;
-    const h = 420;
-    const left = Math.max(0, (window.screen.width - w) / 2);
-    const top = Math.max(0, (window.screen.height - h) / 2);
-    window.open(
-      `${window.location.origin}${window.location.pathname}#timer-popout`,
-      "LifeLogTimerPopout",
-      `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
-    );
+    openTimerPopout();
   };
 
   const start = (m: TimerMode | "break") => {

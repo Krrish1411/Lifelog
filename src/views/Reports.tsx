@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Flame, Lightbulb, Settings2, Target } from "lucide-react";
+import { Flame, Lightbulb, Settings2, Target, Clock } from "lucide-react";
 import { useApp } from "../store";
 import {
   MONTHS, WEEKDAYS_SHORT, addDaysIso, fmtDayShort, fmtDur, isoDate, listDates, parseIso,
@@ -424,21 +424,13 @@ export function ReportsView() {
           </div>
         ), true)}
 
-        {/* Rhythm Pair: Time of day (1-col) + Weekdays (1-col) */}
-        {w.timeOfDay && widgetCard("Time-of-day rhythm", "minutes per hour", (
-          <div>
-            <div className="flex h-[84px] items-end gap-[3px]">
-              {hourBuckets.map((v, h) => (
-                <div key={h} className="group relative flex-1 rounded-t-[4px] transition-all hover:opacity-80"
-                  style={{ height: `${Math.max(3, (v / maxHour) * 100)}%`, background: v > 0 ? (h === peakHour ? "var(--accent)" : "color-mix(in srgb, var(--accent) 45%, var(--panel2))") : "var(--panel2)" }}
-                  title={`${String(h).padStart(2, "0")}:00 — ${fmtDur(v)}`} />
-              ))}
-            </div>
-            <div className="mt-1 flex justify-between text-[9.5px] font-bold" style={{ color: "var(--mut)" }}>
-              <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
-            </div>
-          </div>
-        ))}
+        {/* Time of day rhythm (full 2-col span for 24-hour fidelity) */}
+        {w.timeOfDay && widgetCard(
+          "Time-of-day rhythm",
+          "minutes per hour",
+          <TimeOfDayChart hourBuckets={hourBuckets} peakHour={peakHour} maxHour={maxHour} />,
+          true
+        )}
 
         {w.weekdays && widgetCard("Weekday rhythm", "minutes per weekday", (
           <div className="flex flex-col">
@@ -632,3 +624,160 @@ function DeltaChip({ label, value, prev, fmt }: { label: string; value: number; 
     </span>
   );
 }
+
+function TimeOfDayChart({
+  hourBuckets,
+  peakHour,
+  maxHour,
+}: {
+  hourBuckets: number[];
+  peakHour: number;
+  maxHour: number;
+}) {
+  const [hoveredH, setHoveredH] = useState<number | null>(null);
+  const hasData = hourBuckets.some((v) => v > 0);
+  const activeHours = hourBuckets.filter((v) => v > 0).length;
+
+  const fmtH12 = (h: number) => {
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 === 0 ? 12 : h % 12;
+    return `${h12} ${ampm}`;
+  };
+
+  const fmtHRange = (h: number) => {
+    const start = `${String(h).padStart(2, "0")}:00`;
+    const end = `${String((h + 1) % 24).padStart(2, "0")}:00`;
+    return `${start} – ${end} (${fmtH12(h)})`;
+  };
+
+  if (!hasData) {
+    return (
+      <div className="flex flex-col items-center justify-center py-8 text-center">
+        <Clock size={28} className="text-[var(--mut)] mb-2 opacity-50" />
+        <div className="text-[13px] font-bold" style={{ color: "var(--text)" }}>
+          No focus activity in this time range
+        </div>
+        <div className="text-[11.5px] font-medium mt-0.5 max-w-sm" style={{ color: "var(--mut)" }}>
+          Sessions you track will appear across the 24-hour day to highlight your natural energy peaks and rhythm.
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2.5 w-full select-none">
+      {/* Dynamic Header Badge Row */}
+      <div className="flex flex-wrap items-center justify-between gap-2 text-xs">
+        <div className="flex items-center gap-2">
+          {hoveredH !== null ? (
+            <span className="chip !py-0.5 !px-2 text-[11px] font-bold" style={{ color: "var(--accent)" }}>
+              {fmtHRange(hoveredH)}: <b>{fmtDur(hourBuckets[hoveredH])}</b>
+            </span>
+          ) : (
+            <span className="chip !py-0.5 !px-2 text-[11px] font-bold" style={{ color: "var(--accent)" }}>
+              Peak focus: <b>{fmtH12(peakHour)}</b> ({fmtDur(hourBuckets[peakHour])})
+            </span>
+          )}
+          <span className="text-[11px] font-semibold text-[var(--mut)]">
+            {activeHours} of 24 hours active
+          </span>
+        </div>
+        <div className="text-[10.5px] font-semibold text-[var(--mut)]">
+          Hover or tap a bar to inspect
+        </div>
+      </div>
+
+      {/* 24-Hour Bar Stage */}
+      <div className="relative flex h-[100px] w-full items-end gap-[2px] sm:gap-1.5 border-b border-[var(--line)] pb-1 pt-4">
+        {hourBuckets.map((v, h) => {
+          const isPeak = h === peakHour && v > 0;
+          const isHovered = hoveredH === h;
+          const heightPct = v > 0 ? Math.max(8, Math.round((v / maxHour) * 100)) : 3;
+
+          return (
+            <div
+              key={h}
+              onMouseEnter={() => setHoveredH(h)}
+              onMouseLeave={() => setHoveredH(null)}
+              onClick={() => setHoveredH(h === hoveredH ? null : h)}
+              className="group relative flex h-full flex-1 items-end justify-center cursor-pointer"
+              title={`${fmtHRange(h)} — ${fmtDur(v)}`}
+            >
+              {/* Floating Tooltip on hover */}
+              {isHovered && (
+                <div
+                  className="pointer-events-none absolute -top-8 z-30 flex whitespace-nowrap rounded-md px-1.5 py-0.5 text-[10px] font-bold shadow-lg ring-1"
+                  style={{
+                    background: "var(--panel)",
+                    color: "var(--text)",
+                    borderColor: "var(--line)",
+                  }}
+                >
+                  {fmtDur(v)}
+                </div>
+              )}
+
+              {/* Peak Crown Dot */}
+              {isPeak && (
+                <div
+                  className="absolute -top-2 h-1.5 w-1.5 rounded-full ring-2 ring-[var(--accent)]"
+                  style={{ background: "var(--accent)" }}
+                  title="Peak productive hour"
+                />
+              )}
+
+              {/* The Visual Bar */}
+              <div
+                className={cn(
+                  "w-full rounded-t-[3px] sm:rounded-t-[4px] transition-all duration-200",
+                  isHovered && "brightness-125 scale-y-[1.02] origin-bottom"
+                )}
+                style={{
+                  height: `${heightPct}%`,
+                  background:
+                    v > 0
+                      ? isPeak
+                        ? "var(--accent)"
+                        : isHovered
+                        ? "color-mix(in srgb, var(--accent) 80%, var(--panel2))"
+                        : "color-mix(in srgb, var(--accent) 55%, var(--panel2))"
+                      : "var(--panel2)",
+                  boxShadow: isPeak ? "0 0 10px -2px var(--accent)" : undefined,
+                  opacity: v > 0 ? 1 : 0.45,
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Synchronized 24-Column X-Axis Labels */}
+      <div className="flex w-full items-start gap-[2px] sm:gap-1.5 text-[9.5px] font-bold text-[var(--mut)]">
+        {hourBuckets.map((_, h) => {
+          const showLabel = h === 0 || h === 4 || h === 8 || h === 12 || h === 16 || h === 20 || h === 23;
+          const labelText =
+            h === 0
+              ? "12a"
+              : h === 12
+              ? "12p"
+              : h % 12 === 0
+              ? "12"
+              : `${h % 12}${h >= 12 ? "p" : "a"}`;
+
+          return (
+            <div
+              key={h}
+              className={cn(
+                "flex-1 text-center transition-colors truncate",
+                hoveredH === h && "text-[var(--accent)] font-extrabold"
+              )}
+            >
+              {showLabel ? labelText : ""}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
