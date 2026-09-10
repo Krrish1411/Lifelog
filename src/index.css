@@ -119,12 +119,35 @@ body {
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(circle at 10% 10%, color-mix(in srgb, var(--accent) 6%, transparent) 0%, transparent 60%),
-    radial-gradient(circle at 90% 90%, rgba(79, 163, 165, 0.04) 0%, transparent 60%);
+    radial-gradient(ellipse 65% 55% at 10% 8%, color-mix(in srgb, var(--accent) 7%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 50% at 90% 92%, rgba(56, 189, 248, 0.05) 0%, transparent 65%);
 }
 .ambient::before,
 .ambient::after {
-  display: none;
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(85px);
+  will-change: transform;
+  pointer-events: none;
+}
+.ambient::before {
+  width: 52vw;
+  height: 52vw;
+  left: -12vw;
+  top: -16vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 70%);
+  opacity: 0.65;
+  animation: drift-a 42s ease-in-out infinite alternate;
+}
+.ambient::after {
+  width: 46vw;
+  height: 46vw;
+  right: -12vw;
+  bottom: -15vw;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.14) 0%, transparent 70%);
+  opacity: 0.6;
+  animation: drift-b 50s ease-in-out infinite alternate;
 }
 .ambient .grid-lines {
   position: absolute;
@@ -133,7 +156,15 @@ body {
     linear-gradient(90deg, var(--line) 1px, transparent 1px);
   background-size: 44px 44px;
   mask-image: radial-gradient(ellipse 90% 70% at 50% 0%, black 0%, transparent 78%);
-  opacity: 0.18;
+  opacity: 0.20;
+}
+@keyframes drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(8vw, 6vh, 0) scale(1.15); }
+}
+@keyframes drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to { transform: translate3d(-7vw, -5vh, 0) scale(0.95); }
 }
 
 /* ---------- Reusable surfaces ---------- */
@@ -466,22 +497,11 @@ html[data-engine="zen"] .card {
   background: var(--accent-soft);
 }
 
-/* ---------- Liquid glass engine (Hardware accelerated, 60+ FPS) ---------- */
-html[data-engine="glass"] .glass-card,
-html[data-engine="glass"] .card {
-  position: relative;
-  background: var(--panel) !important;
-  border: 1px solid var(--line) !important;
-  border-radius: 18px;
-  box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.04), 0 1px 2px -1px rgba(0, 0, 0, 0.03);
-  overflow: hidden;
-}
-html[data-theme="dark"][data-engine="glass"] .glass-card,
-html[data-theme="dark"][data-engine="glass"] .card {
-  background: color-mix(in srgb, var(--panel) 92%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--text) 13%, transparent) !important;
-  box-shadow: 0 8px 30px -18px rgba(0, 0, 0, 0.5);
-}
+/* ==========================================================================
+   ENHANCED LIQUID GLASS 2.0 ENGINE (VisionOS & macOS Liquid Glass Fidelity)
+   ========================================================================== */
+
+/* ---------- Fluid Background Field with 4 Chromatic Blobs ---------- */
 .liquid-field {
   position: fixed;
   inset: 0;
@@ -489,11 +509,218 @@ html[data-theme="dark"][data-engine="glass"] .card {
   pointer-events: none;
   overflow: hidden;
   background:
-    radial-gradient(ellipse 60% 50% at 10% 0%, color-mix(in srgb, var(--accent) 5%, transparent) 0%, transparent 70%),
-    radial-gradient(ellipse 50% 40% at 90% 85%, rgba(79, 163, 165, 0.04) 0%, transparent 70%);
+    radial-gradient(ellipse 65% 55% at 5% 5%, color-mix(in srgb, var(--accent) 9%, transparent) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 45% at 95% 85%, rgba(56, 189, 248, 0.07) 0%, transparent 60%),
+    radial-gradient(ellipse 40% 40% at 50% 50%, rgba(192, 132, 252, 0.04) 0%, transparent 70%);
 }
+
 .liquid-field .blob {
-  display: none;
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* Dark Mode Liquid Blobs (Luminescent fluid refraction) */
+html[data-theme="dark"] .liquid-field .blob.b1 {
+  width: 52vw;
+  height: 52vw;
+  left: -12vw;
+  top: -14vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 32%, transparent) 0%, transparent 68%);
+  opacity: 0.58;
+  animation: liquid-a 28s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+html[data-theme="dark"] .liquid-field .blob.b2 {
+  width: 44vw;
+  height: 44vw;
+  right: -10vw;
+  top: 15vh;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.24) 0%, transparent 65%);
+  opacity: 0.52;
+  animation: liquid-b 34s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+html[data-theme="dark"] .liquid-field .blob.b3 {
+  width: 38vw;
+  height: 38vw;
+  left: 20vw;
+  bottom: -14vw;
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.22) 0%, transparent 65%);
+  opacity: 0.48;
+  animation: liquid-c 40s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+html[data-theme="dark"] .liquid-field .blob.b4 {
+  width: 34vw;
+  height: 34vw;
+  right: 15vw;
+  bottom: 8vh;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 20%, rgba(245, 158, 11, 0.2)) 0%, transparent 65%);
+  opacity: 0.42;
+  animation: liquid-d 44s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
+}
+
+/* Light Mode Liquid Blobs (Fresh, crystalline pastel prismatic glow) */
+html:not([data-theme="dark"]) .liquid-field .blob.b1 {
+  width: 52vw;
+  height: 52vw;
+  left: -10vw;
+  top: -12vw;
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 15%, transparent) 0%, transparent 65%);
+  opacity: 0.42;
+  filter: blur(95px);
+  animation: liquid-a 30s ease-in-out infinite alternate;
+}
+
+html:not([data-theme="dark"]) .liquid-field .blob.b2 {
+  width: 42vw;
+  height: 42vw;
+  right: -8vw;
+  top: 20vh;
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.14) 0%, transparent 65%);
+  opacity: 0.38;
+  filter: blur(95px);
+  animation: liquid-b 36s ease-in-out infinite alternate;
+}
+
+html:not([data-theme="dark"]) .liquid-field .blob.b3 {
+  width: 36vw;
+  height: 36vw;
+  left: 25vw;
+  bottom: -10vw;
+  background: radial-gradient(circle, rgba(232, 121, 249, 0.12) 0%, transparent 65%);
+  opacity: 0.32;
+  filter: blur(95px);
+  animation: liquid-c 42s ease-in-out infinite alternate;
+}
+
+html:not([data-theme="dark"]) .liquid-field .blob.b4 {
+  width: 32vw;
+  height: 32vw;
+  right: 18vw;
+  bottom: 10vh;
+  background: radial-gradient(circle, rgba(251, 191, 36, 0.12) 0%, transparent 65%);
+  opacity: 0.32;
+  filter: blur(95px);
+  animation: liquid-d 46s ease-in-out infinite alternate;
+}
+
+@keyframes liquid-a {
+  from { transform: translate3d(0, 0, 0) scale(1) rotate(0deg); }
+  to { transform: translate3d(12vw, 8vh, 0) scale(1.22) rotate(15deg); }
+}
+
+@keyframes liquid-b {
+  from { transform: translate3d(0, 0, 0) scale(1.15) rotate(0deg); }
+  to { transform: translate3d(-10vw, 12vh, 0) scale(0.92) rotate(-20deg); }
+}
+
+@keyframes liquid-c {
+  from { transform: translate3d(0, 0, 0) scale(0.95) rotate(0deg); }
+  to { transform: translate3d(9vw, -10vh, 0) scale(1.18) rotate(25deg); }
+}
+
+@keyframes liquid-d {
+  from { transform: translate3d(0, 0, 0) scale(1.05) rotate(0deg); }
+  to { transform: translate3d(-11vw, -8vh, 0) scale(0.9) rotate(-15deg); }
+}
+
+/* ---------- Enhanced Liquid Glass Cards & Surfaces ---------- */
+html[data-engine="glass"] .glass-card,
+html[data-engine="glass"] .card {
+  position: relative;
+  backdrop-filter: blur(26px) saturate(180%) contrast(104%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%) contrast(104%);
+  background: color-mix(in srgb, var(--panel) 75%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
+  border-radius: 18px;
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.85),
+    0 8px 32px -12px rgba(0, 0, 0, 0.08),
+    0 1px 3px 0 rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.22s ease;
+}
+
+html[data-theme="dark"][data-engine="glass"] .glass-card,
+html[data-theme="dark"][data-engine="glass"] .card {
+  background: color-mix(in srgb, var(--panel) 60%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--text) 14%, transparent) !important;
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.16),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 18%, transparent),
+    inset 0 -22px 42px -28px color-mix(in srgb, var(--accent) 24%, transparent),
+    0 20px 48px -22px rgba(0, 0, 0, 0.7),
+    0 1px 3px 0 rgba(0, 0, 0, 0.4);
+}
+
+/* Card Hover Elevation & Light Refraction */
+html[data-engine="glass"] .card-hover:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line)) !important;
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.95),
+    0 16px 40px -16px color-mix(in srgb, var(--accent) 18%, rgba(0, 0, 0, 0.15)),
+    0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent) !important;
+}
+
+html[data-theme="dark"][data-engine="glass"] .card-hover:hover {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--text)) !important;
+  box-shadow:
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.24),
+    inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 35%, transparent),
+    inset 0 -24px 44px -24px color-mix(in srgb, var(--accent) 32%, transparent),
+    0 24px 56px -20px rgba(0, 0, 0, 0.85),
+    0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent) !important;
+}
+
+/* Crystalline Light Sheen Reflection Sweep */
+html[data-engine="glass"] .card::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 28%,
+    color-mix(in srgb, var(--text) 5%, rgba(255, 255, 255, 0.12)) 46%,
+    transparent 62%
+  );
+  transform: translateX(-130%);
+  transition: transform 0.85s cubic-bezier(0.16, 1, 0.3, 1);
+  z-index: 1;
+}
+
+html[data-engine="glass"] .card:hover::after {
+  transform: translateX(130%);
+}
+
+/* Glass Inputs & Textareas */
+html[data-engine="glass"] .inp {
+  background: color-mix(in srgb, var(--bg) 70%, transparent) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+html[data-theme="dark"][data-engine="glass"] .inp {
+  background: color-mix(in srgb, var(--bg) 55%, transparent) !important;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
+}
+
+html[data-engine="glass"] .inp:focus {
+  background: color-mix(in srgb, var(--panel) 85%, transparent) !important;
+  border-color: var(--accent) !important;
+  box-shadow:
+    0 0 0 3px var(--ring),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1) !important;
 }
 
 /* ---------- Focus stage (full-screen session) ---------- */

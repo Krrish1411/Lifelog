@@ -558,10 +558,17 @@ export function Shell() {
   /* Mobile Top App Bar (< md) */
   const mobileBar = (
     <header
-      className="fixed top-0 inset-x-0 z-40 flex flex-col border-b select-none transition-colors md:hidden"
+      className="fixed top-0 inset-x-0 z-40 flex flex-col border-b backdrop-blur-2xl select-none transition-colors md:hidden"
       style={{
-        background: "var(--panel)",
-        borderColor: "var(--line)",
+        background: state.settings.themeMode === "dark"
+          ? "color-mix(in srgb, var(--panel) 75%, transparent)"
+          : "color-mix(in srgb, var(--panel) 82%, transparent)",
+        borderColor: state.settings.themeMode === "dark"
+          ? "color-mix(in srgb, var(--text) 12%, transparent)"
+          : "color-mix(in srgb, var(--line) 85%, transparent)",
+        boxShadow: state.settings.themeMode === "dark"
+          ? "inset 0 -1px 0 color-mix(in srgb, var(--accent) 15%, transparent), 0 8px 24px -10px rgba(0,0,0,0.5)"
+          : "inset 0 -1px 0 rgba(255,255,255,0.7), 0 6px 20px -10px rgba(0,0,0,0.06)",
         paddingTop: "var(--safe-top)",
       }}
     >
@@ -1071,16 +1078,21 @@ export function Shell() {
         <div className="blob b1" />
         <div className="blob b2" />
         <div className="blob b3" />
+        <div className="blob b4" />
       </div>
 
       <aside
-        className="fixed inset-y-4 left-4 z-40 hidden w-[256px] flex-col rounded-3xl border p-4 md:flex select-none"
+        className="fixed inset-y-4 left-4 z-40 hidden w-[256px] flex-col rounded-3xl border p-4 backdrop-blur-2xl md:flex select-none"
         style={{
-          background: "var(--panel)",
-          borderColor: "var(--line)",
+          background: state.settings.themeMode === "dark"
+            ? "color-mix(in srgb, var(--panel) 58%, transparent)"
+            : "color-mix(in srgb, var(--panel) 76%, transparent)",
+          borderColor: state.settings.themeMode === "dark"
+            ? "color-mix(in srgb, var(--text) 14%, transparent)"
+            : "color-mix(in srgb, var(--line) 85%, transparent)",
           boxShadow: state.settings.themeMode === "dark"
-            ? "0 24px 60px -30px rgba(0,0,0,0.6)"
-            : "0 8px 30px -10px rgba(0,0,0,0.06)",
+            ? "inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 20%, transparent), 0 24px 60px -30px rgba(0, 0, 0, 0.75)"
+            : "inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.9), 0 20px 48px -20px rgba(0, 0, 0, 0.08)",
         }}
       >
         <Logo />
@@ -1134,10 +1146,15 @@ export function Shell() {
           <div
             className="rounded-2xl border px-3 py-2.5 backdrop-blur-xl"
             style={{
-              borderColor: "var(--line)",
+              borderColor: state.settings.themeMode === "dark"
+                ? "color-mix(in srgb, var(--text) 12%, transparent)"
+                : "color-mix(in srgb, var(--line) 85%, transparent)",
               background: state.settings.themeMode === "dark"
-                ? "color-mix(in srgb, var(--panel2) 70%, transparent)"
-                : "var(--panel)",
+                ? "color-mix(in srgb, var(--panel2) 55%, transparent)"
+                : "color-mix(in srgb, var(--panel2) 75%, transparent)",
+              boxShadow: state.settings.themeMode === "dark"
+                ? "inset 0 1px 0 rgba(255,255,255,0.08)"
+                : "inset 0 1px 0 rgba(255,255,255,0.7)",
             }}
           >
             <Clock />
@@ -1616,10 +1633,15 @@ function MiniTimer() {
       )}
       style={{
         bottom: "calc(74px + var(--safe-bottom, 12px))",
-        background: "color-mix(in srgb, var(--panel2) 95%, transparent)",
+        background: state.settings.themeMode === "dark"
+          ? "color-mix(in srgb, var(--panel) 70%, transparent)"
+          : "color-mix(in srgb, var(--panel) 82%, transparent)",
         borderColor: minimized
           ? "color-mix(in srgb, var(--accent) 55%, var(--line))"
           : "color-mix(in srgb, var(--accent) 45%, var(--line))",
+        boxShadow: state.settings.themeMode === "dark"
+          ? "inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.16), inset 0 -1px 0 0 color-mix(in srgb, var(--accent) 25%, transparent), 0 20px 48px -15px rgba(0, 0, 0, 0.75)"
+          : "inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.9), 0 16px 36px -12px rgba(0, 0, 0, 0.12)",
       }}
       title={minimized ? `${label} · Click to expand` : undefined}
     >
