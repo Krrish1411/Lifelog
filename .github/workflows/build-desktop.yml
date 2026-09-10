@@ -55,6 +55,34 @@ jobs:
           mkdir -p lifelog-linux-portable
           cp src-tauri/target/release/lifelog lifelog-linux-portable/
           cp src-tauri/icons/icon.png lifelog-linux-portable/icon.png
+          cat << 'EOF' > lifelog-linux-portable/run.sh
+          #!/bin/sh
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          export WEBKIT_DISABLE_DMABUF_RENDERER=1
+          exec "$DIR/lifelog" "$@"
+          EOF
+          cat << 'EOF' > lifelog-linux-portable/install.sh
+          #!/bin/sh
+          set -e
+          DIR="$(cd "$(dirname "$0")" && pwd)"
+          mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/512x512/apps"
+          cp "$DIR/lifelog" "$HOME/.local/bin/lifelog"
+          chmod +x "$HOME/.local/bin/lifelog"
+          cp "$DIR/icon.png" "$HOME/.local/share/icons/hicolor/512x512/apps/lifelog.png"
+          cat << 'DESK' > "$HOME/.local/share/applications/lifelog.desktop"
+          [Desktop Entry]
+          Name=LifeLog
+          Comment=Minimal, private, offline-first productivity & focus OS
+          Exec=lifelog %U
+          Icon=lifelog
+          Terminal=false
+          Type=Application
+          Categories=Utility;Office;Productivity;
+          DESK
+          update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
+          echo "LifeLog installed successfully to $HOME/.local/bin/lifelog!"
+          echo "You can now launch LifeLog from your application menu or run 'lifelog' in terminal."
+          EOF
           cat << 'EOF' > lifelog-linux-portable/lifelog.desktop
           [Desktop Entry]
           Name=LifeLog
@@ -65,6 +93,7 @@ jobs:
           Type=Application
           Categories=Utility;Office;Productivity;
           EOF
+          chmod +x lifelog-linux-portable/lifelog lifelog-linux-portable/run.sh lifelog-linux-portable/install.sh
           tar -czvf LifeLog-Linux-x64-portable.tar.gz -C lifelog-linux-portable .
 
       - name: Upload Universal AppImage Artifact

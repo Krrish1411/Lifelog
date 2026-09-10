@@ -32,8 +32,10 @@ function obfuscatorPlugin() {
   };
 }
 
+const enableObfuscation = process.env.OBFUSCATE === "true";
+
 export default defineConfig({
-  plugins: [react(), tailwindcss(), obfuscatorPlugin()],
+  plugins: [react(), tailwindcss(), ...(enableObfuscation ? [obfuscatorPlugin()] : [])],
   base: './',
   build: {
     outDir: 'dist',

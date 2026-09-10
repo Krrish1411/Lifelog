@@ -2,5 +2,13 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    #[cfg(target_os = "linux")]
+    {
+        // Fix WebKitGTK blank/black screen on Linux (DMABUF driver buffer conflict on Wayland / NVIDIA / Intel)
+        if std::env::var("WEBKIT_DISABLE_DMABUF_RENDERER").is_err() {
+            std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+        }
+    }
+
     lifelog_lib::run();
 }
