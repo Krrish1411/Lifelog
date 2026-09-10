@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import {
+  AlertCircle,
   Bell,
   Check,
   Compass,
@@ -55,10 +56,12 @@ import {
   Labeled,
   Modal,
   Seg,
+  TextArea,
   TextInput,
   Toggle,
   cn,
 } from "../components/ui";
+import { cleanSeedData, isSeedTask } from "../utils/cleanSeed";
 import {
   playNotificationAlarmSound,
   playTimerFinishSound,
@@ -217,6 +220,25 @@ export function SettingsView() {
     patch(resetPatch);
     triggerHaptic("medium");
     toast("All theme and visual customizations reset to 0", "ok");
+  };
+
+  const demoTasksCount = state.tasks ? state.tasks.filter(isSeedTask).length : 0;
+
+  const handlePurgeDemoData = async () => {
+    const ok = await confirm({
+      title: "Purge Injected Demo Data?",
+      body: "This will remove sample demo tasks ('Hero section redesign', 'Timer engine...', 'Atlas website'), demo habits, and demo projects that were synced from a fresh install. Your personal tasks, habits, and notes will NOT be touched.",
+      confirmLabel: "Purge Demo Data",
+      danger: true,
+    });
+    if (!ok) return;
+    const { cleanedState, stats } = cleanSeedData(state);
+    set(() => cleanedState);
+    triggerHaptic("medium");
+    toast(
+      `Purged ${stats.tasksRemoved} demo tasks, ${stats.habitsRemoved} habits & ${stats.projectsRemoved} demo projects!`,
+      "ok"
+    );
   };
 
   /* ---------------- data ---------------- */
@@ -1098,8 +1120,8 @@ export function SettingsView() {
                     </span>
                   </div>
                   <Labeled label="Your own lines (one per line)" hint="mixed randomly with built-ins">
-                    <textarea
-                      className="inp min-h-[84px] resize-y"
+                    <TextArea
+                      className="min-h-[84px] resize-y"
                       value={quotesDraft}
                       onChange={(e) => setQuotesDraft(e.target.value)}
                       placeholder={"Show up for the hard hour.\nSmall logs, big clarity."}
@@ -1202,6 +1224,29 @@ export function SettingsView() {
         {/* ===================== TAB 4: SYNC & STORAGE ===================== */}
         {activeTab === "sync" && (
           <>
+            {/* Purge Injected Demo Data Banner */}
+            {demoTasksCount > 0 && (
+              <div className="card engine-panel p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-amber-500/40 bg-amber-500/10 lg:col-span-2">
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2 font-display text-[14px] font-bold text-amber-400">
+                    <AlertCircle size={15} />
+                    <span>Injected Demo Data Detected ({demoTasksCount} sample tasks)</span>
+                  </div>
+                  <p className="text-[11.5px] font-semibold text-[var(--mut)]">
+                    Sample demo tasks ("Hero section redesign", "Atlas website", sample habits) were synced from a fresh device. Purge them now to restore your clean personal records.
+                  </p>
+                </div>
+                <Btn
+                  size="sm"
+                  variant="danger"
+                  onClick={handlePurgeDemoData}
+                  className="shrink-0 gap-1.5 text-xs font-bold cursor-pointer"
+                >
+                  <Trash2 size={13} /> Purge Demo Data
+                </Btn>
+              </div>
+            )}
+
             {/* P2P Sync */}
             {section(
               "Device-to-Device Sync (P2P)",

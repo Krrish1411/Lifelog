@@ -3,19 +3,29 @@ import type { State, Task, Note, Habit, Project, Session, DayLog } from "../type
 export type SyncRole = "host" | "client";
 export type SyncStatus = "idle" | "connecting" | "connected" | "syncing" | "error";
 
+export interface DeviceStats {
+  taskCount: number;
+  projectCount: number;
+  habitCount: number;
+  noteCount: number;
+  isFreshSeed: boolean;
+}
+
 export interface SyncPeerInfo {
   deviceId: string;
   deviceName: string;
   platform: "android" | "windows" | "linux" | "macos" | "web";
   connectedAt: number;
+  stats?: DeviceStats;
 }
 
 export type SyncTransport = "relay" | "webrtc";
 
 export type SyncMessage =
-  | { type: "HANDSHAKE"; peer: SyncPeerInfo; lastSyncTs: number }
-  | { type: "HANDSHAKE_ACK"; peer: SyncPeerInfo; lastSyncTs: number }
-  | { type: "FULL_STATE"; state: State; timestamp: number }
+  | { type: "HANDSHAKE"; peer: SyncPeerInfo; lastSyncTs: number; stats?: DeviceStats }
+  | { type: "HANDSHAKE_ACK"; peer: SyncPeerInfo; lastSyncTs: number; stats?: DeviceStats }
+  | { type: "FULL_STATE"; state: State; timestamp: number; filterSeed?: boolean }
+  | { type: "FORCE_REPLACE_STATE"; state: State; timestamp: number }
   | { type: "DELTA_STATE"; delta: PartialStateDelta; timestamp: number }
   | { type: "PING"; timestamp: number }
   | { type: "PONG"; timestamp: number }

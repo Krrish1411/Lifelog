@@ -1680,6 +1680,8 @@ function Overlays({
     view,
     setView,
     openTaskDialog,
+    taskDialog,
+    closeTaskDialog,
     confirmReq,
     resolveConfirm,
     syncDialogOpen,
@@ -1707,12 +1709,16 @@ function Overlays({
   // Android Native Hardware Back Button Handler
   useEffect(() => {
     return initHardwareBackButton(() => {
-      if (drawerOpen) {
-        onCloseDrawer?.();
+      if (confirmReq?.open) {
+        resolveConfirm(false);
         return true;
       }
-      if (moreSheetOpen) {
-        setMoreSheetOpen(false);
+      if (taskDialog.open) {
+        closeTaskDialog();
+        return true;
+      }
+      if (syncDialogOpen) {
+        closeSyncDialog();
         return true;
       }
       if (paletteOpen) {
@@ -1723,8 +1729,12 @@ function Overlays({
         setHelp(false);
         return true;
       }
-      if (confirmReq?.open) {
-        resolveConfirm(false);
+      if (moreSheetOpen) {
+        setMoreSheetOpen(false);
+        return true;
+      }
+      if (drawerOpen) {
+        onCloseDrawer?.();
         return true;
       }
       if (greeting) {
@@ -1737,7 +1747,7 @@ function Overlays({
       }
       return false;
     });
-  }, [paletteOpen, moreSheetOpen, help, confirmReq?.open, greeting, view, setView, closeGreeting, resolveConfirm, setPaletteOpen, drawerOpen, onCloseDrawer]);
+  }, [paletteOpen, moreSheetOpen, help, confirmReq?.open, taskDialog.open, closeTaskDialog, syncDialogOpen, closeSyncDialog, greeting, view, setView, closeGreeting, resolveConfirm, setPaletteOpen, drawerOpen, onCloseDrawer]);
 
   useEffect(() => setConfirmText(""), [confirmReq]);
   const blocked = !!confirmReq?.requireText && confirmText !== confirmReq.requireText;

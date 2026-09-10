@@ -21,7 +21,7 @@ import {
 } from "../utils/core";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
 import { requestDailyNote } from "../utils/nav";
-import { Btn, EmptyState, Modal, Toggle, cn } from "../components/ui";
+import { Btn, EmptyState, Modal, TextArea, TextInput, Toggle, cn } from "../components/ui";
 import { triggerHaptic } from "../utils/native";
 
 const ENERGY_OPTIONS = [
@@ -375,9 +375,9 @@ export function Dashboard() {
         {!compact && (
           <div className="mt-3 min-w-0">
             <span className="lbl mb-1">Feeling note</span>
-            <textarea
+            <TextArea
               ref={feelingInputRef}
-              className="inp min-h-[48px] resize-y w-full min-w-0 text-[13px]"
+              className="min-h-[48px] resize-y w-full min-w-0 text-[13px]"
               value={mood}
               onChange={(e) => {
                 setMood(e.target.value);
@@ -417,8 +417,8 @@ export function Dashboard() {
         />
       </div>
       <div className="mt-3 flex gap-2 w-full min-w-0">
-        <input
-          className="inp flex-1 min-w-0 text-[13px]" value={quick} onChange={(e) => setQuick(e.target.value)}
+        <TextInput
+          className="flex-1 min-w-0 text-[13px]" value={quick} onChange={(e) => setQuick(e.target.value)}
           onKeyDown={(e) => e.key === "Enter" && quickAdd()}
           placeholder="Quick-add to today… (Enter)"
         />
@@ -746,8 +746,8 @@ export function Dashboard() {
                   </Btn>
                 </div>
               </div>
-              <textarea
-                className="inp mt-3 h-[130px] resize-y !leading-relaxed w-full min-w-0 text-[13px]"
+              <TextArea
+                className="mt-3 h-[130px] resize-y !leading-relaxed w-full min-w-0 text-[13px]"
                 value={noteText}
                 onChange={(e) => { setNoteText(e.target.value); setNoteStatus("dirty"); }}
                 placeholder="Intentions, thoughts, what happened… autosaves & encrypts as you type."

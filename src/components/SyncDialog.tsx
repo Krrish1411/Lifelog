@@ -11,14 +11,18 @@ import {
   Radio,
   Zap,
   ArrowRight,
+  ArrowLeftRight,
   KeyRound,
   Lock,
+  Trash2,
+  CheckCircle2,
 } from "lucide-react";
 import { useApp } from "../store";
 import { syncEngine } from "../sync/syncEngine";
 import type { SyncStatus, SyncPeerInfo } from "../sync/syncTypes";
 import { Modal, Btn, TextInput, Seg, cn } from "./ui";
 import { triggerHaptic } from "../utils/native";
+import { cleanSeedData, isSeedTask } from "../utils/cleanSeed";
 
 interface SyncDialogProps {
   open: boolean;
@@ -26,7 +30,7 @@ interface SyncDialogProps {
 }
 
 export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
-  const { state, toast } = useApp();
+  const { state, set, toast, confirm } = useApp();
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [peer, setPeer] = useState<SyncPeerInfo | null>(syncEngine.getConnectedPeer());
   
@@ -225,10 +229,51 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     }
   };
 
+  const [syncDirection, setSyncDirection] = useState<"clone_to_peer" | "two_way">("clone_to_peer");
+  const [isApplyingSync, setIsApplyingSync] = useState(false);
+
+  const demoTasksCount = state?.tasks ? state.tasks.filter(isSeedTask).length : 0;
+
+  const handleExecuteSync = async () => {
+    if (!state) return;
+    setIsApplyingSync(true);
+    try {
+      triggerHaptic("medium");
+      if (syncDirection === "clone_to_peer") {
+        await syncEngine.forceCloneToPeer(state);
+        triggerHaptic("success");
+        toast(`Cloned this device's records to ${peer?.deviceName || "peer"}!`, "ok");
+      } else {
+        await syncEngine.broadcastFullState(state, true);
+        triggerHaptic("success");
+        toast("Two-way sync complete (sample demo items filtered)!", "ok");
+      }
+    } catch (err: any) {
+      toast("Sync failed: " + (err?.message || "network error"), "err");
+    } finally {
+      setIsApplyingSync(false);
+    }
+  };
+
+  const handlePurgeDemoData = async () => {
+    if (!state) return;
+    const ok = await confirm({
+      title: "Purge Injected Demo Data?",
+      body: "This will remove sample tasks ('Hero section redesign', 'Timer engine...'), sample habits, and demo projects that were synced from a new install. Your personal tasks, habits, and notes will NOT be touched.",
+      confirmLabel: "Purge Demo Data",
+      danger: true,
+    });
+    if (!ok) return;
+    const { cleanedState, stats } = cleanSeedData(state);
+    set(() => cleanedState);
+    triggerHaptic("medium");
+    toast(`Cleaned ${stats.tasksRemoved} demo tasks, ${stats.habitsRemoved} habits & ${stats.projectsRemoved} demo projects!`, "ok");
+  };
+
   const handleSyncFullState = async () => {
     try {
       triggerHaptic("medium");
-      await syncEngine.broadcastFullState(state);
+      await syncEngine.broadcastFullState(state, true);
       toast("All data synchronized with peer!", "ok");
     } catch {
       toast("Failed to synchronize state.", "err");
@@ -288,6 +333,24 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
           </div>
         )}
 
+        {/* Demo Data Injected Warning Banner (Clean tool) */}
+        {demoTasksCount > 0 && (
+          <div className="p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="space-y-0.5">
+              <div className="flex items-center gap-1.5 font-bold text-xs text-amber-400">
+                <AlertCircle size={15} />
+                <span>Detected {demoTasksCount} Sample Demo Tasks</span>
+              </div>
+              <p className="text-[11.5px] text-[var(--mut)]">
+                Sample tasks from a fresh device were synced into this device. Click to purge them safely.
+              </p>
+            </div>
+            <Btn size="sm" variant="danger" onClick={handlePurgeDemoData} className="shrink-0 gap-1 text-xs">
+              <Trash2 size={12} /> Purge Demo Data
+            </Btn>
+          </div>
+        )}
+
         {/* 1. Connected State View */}
         {status === "connected" && (
           <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-4">
@@ -318,6 +381,77 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
               </Btn>
             </div>
 
+            {/* Sync Direction & Device Role Selector */}
+            <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--panel)] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="font-display font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
+                  <ArrowLeftRight size={13} className="text-[var(--accent)]" /> Sync Mode & Direction
+                </span>
+                <span className="text-[10.5px] font-mono text-[var(--mut)]">
+                  {peer?.stats?.isFreshSeed ? "⚠️ Peer has fresh demo data" : "Ready"}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setSyncDirection("clone_to_peer")}
+                  className={cn(
+                    "flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer",
+                    syncDirection === "clone_to_peer"
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
+                      : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
+                  )}
+                >
+                  <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
+                    {syncDirection === "clone_to_peer" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-xs text-[var(--text)] flex items-center gap-1">
+                      <span>Mirror This Device → {peer?.deviceName || "Peer"}</span>
+                      <span className="chip !py-0 !px-1.5 text-[9px] font-bold text-emerald-500 border-emerald-500/30">Recommended</span>
+                    </div>
+                    <p className="text-[11px] text-[var(--mut)] mt-0.5 leading-snug">
+                      Host is Primary. Completely overwrites peer with your records. Zero demo tasks or contamination touch this device.
+                    </p>
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setSyncDirection("two_way")}
+                  className={cn(
+                    "flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer",
+                    syncDirection === "two_way"
+                      ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
+                      : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
+                  )}
+                >
+                  <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
+                    {syncDirection === "two_way" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold text-xs text-[var(--text)]">
+                      Two-Way Smart Merge (Filter Demo Items)
+                    </div>
+                    <p className="text-[11px] text-[var(--mut)] mt-0.5 leading-snug">
+                      Exchanges new items bidirectionally while automatically filtering out sample demo tasks.
+                    </p>
+                  </div>
+                </button>
+              </div>
+
+              <Btn
+                variant="primary"
+                className="w-full justify-center gap-1.5"
+                onClick={handleExecuteSync}
+                disabled={isApplyingSync}
+              >
+                {isApplyingSync ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                <span>{isApplyingSync ? "Synchronizing..." : syncDirection === "clone_to_peer" ? `Overwrite ${peer?.deviceName || "Peer"} with Local Records` : "Execute Two-Way Merge"}</span>
+              </Btn>
+            </div>
+
             <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[var(--line)]">
               <div className="p-2 rounded-xl bg-[var(--panel2)]">
                 <span className="text-[var(--mut)] block text-[10.5px]">Transport Link</span>
@@ -329,16 +463,6 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
                 <span className="text-[var(--mut)] block text-[10.5px]">End-to-End Security</span>
                 <span className="font-semibold text-emerald-400">AES-GCM-256 (E2EE)</span>
               </div>
-            </div>
-
-            <div className="flex items-center gap-2 pt-1">
-              <Btn
-                variant="primary"
-                className="w-full justify-center"
-                onClick={handleSyncFullState}
-              >
-                <RefreshCw size={14} /> Force Full Sync Now
-              </Btn>
             </div>
           </div>
         )}

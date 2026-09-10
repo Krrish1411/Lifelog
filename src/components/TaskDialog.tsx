@@ -27,7 +27,7 @@ import {
   uid,
 } from "../utils/core";
 import { parseNaturalLanguageTask } from "../utils/nlp";
-import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, Select, TagInput, TextInput, Toggle, cn } from "./ui";
+import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, Select, TagInput, TextInput, TextArea, Toggle, cn } from "./ui";
 
 const defaultRec = (dueIso: string): Recurrence => {
   const wd = dueIso ? (parseIso(dueIso).getDay() + 6) % 7 : 0;
@@ -484,12 +484,11 @@ export function TaskDialog() {
                     <span className="text-xs font-mono font-bold text-[var(--color-mut)] w-5 shrink-0">
                       #{idx + 1}
                     </span>
-                    <input
-                      type="text"
+                    <TextInput
                       value={block.label ?? `Block ${idx + 1}`}
                       onChange={(e) => updateTimeBlock(block.id, { label: e.target.value })}
                       placeholder="Block label"
-                      className="inp flex-1 h-8 text-xs"
+                      className="flex-1 h-8 text-xs"
                     />
                     <button
                       onClick={() => removeTimeBlock(block.id)}
@@ -716,7 +715,7 @@ export function TaskDialog() {
 
         {/* Notes */}
         <Labeled label="Notes">
-          <textarea className="inp min-h-[64px] resize-y" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Context, links, acceptance criteria…" />
+          <TextArea className="min-h-[64px] resize-y" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Context, links, acceptance criteria…" />
         </Labeled>
 
         {/* Encrypted Private Note */}
@@ -730,7 +729,7 @@ export function TaskDialog() {
             </Btn>
           </div>
           {reveal ? (
-            <textarea className="inp mt-2 min-h-[56px] resize-y" value={privateNote} onChange={(e) => setPrivateNote(e.target.value)} placeholder="Thoughts only you can read…" />
+            <TextArea className="mt-2 min-h-[56px] resize-y" value={privateNote} onChange={(e) => setPrivateNote(e.target.value)} placeholder="Thoughts only you can read…" />
           ) : (
             <div className="mt-2 rounded-lg border border-dashed px-3 py-2.5 text-[12px]" style={{ borderColor: "var(--line)", color: "var(--mut)" }}>
               {privateNote ? "•••••••• (hidden — press Reveal to read or edit)" : "Nothing here yet."}

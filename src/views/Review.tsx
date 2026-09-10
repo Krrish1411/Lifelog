@@ -7,7 +7,7 @@ import {
   addDaysIso, fmtDateLong, fmtDayShort, fmtDur, fmtNoteName, isoDate, listDates,
   parseIso, sessionMinutes, streakStats, todayIso, trackedByDay, uid, weekStartIso,
 } from "../utils/core";
-import { Btn, Modal, Seg, cn } from "../components/ui";
+import { Btn, Modal, Seg, TextArea, cn } from "../components/ui";
 
 type Period = "this-week" | "last-week" | "this-month" | "last-month";
 
@@ -211,8 +211,8 @@ export function ReviewView() {
               <div key={qq.k} className="review-q rounded-xl border p-2.5 w-full min-w-0 overflow-hidden" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                 <div className="text-[12.5px] font-bold truncate">{qq.q}</div>
                 <div className="mb-1.5 text-[10.5px] font-semibold truncate" style={{ color: "var(--mut)" }}>{qq.hint}</div>
-                <textarea
-                  className="inp min-h-[52px] resize-y !border-0 !bg-transparent !p-0 !shadow-none text-[13px] w-full min-w-0"
+                <TextArea
+                  className="min-h-[52px] resize-y !border-0 !bg-transparent !p-0 !shadow-none text-[13px] w-full min-w-0"
                   value={answers[qq.k] ?? ""}
                   onChange={(e) => setAnswers((a) => ({ ...a, [qq.k]: e.target.value }))}
                   placeholder="A few honest words…"

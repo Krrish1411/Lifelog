@@ -1467,8 +1467,8 @@ function TaskCard({
             {!done && (
               <div className="chain-item flex items-center gap-2 px-2 py-1">
                 <Circle size={13} style={{ color: "var(--mut)" }} />
-                <input
-                  className="inp !border-0 !bg-transparent !p-0 text-[12.5px] !shadow-none"
+                <TextInput
+                  className="!border-0 !bg-transparent !p-0 text-[12.5px] !shadow-none"
                   value={newSub}
                   onChange={(e) => setNewSub(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && addSub()}

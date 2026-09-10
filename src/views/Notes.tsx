@@ -878,6 +878,12 @@ export function NotesView() {
 
                 {/* Borderless Title */}
                 <input
+                  type="text"
+                  autoCapitalize="sentences"
+                  autoComplete="on"
+                  autoCorrect="on"
+                  spellCheck={true}
+                  {...({ writingsuggestions: "true" } as any)}
                   value={draft.title}
                   onChange={(e) => {
                     setDraft((d) => ({ ...d, title: e.target.value }));
@@ -954,6 +960,11 @@ export function NotesView() {
                   <textarea
                     ref={taRef}
                     className="note-page flex-1 min-h-[320px] w-full resize-none border-0 !bg-transparent text-[15px] sm:text-[15.5px] leading-[1.75] text-[var(--text)] placeholder:text-[var(--mut)]/30 focus:outline-none focus:ring-0 !p-0 mt-4 pb-28"
+                    autoCapitalize="sentences"
+                    autoComplete="on"
+                    autoCorrect="on"
+                    spellCheck={true}
+                    {...({ writingsuggestions: "true" } as any)}
                     value={draft.text}
                     onChange={(e) => {
                       setDraft((d) => ({ ...d, text: e.target.value }));

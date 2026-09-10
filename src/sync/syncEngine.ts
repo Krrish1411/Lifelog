@@ -1,7 +1,8 @@
 import type { State, Task, Note, Habit, Project, Session, DayLog } from "../types";
-import type { SyncMessage, SyncStatus, SyncPeerInfo, PartialStateDelta, EncryptedSyncPacket, SyncTransport } from "./syncTypes";
+import type { SyncMessage, SyncStatus, SyncPeerInfo, PartialStateDelta, EncryptedSyncPacket, SyncTransport, DeviceStats } from "./syncTypes";
 import { encryptSyncMessage, decryptSyncMessage } from "./syncCrypto";
 import { getDeviceKey, decryptText } from "../utils/crypto";
+import { cleanSeedData, isFreshSeedState } from "../utils/cleanSeed";
 
 const SYNC_STORAGE_KEY = "lifelog.sync.activeSession";
 
@@ -235,6 +236,7 @@ class WebRTCSyncEngine {
       deviceName,
       platform: detectPlatform(),
       connectedAt: Date.now(),
+      stats: this.getLocalStats(),
     };
 
     onProgress?.("Publishing session to relay...");
@@ -325,6 +327,7 @@ class WebRTCSyncEngine {
       deviceName,
       platform: detectPlatform(),
       connectedAt: Date.now(),
+      stats: this.getLocalStats(),
     };
 
     // Start listener on host's incoming stream
@@ -335,20 +338,13 @@ class WebRTCSyncEngine {
       type: "HANDSHAKE",
       peer: joinerPeer,
       lastSyncTs: Date.now(),
+      stats: joinerPeer.stats,
     });
 
     // Mark connected immediately
     this.connectedPeer = meta.hostPeer;
     this.setStatus("connected", meta.hostPeer);
     onProgress?.(`Connected to ${meta.hostPeer.deviceName}!`);
-
-    // If joiner has state, broadcast state to host
-    if (this.localStateGetter) {
-      const currentState = this.localStateGetter();
-      if (currentState) {
-        this.broadcastFullState(currentState).catch(console.error);
-      }
-    }
   }
 
   private async sendRelayMessage(msg: SyncMessage): Promise<void> {
@@ -526,7 +522,56 @@ class WebRTCSyncEngine {
     });
   }
 
-  public async broadcastFullState(state: State): Promise<void> {
+  public getLocalStats(): DeviceStats {
+    const s = this.localStateGetter ? this.localStateGetter() : null;
+    if (!s) {
+      return { taskCount: 0, projectCount: 0, habitCount: 0, noteCount: 0, isFreshSeed: false };
+    }
+    return {
+      taskCount: s.tasks ? s.tasks.length : 0,
+      projectCount: s.projects ? s.projects.length : 0,
+      habitCount: s.habits ? s.habits.length : 0,
+      noteCount: s.notes ? s.notes.length : 0,
+      isFreshSeed: isFreshSeedState(s),
+    };
+  }
+
+  public async forceCloneToPeer(state: State): Promise<void> {
+    if (this.status !== "connected") return;
+    this.setStatus("syncing");
+    try {
+      let payloadState = state;
+      if (state.notes && state.notes.length > 0) {
+        try {
+          const key = await getDeviceKey();
+          const safeNotes = await Promise.all(
+            state.notes.map(async (n) => {
+              if (n.blob && n.blob.plain === undefined && (n.blob.d || n.blob.iv)) {
+                try {
+                  const text = await decryptText(key, n.blob);
+                  if (text && !text.startsWith("(decryption failed)")) {
+                    return { ...n, blob: { ...n.blob, plain: text } };
+                  }
+                } catch {}
+              }
+              return n;
+            })
+          );
+          payloadState = { ...state, notes: safeNotes };
+        } catch {}
+      }
+
+      await this.sendMessage({
+        type: "FORCE_REPLACE_STATE",
+        state: payloadState,
+        timestamp: Date.now(),
+      });
+    } finally {
+      this.setStatus("connected");
+    }
+  }
+
+  public async broadcastFullState(state: State, filterSeed = true): Promise<void> {
     if (this.status !== "connected") return;
     this.setStatus("syncing");
     try {
@@ -555,6 +600,7 @@ class WebRTCSyncEngine {
         type: "FULL_STATE",
         state: payloadState,
         timestamp: Date.now(),
+        filterSeed,
       });
     } finally {
       this.setStatus("connected");
@@ -570,32 +616,26 @@ class WebRTCSyncEngine {
       if (selfPeer) {
         await this.sendMessage({
           type: "HANDSHAKE_ACK",
-          peer: selfPeer,
+          peer: { ...selfPeer, stats: this.getLocalStats() },
           lastSyncTs: Date.now(),
         });
       }
-
-      // Automatically broadcast full local state
-      if (this.localStateGetter) {
-        const currentState = this.localStateGetter();
-        if (currentState) {
-          await this.broadcastFullState(currentState);
-        }
-      }
+      // Note: Do NOT auto-broadcast or auto-merge! Await user direction choice in SyncDialog!
     } else if (msg.type === "HANDSHAKE_ACK") {
       this.connectedPeer = msg.peer;
       this.setStatus("connected", msg.peer);
-
-      // Send local state if available
-      if (this.localStateGetter) {
-        const currentState = this.localStateGetter();
-        if (currentState) {
-          await this.broadcastFullState(currentState);
-        }
-      }
+      // Note: Do NOT auto-broadcast or auto-merge! Await user direction choice in SyncDialog!
+    } else if (msg.type === "FORCE_REPLACE_STATE") {
+      this.setStatus("syncing");
+      this.dispatchStateMerge(() => msg.state);
+      this.setStatus("connected");
     } else if (msg.type === "FULL_STATE") {
       this.setStatus("syncing");
-      this.dispatchStateMerge((local) => mergeFullState(local, msg.state));
+      const remoteState = msg.filterSeed ? cleanSeedData(msg.state).cleanedState : msg.state;
+      this.dispatchStateMerge((local) => {
+        const cleanLocal = msg.filterSeed ? cleanSeedData(local).cleanedState : local;
+        return mergeFullState(cleanLocal, remoteState);
+      });
       this.setStatus("connected");
     } else if (msg.type === "DELTA_STATE") {
       this.dispatchStateMerge((local) => mergeDelta(local, msg.delta));

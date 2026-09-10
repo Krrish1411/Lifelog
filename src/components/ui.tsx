@@ -1,5 +1,5 @@
-import { useEffect, useState, useRef } from "react";
-import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
+import { useEffect, useState, useRef, forwardRef } from "react";
+import type { ButtonHTMLAttributes, InputHTMLAttributes, TextareaHTMLAttributes, ReactNode } from "react";
 import { Plus, Search, X, ChevronDown, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { normalizeHex } from "../utils/core";
@@ -136,10 +136,60 @@ export function Labeled({ label, children, hint }: { label: string; children: Re
     </div>
   );
 }
-export function TextInput(props: InputHTMLAttributes<HTMLInputElement>) {
-  const { className, ...rest } = props;
-  return <input className={cn("inp", className)} {...rest} />;
-}
+export const TextInput = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  (props, ref) => {
+    const {
+      className,
+      type = "text",
+      autoCapitalize,
+      autoComplete,
+      autoCorrect,
+      spellCheck,
+      ...rest
+    } = props;
+    const isTextLike = !type || type === "text" || type === "search";
+    return (
+      <input
+        ref={ref}
+        type={type}
+        className={cn("inp", className)}
+        autoCapitalize={autoCapitalize ?? (isTextLike ? "sentences" : undefined)}
+        autoComplete={autoComplete ?? (isTextLike ? "on" : undefined)}
+        autoCorrect={autoCorrect ?? (isTextLike ? "on" : undefined)}
+        spellCheck={spellCheck ?? (isTextLike ? true : undefined)}
+        {...(isTextLike ? ({ writingsuggestions: "true" } as any) : {})}
+        {...rest}
+      />
+    );
+  }
+);
+TextInput.displayName = "TextInput";
+
+export const TextArea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<HTMLTextAreaElement>>(
+  (props, ref) => {
+    const {
+      className,
+      autoCapitalize = "sentences",
+      autoComplete = "on",
+      autoCorrect = "on",
+      spellCheck = true,
+      ...rest
+    } = props;
+    return (
+      <textarea
+        ref={ref}
+        className={cn("inp", className)}
+        autoCapitalize={autoCapitalize}
+        autoComplete={autoComplete}
+        autoCorrect={autoCorrect}
+        spellCheck={spellCheck}
+        {...({ writingsuggestions: "true" } as any)}
+        {...rest}
+      />
+    );
+  }
+);
+TextArea.displayName = "TextArea";
 export function Toggle({ checked, onChange, label }: { checked: boolean; onChange: (v: boolean) => void; label?: string }) {
   return (
     <button
