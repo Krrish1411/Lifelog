@@ -69,6 +69,7 @@ import {
   sendDesktopNotification,
   initDesktopQuickAdd,
 } from "../utils/native";
+import { WindowControls } from "./WindowControls";
 import { Dashboard } from "../views/Dashboard";
 import { TasksView } from "../views/Tasks";
 import { FocusView } from "../views/Focus";
@@ -534,6 +535,19 @@ export function Shell() {
     );
   };
 
+  /* Desktop Window Controls (Minimize, Maximize, Close for Tauri) */
+  const desktopControls = isTauri ? (
+    <div
+      className="fixed top-3 right-4 z-50 hidden md:flex items-center rounded-xl border p-0.5 backdrop-blur-xl shadow-xs select-none transition-all"
+      style={{
+        background: "color-mix(in srgb, var(--panel) 88%, transparent)",
+        borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
+      }}
+    >
+      <WindowControls />
+    </div>
+  ) : null;
+
   /* Mobile Top App Bar (< md) */
   const mobileBar = (
     <header
@@ -671,6 +685,7 @@ export function Shell() {
   if (layout === "planify") {
     return (
       <div className="relative min-h-screen">
+        {desktopControls}
         {mobileBar}
         {mobileDrawer}
         <aside
@@ -810,6 +825,8 @@ export function Shell() {
             <Btn variant="primary" size="sm" onClick={() => openTaskDialog()}>
               <Plus size={13} /> Task
             </Btn>
+
+            <WindowControls />
           </div>
         </header>
 
@@ -840,6 +857,7 @@ export function Shell() {
   if (layout === "desk") {
     return (
       <div className="relative min-h-screen">
+        {desktopControls}
         {mobileBar}
         {mobileDrawer}
         <aside
@@ -934,6 +952,7 @@ export function Shell() {
   if (layout === "zen") {
     return (
       <div className="relative flex min-h-screen flex-col md:flex-row">
+        {desktopControls}
         {mobileBar}
         {mobileDrawer}
         <div className="ambient" style={{ opacity: 0.5 }}>
@@ -1044,6 +1063,7 @@ export function Shell() {
   /* ============================ 5. LIQUID GLASS ENGINE (Default) ============================ */
   return (
     <div className="relative min-h-screen">
+      {desktopControls}
       {mobileBar}
       {mobileDrawer}
       <div className="liquid-field">

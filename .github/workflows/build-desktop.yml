@@ -73,6 +73,14 @@ jobs:
           # Enforce hardware rendering safety fallback (prevents black screen on DMABUF)
           sed -i '2i export WEBKIT_DISABLE_DMABUF_RENDERER=1' squashfs-root/AppRun
 
+          # Configure GTK window controls (minimize, maximize, close) for Linux environments
+          mkdir -p squashfs-root/etc/xdg/gtk-3.0
+          cat << 'GTKCFG' > squashfs-root/etc/xdg/gtk-3.0/settings.ini
+[Settings]
+gtk-decoration-layout=menu:minimize,maximize,close
+GTKCFG
+          sed -i '3i export XDG_CONFIG_DIRS="$APPDIR/etc/xdg:$XDG_CONFIG_DIRS"' squashfs-root/AppRun
+
           # 4. Repack the fixed Universal AppImage
           rm -f "$APPIMAGE_FILE"
           ARCH=x86_64 /tmp/appimagetool-extracted/AppRun squashfs-root "$APPIMAGE_FILE"

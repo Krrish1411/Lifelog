@@ -4,6 +4,7 @@ import { App as CapApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { LocalNotifications } from "@capacitor/local-notifications";
 import { isTauri as checkIsTauri, invoke } from "@tauri-apps/api/core";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { listen } from "@tauri-apps/api/event";
 import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
@@ -55,6 +56,43 @@ export function initDesktopQuickAdd(onQuickAdd: () => void): () => void {
   return () => {
     if (unlisten) unlisten();
   };
+}
+
+/**
+ * Desktop Window Controls (Minimize, Maximize/Restore, Close)
+ */
+export async function minimizeDesktopWindow(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    const appWindow = getCurrentWindow();
+    await appWindow.minimize();
+  } catch (err) {
+    console.warn("Minimize window error:", err);
+  }
+}
+
+export async function toggleMaximizeDesktopWindow(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    const appWindow = getCurrentWindow();
+    await appWindow.toggleMaximize();
+  } catch (err) {
+    console.warn("Toggle maximize window error:", err);
+  }
+}
+
+export async function closeDesktopWindow(): Promise<void> {
+  if (!isTauri) return;
+  try {
+    await invoke("hide_to_tray");
+  } catch {
+    try {
+      const appWindow = getCurrentWindow();
+      await appWindow.close();
+    } catch (err) {
+      console.warn("Close window error:", err);
+    }
+  }
 }
 
 /**
