@@ -325,12 +325,11 @@ export function ReportsView() {
       </div>
 
       {/* summary strip */}
-      <div className="stagger grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-6 w-full min-w-0">
+      <div className="stagger grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 w-full min-w-0">
         {[
-          { k: "Tracked", v: fmtDur(totalMin), sub: `${workSessions.length} sessions` },
           { k: "Completed", v: String(completedIn.length), sub: "tasks & recurrences" },
           { k: "Active days", v: `${new Set(workSessions.map((s) => isoDate(new Date(s.startedAt)))).size}/${days.length}`, sub: "days with focus" },
-          { k: "Daily average", v: fmtDur(Math.round(totalMin / Math.max(1, days.length))), sub: "per calendar day" },
+          { k: "Pace", v: `${Math.round((completedIn.length / Math.max(1, days.length)) * 10) / 10}/day`, sub: "completion velocity" },
           { k: "Peak hour", v: hourBuckets.some((x) => x > 0) ? `${String(peakHour).padStart(2, "0")}:00` : "—", sub: "most-worked hour" },
           { k: "Avg energy", v: energies.length ? `${(Math.round((energies.reduce((a, x) => a + (x.log?.energy ?? 0), 0) / energies.length) * 10) / 10)}/5` : "—", sub: "from check-ins" },
         ].map((x) => (
@@ -586,26 +585,6 @@ export function ReportsView() {
           </div>
         ), true)}
 
-        {w.sessionQuality && widgetCard("Session quality", "how you focus", (
-          !quality ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No sessions in range.</div> : (
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { k: "Average session", v: fmtDur(quality.avg) },
-                { k: "Longest session", v: fmtDur(quality.longest) },
-                { k: "Deep work (≥25m)", v: `${Math.round((quality.deepMin / Math.max(1, totalMin)) * 100)}%` },
-                { k: "Pauses", v: String(quality.pauses) },
-              ].map((x) => (
-                <div key={x.k} className="rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                  <div className="font-mono text-[18px] font-bold tnum" style={{ color: "var(--accent)" }}>{x.v}</div>
-                  <div className="mt-0.5 text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--mut)" }}>{x.k}</div>
-                </div>
-              ))}
-              <div className="col-span-2 text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
-                Longest session was on “{quality.longestTask}”.
-              </div>
-            </div>
-          )
-        ))}
 
         {w.weekdays && widgetCard("Weekday rhythm", "minutes per weekday", (
           <div className="flex flex-col">

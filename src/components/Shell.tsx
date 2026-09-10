@@ -1541,105 +1541,114 @@ function MiniTimer() {
 
   const big = remainingSec !== null ? fmtHMS(remainingSec) : fmtHMS(elapsedSec);
 
-  if (minimized) {
-    return (
-      <div
-        className="mini-timer fixed z-[60] left-3.5 sm:left-auto sm:right-4 rounded-full border px-3 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-2.5 transition-all hover:scale-105 select-none"
-        style={{
-          bottom: "calc(74px + var(--safe-bottom, 12px))",
-          background: "color-mix(in srgb, var(--panel2) 95%, transparent)",
-          borderColor: "color-mix(in srgb, var(--accent) 55%, var(--line))",
-        }}
-        title={`${label} · Click to expand`}
-      >
-        <span
-          className={cn("h-[8px] w-[8px] rounded-full shrink-0", !openPause && "ring-pulse")}
-          style={{ background: openPause ? "var(--warn)" : "var(--ok)" }}
-        />
-        <span className="font-mono text-[13.5px] font-bold tnum cursor-pointer" onClick={toggleMinimize} style={{ color: "var(--text)" }}>
-          {big}
-        </span>
-        <button
-          type="button"
-          onClick={togglePause}
-          className="p-1 text-[var(--accent)] hover:opacity-75 transition-opacity cursor-pointer"
-          title={openPause ? "Resume" : "Pause"}
-          aria-label={openPause ? "Resume" : "Pause"}
-        >
-          {openPause ? <Play size={12} /> : <Pause size={12} />}
-        </button>
-        <button
-          type="button"
-          onClick={toggleMinimize}
-          className="p-1 text-[var(--mut)] hover:text-[var(--text)] transition-colors cursor-pointer"
-          title="Expand mini timer"
-          aria-label="Expand mini timer"
-        >
-          <Maximize2 size={12} />
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div
-      className="mini-timer fixed z-[60] w-[calc(100%-28px)] sm:w-[290px] left-3.5 sm:left-auto sm:right-4 rounded-2xl border p-3 shadow-2xl backdrop-blur-xl transition-all"
+      className={cn(
+        "mini-timer fixed z-[60] left-3.5 sm:left-auto sm:right-4 border shadow-2xl backdrop-blur-xl transition-all duration-300 ease-out select-none overflow-hidden",
+        minimized
+          ? "rounded-full px-3 py-1.5 w-auto max-w-[210px] hover:scale-105"
+          : "rounded-2xl p-3 w-[calc(100%-28px)] sm:w-[295px]"
+      )}
       style={{
         bottom: "calc(74px + var(--safe-bottom, 12px))",
         background: "color-mix(in srgb, var(--panel2) 95%, transparent)",
-        borderColor: "color-mix(in srgb, var(--accent) 45%, var(--line))",
+        borderColor: minimized
+          ? "color-mix(in srgb, var(--accent) 55%, var(--line))"
+          : "color-mix(in srgb, var(--accent) 45%, var(--line))",
       }}
+      title={minimized ? `${label} · Click to expand` : undefined}
     >
+      {/* Top row: Always present, smoothly transforms */}
       <div className="flex items-center gap-2">
         <span
-          className={cn("h-[9px] w-[9px] rounded-full shrink-0", !openPause && "ring-pulse")}
+          className={cn("h-[8.5px] w-[8.5px] rounded-full shrink-0", !openPause && "ring-pulse")}
           style={{ background: openPause ? "var(--warn)" : "var(--ok)" }}
         />
-        <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--accent)" }}>
-          {openPause ? "Paused" : running.mode === "break" ? "Break" : running.mode}
-        </span>
-        <span className="ml-auto font-mono text-[18px] font-bold tnum" style={{ color: "var(--text)" }}>
+
+        {!minimized && (
+          <span
+            className="text-[10px] font-bold uppercase tracking-[0.14em] truncate transition-opacity duration-200"
+            style={{ color: "var(--accent)" }}
+          >
+            {openPause ? "Paused" : running.mode === "break" ? "Break" : running.mode}
+          </span>
+        )}
+
+        <span
+          className={cn(
+            "font-mono font-bold tnum cursor-pointer transition-all duration-200",
+            minimized ? "text-[13.5px]" : "ml-auto text-[18px]"
+          )}
+          onClick={toggleMinimize}
+          style={{ color: "var(--text)" }}
+        >
           {big}
         </span>
-        <div className="flex items-center gap-0.5 ml-1">
+
+        {minimized && (
           <button
             type="button"
-            onClick={popOutDesktopTimer}
-            className="p-1 rounded text-[var(--mut)] hover:text-[var(--accent)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
-            title="Pop out desktop timer window"
-            aria-label="Desktop popout"
+            onClick={togglePause}
+            className="p-1 text-[var(--accent)] hover:opacity-75 transition-opacity cursor-pointer ml-0.5"
+            title={openPause ? "Resume" : "Pause"}
+            aria-label={openPause ? "Resume" : "Pause"}
           >
-            <ExternalLink size={12} />
+            {openPause ? <Play size={12} /> : <Pause size={12} />}
           </button>
+        )}
+
+        <div className="flex items-center gap-0.5 ml-auto sm:ml-1">
+          {!minimized && (
+            <button
+              type="button"
+              onClick={popOutDesktopTimer}
+              className="p-1 rounded text-[var(--mut)] hover:text-[var(--accent)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
+              title="Pop out desktop timer window"
+              aria-label="Desktop popout"
+            >
+              <ExternalLink size={12} />
+            </button>
+          )}
           <button
             type="button"
             onClick={toggleMinimize}
-            className="p-1 rounded text-[var(--mut)] hover:text-[var(--text)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
-            title="Minimize mini timer"
-            aria-label="Minimize mini timer"
+            className="p-1 rounded text-[var(--mut)] hover:text-[var(--text)] hover:bg-[var(--panel)] transition-all duration-200 cursor-pointer active:scale-90"
+            title={minimized ? "Expand mini timer" : "Minimize mini timer"}
+            aria-label={minimized ? "Expand mini timer" : "Minimize mini timer"}
           >
-            <Minimize2 size={12} />
+            {minimized ? <Maximize2 size={12} /> : <Minimize2 size={12} />}
           </button>
         </div>
       </div>
-      <div className="mt-1 truncate text-[12px] font-bold" title={label}>
-        {label}
-      </div>
-      {pct !== null && (
-        <div className="mt-1.5 h-[5px] overflow-hidden rounded-full" style={{ background: "var(--bg)" }}>
-          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--accent)" }} />
+
+      {/* Expanded body with smooth height/opacity collapse */}
+      <div
+        className={cn(
+          "transition-all duration-300 ease-in-out",
+          minimized
+            ? "max-h-0 opacity-0 pointer-events-none mt-0"
+            : "max-h-[140px] opacity-100 mt-1"
+        )}
+      >
+        <div className="truncate text-[12px] font-bold" title={label}>
+          {label}
         </div>
-      )}
-      <div className="mt-2 flex gap-1.5">
-        <Btn size="sm" variant="soft" className="flex-1" onClick={togglePause}>
-          {openPause ? <Play size={12} /> : <Pause size={12} />} {openPause ? "Resume" : "Pause"}
-        </Btn>
-        <Btn size="sm" variant="danger" onClick={stop}>
-          <Square size={11} /> Stop
-        </Btn>
-        <Btn size="sm" variant="ghost" onClick={() => setView("focus")} title="Open full counter">
-          <Timer size={12} />
-        </Btn>
+        {pct !== null && (
+          <div className="mt-1.5 h-[5px] overflow-hidden rounded-full" style={{ background: "var(--bg)" }}>
+            <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: "var(--accent)" }} />
+          </div>
+        )}
+        <div className="mt-2 flex gap-1.5">
+          <Btn size="sm" variant="soft" className="flex-1" onClick={togglePause}>
+            {openPause ? <Play size={12} /> : <Pause size={12} />} {openPause ? "Resume" : "Pause"}
+          </Btn>
+          <Btn size="sm" variant="danger" onClick={stop}>
+            <Square size={11} /> Stop
+          </Btn>
+          <Btn size="sm" variant="ghost" onClick={() => setView("focus")} title="Open full counter">
+            <Timer size={12} />
+          </Btn>
+        </div>
       </div>
     </div>
   );

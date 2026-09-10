@@ -1,11 +1,14 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
+  Calendar,
   CalendarPlus,
   Check,
+  CheckSquare,
   ChevronDown,
   ChevronRight,
   ChevronUp,
   Circle,
+  Clock,
   Inbox,
   ListChecks,
   Pencil,
@@ -1214,7 +1217,7 @@ function TaskCard({
             </div>
           )}
 
-          {/* Tactile Checkbox */}
+          {/* Todoist-Style Circular Priority Checkbox */}
           <div className="flex items-center justify-center shrink-0 pt-0.5">
             <button
               type="button"
@@ -1224,18 +1227,27 @@ function TaskCard({
                 onToggle();
               }}
               className={cn(
-                "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-md border-[2px] transition-transform active:scale-85 hover:scale-105"
+                "group/check relative flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full border-[2px] transition-all active:scale-90 hover:scale-105"
               )}
               style={{
-                borderColor: done ? "var(--ok)" : proj?.color ?? "var(--accent)",
+                borderColor: done ? "var(--ok)" : PRIORITY_META[t.priority]?.color ?? "var(--accent)",
                 background: done ? "var(--ok)" : "transparent",
                 cursor: "pointer",
                 opacity: snoozed ? 0.5 : 1,
               }}
-              title={done ? "Reopen task" : "Complete task"}
+              title={done ? "Reopen task" : `Complete task (${PRIORITY_META[t.priority].label})`}
               aria-label="Toggle done"
             >
-              {done && <Check size={12} strokeWidth={2.8} style={{ color: "var(--on-accent)" }} />}
+              {done ? (
+                <Check size={11} strokeWidth={3} style={{ color: "var(--on-accent)" }} />
+              ) : (
+                <Check
+                  size={10}
+                  strokeWidth={2.8}
+                  className="opacity-0 group-hover/check:opacity-80 transition-opacity"
+                  style={{ color: PRIORITY_META[t.priority]?.color ?? "var(--accent)" }}
+                />
+              )}
             </button>
           </div>
 
@@ -1262,7 +1274,7 @@ function TaskCard({
                 e.stopPropagation();
                 onEdit();
               }}
-              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--mut)] hover:bg-[var(--panel2)] active:scale-90 cursor-pointer"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--mut)] hover:bg-[var(--panel2)] hover:text-[var(--text)] active:scale-90 cursor-pointer transition-colors"
               aria-label="Edit task"
               title="Edit task"
             >
@@ -1275,8 +1287,8 @@ function TaskCard({
                   e.stopPropagation();
                   onFocus();
                 }}
-                className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--accent)] bg-[var(--accent-soft)] hover:opacity-80 active:scale-90 cursor-pointer"
-                title="Focus on task"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--accent)] bg-[var(--accent-soft)] hover:bg-[var(--accent)] hover:text-[var(--on-accent)] transition-all active:scale-90 cursor-pointer"
+                title="Start focus session (Pomodoro)"
                 aria-label="Start focus"
               >
                 <Play size={12} fill="currentColor" />
@@ -1286,7 +1298,27 @@ function TaskCard({
         </div>
 
         {/* Row 2: Metadata Badges (Project, Due Date, Priority, Tags, Subtasks, Time) */}
-        <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium pt-1">
+        <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium pt-0.5">
+          {/* Due date chip with smart Todoist coloring */}
+          {t.due && (
+            <span
+              className={cn(
+                "chip !py-0.5 text-[10.5px] flex items-center gap-1",
+                overdue
+                  ? "!border-red-500/40 !bg-red-500/10 text-red-600 dark:text-red-400 font-bold"
+                  : t.due === today
+                    ? "!border-amber-500/40 !bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
+                    : "text-[var(--mut)]"
+              )}
+            >
+              <Calendar size={10} className="shrink-0" />
+              <span>
+                {overdue ? "Overdue: " : t.due === today ? "Today" : fmtDayShort(t.due)}
+                {t.dueTime ? ` · ${t.dueTime}` : ""}
+              </span>
+            </span>
+          )}
+
           {/* Priority chip */}
           {t.priority === "urgent" ? (
             <span
@@ -1306,23 +1338,9 @@ function TaskCard({
 
           {/* Project chip */}
           {proj && (
-            <span className="chip !py-0.5 text-[10.5px]">
-              <span className="h-[7px] w-[7px] rounded-full" style={{ background: proj.color }} />
-              {proj.emoji} {proj.name}
-            </span>
-          )}
-
-          {/* Due date chip */}
-          {t.due && (
-            <span
-              className={cn(
-                "chip !py-0.5 text-[10.5px]",
-                overdue && "!border-red-500/40 !bg-red-500/10 text-red-600 dark:text-red-400 font-bold"
-              )}
-            >
-              📅 {overdue ? "overdue · " : ""}
-              {fmtDayShort(t.due)}
-              {t.dueTime ? ` · ${t.dueTime}` : ""}
+            <span className="chip !py-0.5 text-[10.5px] flex items-center gap-1">
+              <span className="h-[6px] w-[6px] rounded-full shrink-0" style={{ background: proj.color }} />
+              <span className="font-semibold text-[var(--mut)]">#{proj.name}</span>
             </span>
           )}
 
@@ -1339,7 +1357,7 @@ function TaskCard({
                 className="h-[6px] w-[6px] rounded-full"
                 style={{ background: state.tagColors[tag] ?? "var(--accent)" }}
               />
-              #{tag}
+              @{tag}
             </span>
           ))}
 
@@ -1348,34 +1366,43 @@ function TaskCard({
             <button
               type="button"
               onClick={() => setChainOpen((v) => !v)}
-              className="chip shrink-0 !py-0.5 text-[10.5px] cursor-pointer hover:bg-[var(--panel2)] active:scale-95"
+              className="chip shrink-0 !py-0.5 text-[10.5px] cursor-pointer hover:bg-[var(--panel2)] active:scale-95 flex items-center gap-1"
               style={{
                 color: subDone === t.subtasks.length ? "var(--ok)" : "var(--mut)",
+                borderColor: subDone === t.subtasks.length ? "var(--ok)" : undefined,
               }}
+              title="Toggle subtasks checklist"
             >
-              {chainOpen ? <ChevronDown size={11} /> : <ChevronRight size={11} />} {subDone}/
-              {t.subtasks.length} steps
+              <CheckSquare size={10} />
+              <span>{subDone}/{t.subtasks.length}</span>
+              {chainOpen ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
             </button>
           )}
 
           {/* Recurrence chip */}
           {t.recurrence && (
-            <span className="chip !py-0.5 text-[10.5px] text-[var(--accent)]">
+            <span className="chip !py-0.5 text-[10.5px] text-[var(--accent)] flex items-center gap-1">
               <Repeat size={9} /> {describeRecurrence(t.recurrence)}
             </span>
           )}
 
-          {/* Estimate chip */}
-          {t.estimateMin > 0 && (
-            <span className="chip !py-0.5 text-[10.5px] text-[var(--mut)]">
-              ⏳ est {fmtDur(t.estimateMin)}
-            </span>
-          )}
-
-          {/* Logged time chip */}
-          {tracked > 0 && (
-            <span className="chip !py-0.5 text-[10.5px] text-[var(--accent)] font-bold">
-              ▸ {fmtDur(tracked)} logged
+          {/* Super Productivity Unified Time Tracking & Estimate Badge */}
+          {(tracked > 0 || t.estimateMin > 0) && (
+            <span
+              className={cn(
+                "chip !py-0.5 text-[10.5px] font-mono font-medium tnum flex items-center gap-1",
+                tracked > 0 ? "text-[var(--accent)] border-[var(--accent)]/30" : "text-[var(--mut)]"
+              )}
+              title={`Tracked: ${fmtDur(tracked || 0)} · Planned: ${t.estimateMin > 0 ? fmtDur(t.estimateMin) : "none"}`}
+            >
+              <Clock size={10} className="shrink-0" />
+              <span>{fmtDur(tracked || 0)}</span>
+              {t.estimateMin > 0 && (
+                <>
+                  <span className="opacity-40">/</span>
+                  <span className="text-[var(--mut)]">{fmtDur(t.estimateMin)}</span>
+                </>
+              )}
             </span>
           )}
         </div>
@@ -1398,7 +1425,7 @@ function TaskCard({
               >
                 <button
                   onClick={() => toggleSub(s.id)}
-                  className="flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all hover:scale-110"
+                  className="group/subcheck flex h-[16px] w-[16px] shrink-0 items-center justify-center rounded-full border-[1.5px] transition-all hover:scale-110"
                   style={{
                     borderColor: s.done ? "var(--ok)" : "var(--line)",
                     background: s.done ? "var(--ok)" : "transparent",
@@ -1406,7 +1433,11 @@ function TaskCard({
                   }}
                   aria-label="Toggle subtask"
                 >
-                  {s.done && <Check size={10} style={{ color: "var(--on-accent)" }} />}
+                  {s.done ? (
+                    <Check size={9} strokeWidth={3} style={{ color: "var(--on-accent)" }} />
+                  ) : (
+                    <Check size={8} strokeWidth={2.5} className="opacity-0 group-hover/subcheck:opacity-60 text-[var(--mut)]" />
+                  )}
                 </button>
                 <span
                   className={cn(

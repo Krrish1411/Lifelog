@@ -170,13 +170,16 @@ export function HabitsView() {
                               title={`${fmtDayShort(iso)}${future ? " · future (locked)" : locked ? " · locked — use Edit past days" : done ? " · done" : ""}`}
                               className="h-[14px] w-[14px] rounded-[3.5px] transition-all"
                               style={{
-                                background: done ? h.color : "var(--panel2)",
-                                border: done ? `1px solid color-mix(in srgb, ${h.color} 80%, black)` : "1px solid var(--line)",
-                                outline: isToday ? `1.5px solid ${done ? "var(--text)" : h.color}` : "none",
+                                background: done ? h.color : "color-mix(in srgb, var(--panel2) 80%, var(--bg) 20%)",
+                                border: done
+                                  ? `1.5px solid color-mix(in srgb, ${h.color} 70%, var(--text) 30%)`
+                                  : "1.5px solid color-mix(in srgb, var(--text) 24%, var(--line) 76%)",
+                                outline: isToday ? `2px solid ${done ? "var(--text)" : h.color}` : "none",
                                 outlineOffset: 1.5,
-                                opacity: future ? 0.28 : locked && !done ? 0.75 : 1,
+                                opacity: future ? 0.25 : locked && !done ? 0.8 : 1,
                                 cursor: canClick ? "pointer" : future ? "not-allowed" : "default",
                                 transform: hoverDay === iso && canClick ? "scale(1.35)" : "scale(1)",
+                                boxShadow: done ? "0 1px 2px rgba(0,0,0,0.15)" : "none",
                               }}
                               aria-label={iso}
                             />

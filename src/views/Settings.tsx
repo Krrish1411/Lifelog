@@ -288,8 +288,8 @@ export function SettingsView() {
     toast(lines.length ? `${lines.length} personal line(s) saved — mixed into the greeting` : "Personal quotes cleared", "ok");
   };
 
-  const section = (title: string, sub: string, body: React.ReactNode, span = false) => (
-    <div className={cn("card card-hover p-4", span && "lg:col-span-2")}>
+  const section = (title: string, sub: string, body: React.ReactNode, span = false, className?: string) => (
+    <div className={cn("card card-hover p-4", span && "lg:col-span-2", className)}>
       <div className="font-display text-[15px] font-bold tracking-tight">{title}</div>
       <div className="mb-3 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>{sub}</div>
       {body}
@@ -400,7 +400,8 @@ export function SettingsView() {
               })}
             </div>
           ),
-          true
+          true,
+          "hidden md:block"
         )}
 
         {section("Profile", "Used in greetings across the app.", (

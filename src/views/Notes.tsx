@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
-  Bold, CheckSquare, Film, FolderPlus, Heading1, Heading2,
+  Bold, CheckSquare, ChevronDown, ChevronRight, Film, Folder, FolderOpen, FolderPlus, Heading1, Heading2,
   Highlighter, ImageIcon, Italic, Link2, List, ListOrdered, ListTodo,
   Lock, Maximize2, Mic, Minimize2, Minus, PanelLeft,
   Paperclip, Pencil, Pin, PinOff, Plus, Quote, Square, Strikethrough,
@@ -38,6 +38,23 @@ export function NotesView() {
   const [showNewFolder, setShowNewFolder] = useState(false);
   const [editingFolder, setEditingFolder] = useState<{ id: string; name: string } | null>(null);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>(() => {
+    try {
+      const saved = localStorage.getItem("lifelog.notes.expandedFolders");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { "f-daily": true };
+  });
+
+  const toggleFolderExpand = (folderId: string) => {
+    setExpandedFolders((prev) => {
+      const next = { ...prev, [folderId]: !prev[folderId] };
+      try {
+        localStorage.setItem("lifelog.notes.expandedFolders", JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  };
 
   useBodyScrollLock(drawerOpen);
   const [popped, setPopped] = useState(false);
@@ -451,131 +468,289 @@ export function NotesView() {
     </div>
   );
 
-  /* ---------------- Folders sidebar content ---------------- */
-  const foldersContent = (
-    <div className="flex flex-col gap-1 overflow-y-auto p-2.5 w-full min-w-0">
-      <div className="text-[10px] font-bold uppercase tracking-wider px-2 py-1" style={{ color: "var(--mut)" }}>
-        Folders
-      </div>
-      {[{ id: "all", name: "All notes", emoji: "🗂️", pinned: false }, ...folders.map((f) => ({ id: f.id, name: f.name, emoji: f.id === "f-daily" ? "📅" : "📁", pinned: !!f.pinned }))].map((f) => {
-        const count = f.id === "all" ? state.notes.length : state.notes.filter((n) => n.folderId === f.id).length;
-        return (
-          <div key={f.id} className="group flex items-center gap-1">
-            <button
-              onClick={() => { setFolderSel(f.id); }}
-              className="flex min-w-0 flex-1 items-center gap-2 rounded-lg px-2.5 py-2 text-left text-[12.5px] font-bold transition-all"
-              style={folderSel === f.id ? { background: "var(--accent-soft)", color: "var(--accent)" } : { color: "var(--text)", cursor: "pointer" }}
-            >
-              <span>{f.pinned ? "📌" : f.emoji}</span>
-              <span className="truncate">{f.name}</span>
-              <span className="tnum ml-auto text-[10.5px] px-1.5 py-0.5 rounded-full" style={{ background: "var(--panel2)", color: "var(--mut)" }}>{count}</span>
-            </button>
-            {f.id !== "all" && (
-              <span className="flex items-center gap-0.5 pr-1 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => togglePinFolder(f.id, f.pinned)}
-                  className="rounded p-1 text-[var(--mut)] hover:text-[var(--accent)] transition-colors cursor-pointer"
-                  style={{ color: f.pinned ? "var(--accent)" : undefined }}
-                  title={f.pinned ? "Unpin folder" : "Pin folder"}
-                >
-                  {f.pinned ? <PinOff size={12} /> : <Pin size={12} />}
-                </button>
-                {f.id !== "f-daily" && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => setEditingFolder({ id: f.id, name: f.name })}
-                      className="rounded p-1 text-[var(--mut)] hover:text-[var(--text)] transition-colors cursor-pointer"
-                      title="Rename folder"
-                    >
-                      <Pencil size={12} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => deleteFolder(f.id)}
-                      className="rounded p-1 text-[var(--mut)] hover:text-[var(--danger)] transition-colors cursor-pointer"
-                      title="Delete folder"
-                    >
-                      <Trash2 size={12} />
-                    </button>
-                  </>
-                )}
-              </span>
+  const createNoteInFolder = (folderId: string) => {
+    const id = uid();
+    const actualFolder = folderId === "all" ? (state.folders.find((f) => f.id !== "f-daily")?.id ?? "f-daily") : folderId;
+    set((s) => ({
+      ...s,
+      notes: [
+        {
+          id,
+          title: "Untitled note",
+          folderId: actualFolder,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          blob: { plain: "" },
+          daily: false,
+          day: null,
+        },
+        ...s.notes,
+      ],
+    }));
+    setExpandedFolders((prev) => ({ ...prev, [actualFolder]: true }));
+    loadedFor.current = null;
+    setSelId(id);
+    setDrawerOpen(false);
+    toast("Note created — encrypted as you type", "ok");
+  };
+
+  const renderNoteItem = (n: Note, isNested: boolean) => {
+    const isSelected = selId === n.id;
+    return (
+      <div key={n.id} className="group/note relative flex items-center">
+        <button
+          onClick={() => {
+            loadedFor.current = null;
+            setSelId(n.id);
+            setDrawerOpen(false);
+          }}
+          className={cn(
+            "min-w-0 flex-1 rounded-lg px-2.5 py-1.5 text-left transition-all cursor-pointer flex items-center justify-between gap-1.5",
+            isSelected
+              ? "bg-[var(--accent-soft)] text-[var(--accent)] font-bold shadow-2xs border border-[var(--accent)]/30"
+              : "text-[var(--text)] hover:bg-[var(--panel2)] border border-transparent font-medium"
+          )}
+        >
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            {n.pinned ? (
+              <Pin size={11} className="text-[var(--accent)] shrink-0" fill="currentColor" />
+            ) : n.daily ? (
+              <span className="text-[12px] shrink-0">📅</span>
+            ) : (
+              <FileText size={12} className={isSelected ? "text-[var(--accent)] shrink-0" : "text-[var(--mut)] shrink-0"} />
+            )}
+            <span className="truncate text-[12.5px]">
+              {n.title || "Untitled note"}
+            </span>
+            {(n.attachments?.length ?? 0) > 0 && (
+              <Paperclip size={10} className="text-[var(--mut)] shrink-0" />
             )}
           </div>
-        );
-      })}
-      {showNewFolder ? (
-        <div className="mt-1 flex gap-1 px-1">
-          <TextInput autoFocus value={newFolder} onChange={(e) => setNewFolder(e.target.value)} onKeyDown={(e) => e.key === "Enter" && addFolder()} placeholder="Folder name" />
-        </div>
-      ) : (
-        <button onClick={() => setShowNewFolder(true)} className="mt-1 flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[12px] font-bold text-[var(--accent)] hover:bg-[var(--panel2)] transition-colors cursor-pointer">
-          <FolderPlus size={13} /> New folder
+          <span className="text-[10px] text-[var(--mut)] shrink-0 tnum ml-1">
+            {fmtDayShort(isoOf(n.updatedAt))}
+          </span>
         </button>
-      )}
-    </div>
-  );
 
-  /* ---------------- Notes list sidebar content ---------------- */
-  const notesListContent = (
+        {/* Note quick actions on hover */}
+        <div className="absolute right-1 top-1/2 -translate-y-1/2 hidden group-hover/note:flex items-center gap-0.5 bg-[var(--panel)] rounded-md p-0.5 shadow-sm border border-[var(--line)]">
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); togglePinNote(n); }}
+            className="p-1 text-[var(--mut)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+            title={n.pinned ? "Unpin note" : "Pin note"}
+          >
+            {n.pinned ? <PinOff size={11} /> : <Pin size={11} />}
+          </button>
+          <button
+            type="button"
+            onClick={(e) => { e.stopPropagation(); deleteNote(n); }}
+            className="p-1 text-[var(--mut)] hover:text-[var(--danger)] transition-colors cursor-pointer"
+            title="Delete note"
+          >
+            <Trash2 size={11} />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  /* ---------------- Unified Folder & Notes Tree Content ---------------- */
+  const sidebarTreeContent = (
     <div className="flex min-h-0 flex-1 flex-col p-2.5 w-full min-w-0 overflow-hidden">
+      {/* Top Header & Actions */}
       <div className="flex items-center justify-between px-2 pb-2">
         <span className="text-[11px] font-bold uppercase tracking-wider" style={{ color: "var(--mut)" }}>
-          {notes.length} {notes.length === 1 ? "Note" : "Notes"}
+          Folders & Notes
         </span>
-        <button onClick={createNote} className="flex items-center gap-1 text-[11px] font-bold text-[var(--accent)] hover:underline cursor-pointer">
-          <Plus size={13} /> New
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setShowNewFolder(true)}
+            className="flex items-center gap-1 text-[11px] font-bold text-[var(--mut)] hover:text-[var(--text)] transition-colors cursor-pointer p-0.5"
+            title="New folder"
+          >
+            <FolderPlus size={13} />
+          </button>
+          <button
+            onClick={createNote}
+            className="flex items-center gap-1 text-[11px] font-bold text-[var(--accent)] hover:underline cursor-pointer"
+            title="New note"
+          >
+            <Plus size={13} /> Note
+          </button>
+        </div>
       </div>
+
+      {/* Inline New Folder creation input */}
+      {showNewFolder && (
+        <div className="mb-2 px-1 flex gap-1 items-center">
+          <TextInput
+            autoFocus
+            value={newFolder}
+            onChange={(e) => setNewFolder(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") addFolder();
+              if (e.key === "Escape") { setShowNewFolder(false); setNewFolder(""); }
+            }}
+            placeholder="Folder name…"
+            className="text-xs !py-1"
+          />
+          <Btn size="sm" variant="primary" onClick={addFolder} className="!py-1 !px-2 shrink-0">Add</Btn>
+          <button onClick={() => { setShowNewFolder(false); setNewFolder(""); }} className="p-1 text-[var(--mut)] hover:text-[var(--text)] cursor-pointer">
+            <X size={13} />
+          </button>
+        </div>
+      )}
+
+      {/* Tree scroll area */}
       <div className="flex-1 overflow-y-auto pr-0.5 space-y-1">
-        {notes.length === 0 && <EmptyState icon={Lock} title="No notes found" body="Create a note or select another folder." />}
-        {notes.map((n) => {
-          const isSelected = selId === n.id;
-          return (
-            <div key={n.id} className="group relative flex items-center">
-              <button
-                onClick={() => {
-                  loadedFor.current = null;
-                  setSelId(n.id);
-                  setDrawerOpen(false);
-                }}
-                className={cn(
-                  "min-w-0 flex-1 rounded-xl border px-3 py-2.5 text-left transition-all cursor-pointer",
-                  isSelected
-                    ? "border-[var(--accent)] bg-[var(--accent-soft)] shadow-xs"
-                    : "border-[var(--line)] bg-[var(--panel)] hover:bg-[var(--panel2)]"
-                )}
-              >
-                <div className="flex items-center gap-1.5 pr-12">
-                  {n.pinned && <Pin size={11} fill="var(--accent)" style={{ color: "var(--accent)" }} />}
-                  {n.daily && <span className="text-[12px]">📅</span>}
-                  <span className={cn("truncate text-[13px] font-bold", isSelected ? "text-[var(--accent)]" : "text-[var(--text)]")}>
-                    {n.title || "Untitled note"}
-                  </span>
-                  {(n.attachments?.length ?? 0) > 0 && <Paperclip size={10} style={{ color: "var(--mut)" }} />}
-                </div>
-                <div className="mt-1 flex items-center justify-between text-[10.5px] font-medium tnum" style={{ color: "var(--mut)" }}>
-                  <span className="truncate">
-                    {n.daily && n.day ? fmtDayShort(n.day) : state.folders.find((f) => f.id === n.folderId)?.name}
-                  </span>
-                  <span className="shrink-0 ml-1">
-                    {fmtDayShort(isoOf(n.updatedAt))}
-                  </span>
-                </div>
-              </button>
-              <div className="absolute right-2 top-2 flex sm:hidden sm:group-hover:flex items-center gap-1 bg-[var(--panel)] rounded-md p-1 shadow-sm border border-[var(--line)]">
-                <button onClick={(e) => { e.stopPropagation(); togglePinNote(n); }} style={{ color: n.pinned ? "var(--accent)" : "var(--mut)", cursor: "pointer" }} title={n.pinned ? "Unpin" : "Pin"}>
-                  {n.pinned ? <PinOff size={12} /> : <Pin size={12} />}
-                </button>
-                <button onClick={(e) => { e.stopPropagation(); deleteNote(n); }} style={{ color: "var(--danger)", cursor: "pointer" }} title="Delete">
-                  <Trash2 size={12} />
-                </button>
-              </div>
+        {/* If user searched query, show flat search matches */}
+        {query.trim() ? (
+          <div>
+            <div className="text-[10.5px] font-bold uppercase tracking-wider text-[var(--mut)] px-2 py-1">
+              Search Results ({notes.length})
             </div>
-          );
-        })}
+            {notes.length === 0 ? (
+              <div className="p-4 text-center text-xs text-[var(--mut)]">No notes matching “{query}”</div>
+            ) : (
+              notes.map((n) => renderNoteItem(n, false))
+            )}
+          </div>
+        ) : (
+          <>
+            {/* All Notes Root Option */}
+            <div
+              className={cn(
+                "flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-bold transition-colors cursor-pointer hover:bg-[var(--panel2)]",
+                folderSel === "all" ? "bg-[var(--panel2)] text-[var(--accent)]" : "text-[var(--text)]"
+              )}
+              onClick={() => setFolderSel("all")}
+            >
+              <span className="text-[13px]">🗂️</span>
+              <span className="truncate flex-1">All notes</span>
+              <span
+                className="tnum text-[10.5px] px-1.5 py-0.2 rounded-full ml-auto shrink-0"
+                style={{ background: "var(--panel)", color: "var(--mut)" }}
+              >
+                {state.notes.length}
+              </span>
+            </div>
+
+            {/* Folders Accordion Nodes */}
+            {folders.map((f) => {
+              const isExpanded = !!expandedFolders[f.id];
+              const folderNotes = state.notes
+                .filter((n) => n.folderId === f.id)
+                .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt);
+
+              const displayedNotes = (f.id === "f-daily" && selId?.startsWith("draft-daily-"))
+                ? [
+                    {
+                      id: selId,
+                      title: draft.title || fmtNoteName(selId.replace("draft-daily-", "") || today),
+                      folderId: "f-daily",
+                      createdAt: Date.now(),
+                      updatedAt: Date.now(),
+                      blob: { plain: "" },
+                      daily: true,
+                      day: selId.replace("draft-daily-", "") || today,
+                    } as Note,
+                    ...folderNotes,
+                  ]
+                : folderNotes;
+
+              return (
+                <div key={f.id} className="flex flex-col group/folder select-none">
+                  {/* Folder Header Row */}
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-bold transition-colors cursor-pointer hover:bg-[var(--panel2)]",
+                      selFolder?.id === f.id ? "text-[var(--accent)]" : "text-[var(--text)]"
+                    )}
+                    onClick={() => {
+                      setFolderSel(f.id);
+                      toggleFolderExpand(f.id);
+                    }}
+                  >
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); toggleFolderExpand(f.id); }}
+                      className="p-0.5 text-[var(--mut)] hover:text-[var(--text)] transition-transform"
+                      aria-label="Toggle folder"
+                    >
+                      {isExpanded ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
+                    </button>
+                    <span className="text-[13px]">{f.id === "f-daily" ? "📅" : isExpanded ? "📂" : "📁"}</span>
+                    <span className="truncate flex-1">{f.name}</span>
+                    <span
+                      className="tnum text-[10.5px] px-1.5 py-0.2 rounded-full ml-auto shrink-0"
+                      style={{ background: "var(--panel)", color: "var(--mut)" }}
+                    >
+                      {displayedNotes.length}
+                    </span>
+
+                    {/* Folder inline action buttons on hover */}
+                    <div className="hidden group-hover/folder:flex items-center gap-0.5 shrink-0 ml-1">
+                      {f.id !== "f-daily" && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); createNoteInFolder(f.id); }}
+                          className="rounded p-1 text-[var(--mut)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                          title="New note in folder"
+                        >
+                          <Plus size={11} />
+                        </button>
+                      )}
+                      {f.id !== "all" && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); togglePinFolder(f.id, f.pinned); }}
+                          className="rounded p-1 text-[var(--mut)] hover:text-[var(--accent)] transition-colors cursor-pointer"
+                          style={{ color: f.pinned ? "var(--accent)" : undefined }}
+                          title={f.pinned ? "Unpin folder" : "Pin folder"}
+                        >
+                          {f.pinned ? <PinOff size={11} /> : <Pin size={11} />}
+                        </button>
+                      )}
+                      {f.id !== "f-daily" && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); setEditingFolder({ id: f.id, name: f.name }); }}
+                            className="rounded p-1 text-[var(--mut)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                            title="Rename folder"
+                          >
+                            <Pencil size={11} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => { e.stopPropagation(); deleteFolder(f.id); }}
+                            className="rounded p-1 text-[var(--mut)] hover:text-[var(--danger)] transition-colors cursor-pointer"
+                            title="Delete folder"
+                          >
+                            <Trash2 size={11} />
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Notes Inside Folder (Indented Tree Children) */}
+                  {isExpanded && (
+                    <div className="pl-3.5 ml-2 border-l border-[var(--line)] flex flex-col space-y-0.5 mt-0.5 mb-1">
+                      {displayedNotes.length === 0 ? (
+                        <div className="py-1 px-2 text-[11px] text-[var(--mut)] italic">
+                          No notes in folder
+                        </div>
+                      ) : (
+                        displayedNotes.map((n) => renderNoteItem(n, true))
+                      )}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </>
+        )}
       </div>
     </div>
   );
@@ -692,9 +867,9 @@ export function NotesView() {
               </div>
             </div>
 
-            {/* Centered Document Canvas (Obsidian / Notion Page) */}
+            {/* Document Canvas (Obsidian / Notion Page) */}
             <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
-              <div className={cn("mx-auto w-full max-w-[760px] flex flex-col min-h-full px-2 sm:px-6 pt-5 pb-8", popout && "max-w-[860px]")}>
+              <div className="w-full max-w-none flex flex-col min-h-full px-3 sm:px-6 md:px-8 lg:px-12 pt-4 pb-8">
                 {/* Notion-style Page Icon */}
                 <div className="text-3xl mb-1 select-none flex items-center gap-2">
                   <span>{isDaily ? "📅" : "📝"}</span>
@@ -854,18 +1029,13 @@ export function NotesView() {
             </div>
 
             {/* Search Input */}
-            <div className="px-3 pt-3 shrink-0">
+            <div className="px-3 pt-3 pb-1 shrink-0">
               <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" />
             </div>
 
-            {/* Folders List in Drawer */}
-            <div className="border-b border-[var(--line)] shrink-0 max-h-[190px] overflow-y-auto overscroll-contain">
-              {foldersContent}
-            </div>
-
-            {/* Notes List in Drawer */}
+            {/* Unified Folders & Notes Tree in Drawer */}
             <div className="flex-1 min-h-0 overflow-hidden flex flex-col overscroll-contain">
-              {notesListContent}
+              {sidebarTreeContent}
             </div>
           </aside>
         </div>
@@ -883,14 +1053,9 @@ export function NotesView() {
             <SearchInput value={query} onChange={setQuery} placeholder="Search notes…" />
           </div>
 
-          {/* Folders List in Sidebar */}
-          <div className="border-b border-[var(--line)] shrink-0 max-h-[190px] overflow-y-auto">
-            {foldersContent}
-          </div>
-
-          {/* Notes List in Sidebar */}
+          {/* Unified Folders & Notes Tree in Sidebar */}
           <div className="flex-1 min-h-0 overflow-hidden flex flex-col">
-            {notesListContent}
+            {sidebarTreeContent}
           </div>
         </aside>
 
