@@ -6,12 +6,12 @@ use tauri::{
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 
 #[tauri::command]
-fn update_tray_status(app: tauri::AppHandle, title: String, tooltip: String) -> Result<(), String> {
+fn update_tray_status(app: tauri::AppHandle, _title: String, tooltip: String) -> Result<(), String> {
     if let Some(tray) = app.tray_by_id("main-tray") {
         let _ = tray.set_tooltip(Some(&tooltip));
         #[cfg(target_os = "macos")]
         {
-            let _ = tray.set_title(Some(&title));
+            let _ = tray.set_title(Some(&_title));
         }
     }
     Ok(())
