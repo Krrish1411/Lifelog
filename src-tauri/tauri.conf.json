@@ -76,8 +76,7 @@
     },
     "macOS": {
       "frameworks": [],
-      "minimumSystemVersion": "10.15",
-      "license": null
+      "minimumSystemVersion": "10.15"
     }
   }
 }
