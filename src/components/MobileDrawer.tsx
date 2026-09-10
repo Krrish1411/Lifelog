@@ -214,7 +214,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
 
       {/* Drawer content panel */}
       <aside
-        className="relative z-10 flex h-full w-[290px] max-w-[85vw] flex-col border-r bg-[var(--panel)] shadow-2xl transition-transform animate-in slide-in-from-left duration-250 select-none overscroll-contain"
+        className="relative z-10 flex h-full w-[290px] max-w-[85vw] flex-col border-r glass-regular shadow-2xl transition-transform animate-in slide-in-from-left duration-250 select-none overscroll-contain"
         style={{
           borderColor: "var(--line)",
           paddingTop: "max(calc(var(--safe-top) + 8px), 16px)",

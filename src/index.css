@@ -127,12 +127,11 @@ body {
   content: "";
   position: absolute;
   border-radius: 50%;
-  filter: blur(42px);
+  filter: blur(85px);
   will-change: transform;
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
   pointer-events: none;
-  contain: strict;
 }
 .ambient::before {
   width: 52vw;
@@ -518,6 +517,15 @@ html[data-engine="zen"] .card {
     radial-gradient(ellipse 50% 50% at 50% 85%, rgba(245, 158, 11, 0.08) 0%, transparent 60%);
 }
 
+/* Light Mode Liquid Mesh Field (Rich ambient chromatic luminescence for frosted glass refraction) */
+html:not([data-theme="dark"]) .liquid-field {
+  background:
+    radial-gradient(ellipse 85% 70% at 50% 15%, color-mix(in srgb, var(--accent) 16%, #ffffff) 0%, transparent 70%),
+    radial-gradient(ellipse 70% 60% at 10% 20%, rgba(56, 189, 248, 0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 65% 65% at 90% 80%, rgba(192, 132, 252, 0.20) 0%, transparent 70%),
+    radial-gradient(ellipse 55% 55% at 50% 90%, rgba(245, 158, 11, 0.16) 0%, transparent 65%);
+}
+
 /* On mobile screens (< 768px), disable liquid mesh in Classic mode to conserve GPU & battery */
 @media (max-width: 767px) {
   html[data-mobile-engine="classic"] .liquid-field {
@@ -528,12 +536,11 @@ html[data-engine="zen"] .card {
 .liquid-field .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(44px);
+  filter: blur(85px);
   will-change: transform;
   transform: translate3d(0, 0, 0);
   backface-visibility: hidden;
   pointer-events: none;
-  contain: strict;
 }
 
 /* Dark Mode Liquid Blobs (Rich, vibrant fluid luminescence behind glass) */
@@ -577,48 +584,48 @@ html[data-theme="dark"] .liquid-field .blob.b4 {
   animation: liquid-d 42s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
-/* Light Mode Liquid Blobs (Fresh crystalline prismatic refraction) */
+/* Light Mode Liquid Blobs (Radiant pastel chromatic glow for high-contrast Apple frosted glass) */
 html:not([data-theme="dark"]) .liquid-field .blob.b1 {
-  width: 55vw;
-  height: 55vw;
+  width: 58vw;
+  height: 58vw;
   left: -8vw;
   top: -10vw;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 22%, transparent) 0%, transparent 65%);
-  opacity: 0.55;
-  filter: blur(48px);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 32%, #f43f5e) 0%, rgba(254, 205, 211, 0.65) 42%, transparent 70%);
+  opacity: 0.68;
+  filter: blur(95px);
   animation: liquid-a 28s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b2 {
-  width: 46vw;
-  height: 46vw;
+  width: 48vw;
+  height: 48vw;
   right: -6vw;
-  top: 18vh;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.2) 0%, transparent 65%);
-  opacity: 0.48;
-  filter: blur(48px);
+  top: 16vh;
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.38) 0%, rgba(186, 230, 253, 0.65) 44%, transparent 70%);
+  opacity: 0.62;
+  filter: blur(95px);
   animation: liquid-b 34s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b3 {
-  width: 40vw;
-  height: 40vw;
-  left: 22vw;
+  width: 44vw;
+  height: 44vw;
+  left: 20vw;
   bottom: -8vw;
-  background: radial-gradient(circle, rgba(232, 121, 249, 0.18) 0%, transparent 65%);
-  opacity: 0.42;
-  filter: blur(48px);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.32) 0%, rgba(233, 213, 255, 0.60) 45%, transparent 70%);
+  opacity: 0.58;
+  filter: blur(95px);
   animation: liquid-c 40s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b4 {
-  width: 36vw;
-  height: 36vw;
-  right: 20vw;
+  width: 40vw;
+  height: 40vw;
+  right: 18vw;
   bottom: 8vh;
-  background: radial-gradient(circle, rgba(251, 191, 36, 0.18) 0%, transparent 65%);
-  opacity: 0.42;
-  filter: blur(48px);
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.30) 0%, rgba(254, 240, 138, 0.58) 48%, transparent 70%);
+  opacity: 0.56;
+  filter: blur(95px);
   animation: liquid-d 44s ease-in-out infinite alternate;
 }
 
@@ -644,16 +651,17 @@ html:not([data-theme="dark"]) .liquid-field .blob.b4 {
 /* TIER 1: Glass Regular (Navigation sidebars, toolbars, main control bars) */
 .glass-regular {
   position: relative;
-  backdrop-filter: blur(24px) saturate(190%);
-  -webkit-backdrop-filter: blur(24px) saturate(190%);
+  backdrop-filter: blur(32px) saturate(210%) contrast(104%);
+  -webkit-backdrop-filter: blur(32px) saturate(210%) contrast(104%);
   transform: translateZ(0);
   backface-visibility: hidden;
-  background: color-mix(in srgb, var(--panel) 72%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
+  background: rgba(255, 255, 255, 0.72) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
   box-shadow:
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.85),
-    0 14px 34px -10px rgba(0, 0, 0, 0.08),
-    0 1px 3px 0 rgba(0, 0, 0, 0.03);
+    inset 0 1.5px 0.5px 0 #ffffff,
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.4),
+    0 16px 36px -12px rgba(15, 23, 42, 0.08),
+    0 2px 6px -1px rgba(15, 23, 42, 0.04);
 }
 html[data-theme="dark"] .glass-regular {
   background: color-mix(in srgb, var(--panel) 52%, transparent) !important;
@@ -668,16 +676,16 @@ html[data-theme="dark"] .glass-regular {
 /* TIER 2: Glass Elevated (Floating pill bars, modals, mini-timer, palette) */
 .glass-elevated {
   position: relative;
-  backdrop-filter: blur(28px) saturate(200%);
-  -webkit-backdrop-filter: blur(28px) saturate(200%);
+  backdrop-filter: blur(40px) saturate(230%) contrast(108%);
+  -webkit-backdrop-filter: blur(40px) saturate(230%) contrast(108%);
   transform: translateZ(0);
   backface-visibility: hidden;
-  background: color-mix(in srgb, var(--panel) 80%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent) !important;
+  background: rgba(255, 255, 255, 0.82) !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
   box-shadow:
-    inset 0 1.25px 0 0 rgba(255, 255, 255, 0.95),
-    0 24px 60px -16px rgba(0, 0, 0, 0.12),
-    0 2px 8px 0 rgba(0, 0, 0, 0.04);
+    inset 0 1.5px 0.5px 0 #ffffff,
+    0 24px 60px -16px rgba(15, 23, 42, 0.12),
+    0 4px 12px -2px rgba(15, 23, 42, 0.05);
 }
 html[data-theme="dark"] .glass-elevated {
   background: color-mix(in srgb, var(--panel) 62%, transparent) !important;
@@ -692,20 +700,22 @@ html[data-theme="dark"] .glass-elevated {
 /* TIER 3: Glass Clear (Pill buttons, chips, filter tabs, secondary controls) */
 .glass-clear {
   position: relative;
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: color-mix(in srgb, var(--panel) 42%, transparent);
-  border: 1px solid color-mix(in srgb, var(--line) 75%, transparent);
+  backdrop-filter: blur(20px) saturate(190%);
+  -webkit-backdrop-filter: blur(20px) saturate(190%);
+  background: rgba(255, 255, 255, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.80);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.85);
   transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
 }
 .glass-clear:hover {
-  background: color-mix(in srgb, var(--panel) 65%, transparent);
-  border-color: color-mix(in srgb, var(--accent) 40%, var(--line));
+  background: rgba(255, 255, 255, 0.78);
+  border-color: rgba(255, 255, 255, 0.95);
   transform: translateY(-1px);
 }
 html[data-theme="dark"] .glass-clear {
   background: color-mix(in srgb, var(--panel2) 42%, transparent);
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  box-shadow: none;
 }
 html[data-theme="dark"] .glass-clear:hover {
   background: color-mix(in srgb, var(--panel2) 70%, transparent);
@@ -720,7 +730,7 @@ html[data-theme="dark"] .glass-clear:hover {
   background: color-mix(in srgb, var(--accent) 22%, color-mix(in srgb, var(--panel) 75%, transparent));
   border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
   box-shadow:
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.5),
+    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.6),
     0 12px 28px -8px color-mix(in srgb, var(--accent) 35%, transparent);
   transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
 }
@@ -739,15 +749,16 @@ html[data-theme="dark"] .glass-prominent {
 html[data-engine="glass"] .glass-card,
 html[data-engine="glass"] .card {
   position: relative;
-  backdrop-filter: blur(30px) saturate(190%) contrast(104%);
-  -webkit-backdrop-filter: blur(30px) saturate(190%) contrast(104%);
-  background: color-mix(in srgb, var(--panel) 70%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
+  backdrop-filter: blur(32px) saturate(200%) contrast(104%);
+  -webkit-backdrop-filter: blur(32px) saturate(200%) contrast(104%);
+  background: rgba(255, 255, 255, 0.70) !important;
+  border: 1px solid rgba(255, 255, 255, 0.85) !important;
   border-radius: 20px;
   box-shadow:
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.9),
-    0 10px 36px -12px rgba(0, 0, 0, 0.08),
-    0 1px 3px 0 rgba(0, 0, 0, 0.03);
+    inset 0 1.5px 0.5px 0 #ffffff,
+    inset 0 -1px 0 0 rgba(255, 255, 255, 0.4),
+    0 12px 36px -12px rgba(15, 23, 42, 0.07),
+    0 2px 6px -1px rgba(15, 23, 42, 0.03);
   overflow: hidden;
   transition: transform 0.22s cubic-bezier(0.16, 1, 0.3, 1),
               box-shadow 0.22s cubic-bezier(0.16, 1, 0.3, 1),
@@ -784,11 +795,12 @@ html[data-theme="dark"][data-engine="glass"] .card {
   border-radius: 24px !important;
   backdrop-filter: blur(36px) saturate(210%) contrast(106%) !important;
   -webkit-backdrop-filter: blur(36px) saturate(210%) contrast(106%) !important;
-  background: color-mix(in srgb, var(--panel) 65%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)) !important;
+  background: rgba(255, 255, 255, 0.78) !important;
+  border: 1px solid rgba(255, 255, 255, 0.92) !important;
   box-shadow:
-    inset 0 1.25px 0 0 rgba(255, 255, 255, 0.95),
-    0 18px 46px -16px color-mix(in srgb, var(--accent) 22%, rgba(0, 0, 0, 0.1)) !important;
+    inset 0 2px 1px 0 #ffffff,
+    0 20px 48px -14px color-mix(in srgb, var(--accent) 18%, rgba(15, 23, 42, 0.08)),
+    0 4px 10px -2px rgba(15, 23, 42, 0.04) !important;
 }
 html[data-theme="dark"] .card-primary {
   background: color-mix(in srgb, var(--panel) 48%, transparent) !important;
@@ -803,9 +815,11 @@ html[data-theme="dark"] .card-primary {
 /* Secondary Content Card: Grounded readability, flatter surface */
 .card-secondary {
   border-radius: 18px !important;
-  background: color-mix(in srgb, var(--panel) 82%, transparent) !important;
-  border: 1px solid color-mix(in srgb, var(--line) 85%, transparent) !important;
-  box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.05) !important;
+  background: rgba(255, 255, 255, 0.64) !important;
+  border: 1px solid rgba(255, 255, 255, 0.78) !important;
+  box-shadow:
+    inset 0 1px 0.5px 0 #ffffff,
+    0 8px 24px -10px rgba(15, 23, 42, 0.05) !important;
 }
 html[data-theme="dark"] .card-secondary {
   background: color-mix(in srgb, var(--panel) 68%, transparent) !important;
@@ -816,10 +830,10 @@ html[data-theme="dark"] .card-secondary {
 /* Card Hover Elevation & Light Refraction */
 html[data-engine="glass"] .card-hover:hover {
   transform: translateY(-2px);
-  border-color: color-mix(in srgb, var(--accent) 45%, var(--line)) !important;
+  border-color: rgba(255, 255, 255, 0.95) !important;
   box-shadow:
-    inset 0 1px 0.5px 0 rgba(255, 255, 255, 0.95),
-    0 18px 44px -15px color-mix(in srgb, var(--accent) 20%, rgba(0, 0, 0, 0.15)),
+    inset 0 1.5px 0.5px 0 #ffffff,
+    0 22px 50px -14px color-mix(in srgb, var(--accent) 18%, rgba(15, 23, 42, 0.12)),
     0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent) !important;
 }
 
@@ -855,11 +869,11 @@ html[data-engine="glass"] .card:hover::after {
 
 /* Glass Inputs & Textareas */
 html[data-engine="glass"] .inp {
-  background: color-mix(in srgb, var(--bg) 65%, transparent) !important;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid color-mix(in srgb, var(--line) 90%, transparent);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0.65) !important;
+  backdrop-filter: blur(20px) saturate(180%);
+  -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04), 0 1px 0 rgba(255, 255, 255, 0.6);
 }
 html[data-theme="dark"][data-engine="glass"] .inp {
   background: color-mix(in srgb, var(--bg) 48%, transparent) !important;
@@ -867,6 +881,13 @@ html[data-theme="dark"][data-engine="glass"] .inp {
   box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.4);
 }
 html[data-engine="glass"] .inp:focus {
+  background: rgba(255, 255, 255, 0.88) !important;
+  border-color: var(--accent) !important;
+  box-shadow:
+    0 0 0 3px var(--ring),
+    inset 0 1px 0 #ffffff !important;
+}
+html[data-theme="dark"][data-engine="glass"] .inp:focus {
   background: color-mix(in srgb, var(--panel) 82%, transparent) !important;
   border-color: var(--accent) !important;
   box-shadow:

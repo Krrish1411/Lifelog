@@ -658,8 +658,8 @@ export function Shell() {
         {mobileBar}
         {mobileDrawer}
         <aside
-          className="fixed inset-y-0 left-0 z-40 hidden w-[74px] flex-col items-center gap-1.5 border-r py-5 md:flex md:w-[84px] select-none"
-          style={{ background: "var(--panel)", borderColor: "var(--line)" }}
+          className="fixed inset-y-0 left-0 z-40 hidden w-[74px] flex-col items-center gap-1.5 border-r py-5 md:flex md:w-[84px] select-none glass-regular"
+          style={{ borderColor: "var(--line)" }}
         >
           <Logo small />
 
@@ -827,8 +827,8 @@ export function Shell() {
         {mobileBar}
         {mobileDrawer}
         <aside
-          className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r p-4 md:flex select-none"
-          style={{ background: "var(--panel)", borderColor: "var(--line)" }}
+          className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r p-4 md:flex select-none glass-regular"
+          style={{ borderColor: "var(--line)" }}
         >
           <div className="flex items-center justify-between">
             <Logo />
@@ -1451,9 +1451,8 @@ function StatusBarDesk({
 
   return (
     <div
-      className="fixed bottom-0 right-0 z-40 hidden h-[52px] items-center gap-4 border-l border-t px-5 backdrop-blur-md md:flex select-none"
+      className="fixed bottom-0 right-0 z-40 hidden h-[52px] items-center gap-4 border-l border-t px-5 glass-regular md:flex select-none"
       style={{
-        background: "color-mix(in srgb, var(--panel) 92%, transparent)",
         borderColor: "var(--line)",
         left: "236px",
       }}
