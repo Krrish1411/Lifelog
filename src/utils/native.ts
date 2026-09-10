@@ -3,8 +3,59 @@ import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { App as CapApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { LocalNotifications } from "@capacitor/local-notifications";
+import { isTauri as checkIsTauri, invoke } from "@tauri-apps/api/core";
+import { listen } from "@tauri-apps/api/event";
+import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
-export const isNative = Capacitor.isNativePlatform();
+export const isNativeMobile = Capacitor.isNativePlatform();
+export const isTauri = typeof window !== "undefined" && checkIsTauri();
+export const isNative = isNativeMobile || isTauri;
+export const platformType = isTauri ? "desktop" : isNativeMobile ? "android" : "web";
+
+/**
+ * Send native desktop notification via Tauri.
+ */
+export async function sendDesktopNotification(title: string, body?: string): Promise<void> {
+  if (!isTauri) return;
+  try {
+    let granted = await isPermissionGranted();
+    if (!granted) {
+      const perm = await requestPermission();
+      granted = perm === "granted";
+    }
+    if (granted) {
+      sendNotification({ title, body });
+    }
+  } catch (err) {
+    console.warn("Desktop notification error:", err);
+  }
+}
+
+/**
+ * Update desktop system tray title and tooltip (e.g. live countdown).
+ */
+export async function updateDesktopTray(title: string, tooltip: string): Promise<void> {
+  if (!isTauri) return;
+  try {
+    await invoke("update_tray_status", { title, tooltip });
+  } catch {}
+}
+
+/**
+ * Listen for global shortcut (Ctrl+Shift+Space / Cmd+Shift+Space) quick-capture event.
+ */
+export function initDesktopQuickAdd(onQuickAdd: () => void): () => void {
+  if (!isTauri) return () => {};
+  let unlisten: (() => void) | undefined;
+  listen("trigger-quick-add", () => {
+    onQuickAdd();
+  }).then((fn) => {
+    unlisten = fn;
+  });
+  return () => {
+    if (unlisten) unlisten();
+  };
+}
 
 /**
  * Tactile physical haptics for Android and mobile.
@@ -14,7 +65,7 @@ export async function triggerHaptic(
   type: "light" | "medium" | "heavy" | "success" | "warning" | "error" = "light"
 ): Promise<void> {
   try {
-    if (isNative) {
+    if (isNativeMobile) {
       if (type === "light") {
         await Haptics.impact({ style: ImpactStyle.Light });
       } else if (type === "medium") {
@@ -43,7 +94,7 @@ export async function triggerHaptic(
  * or false if default back behavior should occur.
  */
 export function initHardwareBackButton(onBack: () => boolean): () => void {
-  if (!isNative) return () => {};
+  if (!isNativeMobile) return () => {};
 
   const handle = CapApp.addListener("backButton", () => {
     const handled = onBack();
@@ -63,7 +114,7 @@ export function initHardwareBackButton(onBack: () => boolean): () => void {
  * Sets --status-bar-height on :root so content never collides with notches or system status bars.
  */
 export async function initNativeSystemBars(): Promise<void> {
-  if (!isNative) return;
+  if (!isNativeMobile) return;
   try {
     // Prevent webview from drawing behind the Android status bar
     await StatusBar.setOverlaysWebView({ overlay: false });
@@ -80,7 +131,7 @@ export async function initNativeSystemBars(): Promise<void> {
  * and applies matching background color.
  */
 export async function configureStatusBar(isDark: boolean, bgColor?: string): Promise<void> {
-  if (!isNative) return;
+  if (!isNativeMobile) return;
   try {
     await StatusBar.setOverlaysWebView({ overlay: false });
     await StatusBar.setStyle({ style: isDark ? Style.Dark : Style.Light });
@@ -140,7 +191,7 @@ function hashStringToInt(str: string): number {
  * Initialize Android notification channels with sound and vibration enabled.
  */
 export async function initNotificationChannels(): Promise<void> {
-  if (!isNative) return;
+  if (!isNativeMobile) return;
   try {
     // Delete custom sound channels so Android applies native OS default notification sound
     try {
@@ -173,10 +224,18 @@ export async function initNotificationChannels(): Promise<void> {
 }
 
 /**
- * Request system notification permissions on Android (POST_NOTIFICATIONS).
+ * Request system notification permissions (Tauri Desktop, Android POST_NOTIFICATIONS, or Browser).
  */
 export async function requestNativeNotificationPermission(): Promise<boolean> {
-  if (!isNative) {
+  if (isTauri) {
+    try {
+      const p = await requestPermission();
+      return p === "granted";
+    } catch {
+      return false;
+    }
+  }
+  if (!isNativeMobile) {
     if ("Notification" in window) {
       const p = await Notification.requestPermission();
       return p === "granted";
@@ -197,7 +256,14 @@ export async function requestNativeNotificationPermission(): Promise<boolean> {
  * Check current notification permission status.
  */
 export async function checkNativeNotificationPermission(): Promise<boolean> {
-  if (!isNative) {
+  if (isTauri) {
+    try {
+      return await isPermissionGranted();
+    } catch {
+      return false;
+    }
+  }
+  if (!isNativeMobile) {
     return "Notification" in window && Notification.permission === "granted";
   }
   try {
@@ -209,8 +275,7 @@ export async function checkNativeNotificationPermission(): Promise<boolean> {
 }
 
 /**
- * Schedule a native reminder for a task using Android AlarmManager.
- * Runs even if the app is completely closed or device rebooted.
+ * Schedule a native reminder for a task using Android AlarmManager or desktop notification.
  */
 export async function scheduleTaskDueNotification(
   task: { id: string; title: string; due?: string | null; dueTime?: string | null },
@@ -227,7 +292,7 @@ export async function scheduleTaskDueNotification(
     // Only schedule future reminders
     if (targetTime <= Date.now()) return;
 
-    if (isNative) {
+    if (isNativeMobile) {
       await LocalNotifications.schedule({
         notifications: [
           {
@@ -250,7 +315,7 @@ export async function scheduleTaskDueNotification(
  */
 export async function cancelTaskDueNotification(taskId: string): Promise<void> {
   try {
-    if (isNative) {
+    if (isNativeMobile) {
       await LocalNotifications.cancel({
         notifications: [{ id: hashStringToInt(`task-${taskId}`) }],
       });
@@ -261,11 +326,18 @@ export async function cancelTaskDueNotification(taskId: string): Promise<void> {
 }
 
 /**
- * Triggers a test notification (Native Android or Browser) to verify audio & push alert permissions.
+ * Triggers a test notification (Desktop, Native Android or Browser) to verify push alert permissions.
  */
 export async function testNotificationAlert(): Promise<boolean> {
   try {
-    if (isNative) {
+    if (isTauri) {
+      await sendDesktopNotification(
+        "🔔 LifeLog Test Alarm",
+        "Your desktop notifications are working properly!"
+      );
+      return true;
+    }
+    if (isNativeMobile) {
       await LocalNotifications.schedule({
         notifications: [
           {
@@ -281,19 +353,23 @@ export async function testNotificationAlert(): Promise<boolean> {
     } else {
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
         if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.ready.then((reg) => {
-            reg.showNotification("🔔 LifeLog Test Notification", {
-              body: "Desktop notification and chime are working properly!",
-              icon: "/icon-192.png",
+          navigator.serviceWorker.ready
+            .then((reg) => {
+              reg.showNotification("🔔 LifeLog Test Notification", {
+                body: "Desktop notification and chime are working properly!",
+                icon: "/icon-192.png",
+              });
+            })
+            .catch(() => {
+              new Notification("🔔 LifeLog Test Notification", {
+                body: "Desktop notification and chime are working properly!",
+                icon: "/icon-192.png",
+              });
             });
-          }).catch(() => {
-            new Notification("🔔 LifeLog Test Notification", {
-              body: "Desktop notification and chime are working properly!",
-            });
-          });
         } else {
           new Notification("🔔 LifeLog Test Notification", {
             body: "Desktop notification and chime are working properly!",
+            icon: "/icon-192.png",
           });
         }
         return true;
@@ -309,14 +385,18 @@ const TIMER_NOTIFICATION_ID = 99999;
 
 /**
  * Schedule an exact timer completion notification when a Pomodoro / Countdown begins.
- * Fires even if phone screen is locked or app is killed.
  */
 export async function scheduleTimerEndNotification(
   durationMs: number,
   title: string,
   mode: string
 ): Promise<void> {
-  if (!isNative || durationMs <= 0) return;
+  if (durationMs <= 0) return;
+  if (isTauri) {
+    // On desktop, tray status reflects live progress; notifications fire on completion in Shell
+    return;
+  }
+  if (!isNativeMobile) return;
   try {
     const targetDate = new Date(Date.now() + durationMs);
     await LocalNotifications.schedule({
@@ -341,7 +421,7 @@ export async function scheduleTimerEndNotification(
  * Cancel any pending timer completion notification.
  */
 export async function cancelTimerEndNotification(): Promise<void> {
-  if (!isNative) return;
+  if (!isNativeMobile) return;
   try {
     await LocalNotifications.cancel({
       notifications: [{ id: TIMER_NOTIFICATION_ID }],
@@ -352,12 +432,17 @@ export async function cancelTimerEndNotification(): Promise<void> {
 }
 
 /**
- * Send an immediate test notification with sound, haptics, and notification shade display.
+ * Send an immediate test notification with sound and system tray display.
  */
 export async function sendNativeTestNotification(): Promise<void> {
   await triggerHaptic("success");
 
-  if (isNative) {
+  if (isTauri) {
+    await sendDesktopNotification(
+      "LifeLog Desktop Active 🚀",
+      "Native desktop notifications and system tray live countdown are enabled!"
+    );
+  } else if (isNativeMobile) {
     await LocalNotifications.schedule({
       notifications: [
         {
@@ -375,15 +460,20 @@ export async function sendNativeTestNotification(): Promise<void> {
 const RUNNING_TIMER_NOTIF_ID = 88888;
 
 /**
- * Show a persistent/running timer status notification in the Android notification shade tray.
- * Displays the current task name and mode when the app is minimized.
+ * Show a persistent/running timer status notification in the Android shade or desktop system tray.
  */
 export async function showRunningTimerNotification(
   taskTitle: string,
   mode: string,
   remainingSeconds?: number
 ): Promise<void> {
-  if (!isNative) return;
+  if (isTauri) {
+    const modePrefix = mode === "break" ? "☕" : "🍅";
+    const timeStr = remainingSeconds !== undefined ? ` · ${Math.floor(remainingSeconds / 60)}m left` : "";
+    updateDesktopTray(`${modePrefix}${timeStr}`, `LifeLog: ${taskTitle || "Focus"} (${mode})`);
+    return;
+  }
+  if (!isNativeMobile) return;
   try {
     const modeLabel = mode === "break" ? "☕ Break" : "🎯 Focus";
     const timeStr = remainingSeconds !== undefined ? ` · ${Math.floor(remainingSeconds / 60)}m left` : "";
@@ -405,10 +495,14 @@ export async function showRunningTimerNotification(
 }
 
 /**
- * Dismiss the running timer notification when user returns to app or stops/pauses timer.
+ * Dismiss running timer notification and reset desktop system tray.
  */
 export async function dismissRunningTimerNotification(): Promise<void> {
-  if (!isNative) return;
+  if (isTauri) {
+    updateDesktopTray("LifeLog", "LifeLog — Focus & Productivity");
+    return;
+  }
+  if (!isNativeMobile) return;
   try {
     await LocalNotifications.cancel({
       notifications: [{ id: RUNNING_TIMER_NOTIF_ID }],
@@ -426,7 +520,7 @@ export async function dismissRunningTimerNotification(): Promise<void> {
 export function initRunningTimerTrayListener(
   getActiveTimer: () => { running: boolean; taskTitle: string; mode: string; remainingSec?: number } | null
 ): () => void {
-  if (!isNative) return () => {};
+  if (!isNativeMobile) return () => {};
 
   const handle = CapApp.addListener("appStateChange", (state) => {
     if (!state.isActive) {

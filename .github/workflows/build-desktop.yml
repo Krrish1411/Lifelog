@@ -1,0 +1,171 @@
+name: Build LifeLog Desktop Apps
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+jobs:
+  build-linux:
+    name: Build Linux (Universal AppImage, Portable tar.gz, Deb & RPM)
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Set up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux Dependencies (WebKitGTK, AppIndicator, RSVG)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            patchelf \
+            build-essential \
+            curl \
+            wget \
+            file \
+            libssl-dev \
+            rpm
+
+      - name: Install Node Dependencies
+        run: npm install
+
+      - name: Build Web Production Assets
+        run: npm run build
+
+      - name: Build Tauri Desktop (AppImage, Deb, RPM)
+        run: npx tauri build
+
+      - name: Create Portable Linux tar.gz Bundle (Arch & Fedora Ready)
+        run: |
+          mkdir -p lifelog-linux-portable
+          cp src-tauri/target/release/lifelog lifelog-linux-portable/
+          cp src-tauri/icons/icon.png lifelog-linux-portable/icon.png
+          cat << 'EOF' > lifelog-linux-portable/lifelog.desktop
+          [Desktop Entry]
+          Name=LifeLog
+          Comment=Minimal, private, offline-first productivity & focus OS
+          Exec=lifelog
+          Icon=icon
+          Terminal=false
+          Type=Application
+          Categories=Utility;Office;Productivity;
+          EOF
+          tar -czvf LifeLog-Linux-x64-portable.tar.gz -C lifelog-linux-portable .
+
+      - name: Upload Universal AppImage Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeLog-Linux-AppImage
+          path: src-tauri/target/release/bundle/appimage/*.AppImage
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Linux Deb & RPM Packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeLog-Linux-Packages
+          path: |
+            src-tauri/target/release/bundle/deb/*.deb
+            src-tauri/target/release/bundle/rpm/*.rpm
+            LifeLog-Linux-x64-portable.tar.gz
+          if-no-files-found: warn
+          retention-days: 30
+
+  build-windows:
+    name: Build Windows (Native NSIS Setup .exe & Portable zip)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Set up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node Dependencies
+        run: npm install
+
+      - name: Build Web Production Assets
+        run: npm run build
+
+      - name: Build Tauri Desktop (NSIS Setup .exe)
+        run: npx tauri build
+
+      - name: Package Portable Windows Zip
+        shell: bash
+        run: |
+          mkdir -p lifelog-windows-portable
+          cp src-tauri/target/release/lifelog.exe lifelog-windows-portable/LifeLog.exe
+          cp src-tauri/icons/icon.ico lifelog-windows-portable/icon.ico
+          7z a LifeLog-Windows-x64-portable.zip ./lifelog-windows-portable/*
+
+      - name: Upload Windows NSIS Setup .exe Installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeLog-Windows-Installer
+          path: src-tauri/target/release/bundle/nsis/*-setup.exe
+          if-no-files-found: warn
+          retention-days: 30
+
+      - name: Upload Windows Portable Zip
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeLog-Windows-Portable
+          path: LifeLog-Windows-x64-portable.zip
+          if-no-files-found: warn
+          retention-days: 30
+
+  build-macos:
+    name: Build macOS (.dmg Disk Image)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Source Code
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Set up Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Node Dependencies
+        run: npm install
+
+      - name: Build Web Production Assets
+        run: npm run build
+
+      - name: Build Tauri Desktop (.dmg)
+        run: npx tauri build
+
+      - name: Upload macOS DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LifeLog-macOS-DMG
+          path: src-tauri/target/release/bundle/dmg/*.dmg
+          if-no-files-found: warn
+          retention-days: 30
