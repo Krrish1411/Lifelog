@@ -131,6 +131,10 @@ function mergeState(raw: Partial<State>): State {
     settings: {
       ...DEFAULT_SETTINGS,
       ...(base.settings ?? {}),
+      accent:
+        !base.settings?.accent || base.settings.accent.toLowerCase() === "#d97706"
+          ? DEFAULT_SETTINGS.accent
+          : base.settings.accent,
       reportWidgets: {
         ...DEFAULT_SETTINGS.reportWidgets,
         ...(base.settings?.reportWidgets ?? {}),

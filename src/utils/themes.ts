@@ -18,6 +18,28 @@ export interface DesignerTheme {
 
 export const DARK_THEMES: DesignerTheme[] = [
   {
+    id: "crimson-dark",
+    name: "LifeLog Crimson Dark",
+    tag: "Signature Crimson · Deep Slate Dark",
+    desc: "Rich dark palette featuring LifeLog's signature crimson red highlights on deep velvet slate.",
+    mode: "dark",
+    counterpartId: "minimal-white",
+    accent: "#ef4444",
+    bg: "#090d14",
+    tokens: {
+      panel: "#0f1522",
+      panel2: "#1c2436",
+      line: "#29354d",
+      text: "#f8fafc",
+      mut: "#94a3b8",
+      ok: "#34d399",
+      warn: "#fbbf24",
+      danger: "#ef4444",
+    },
+    previewBg: "#090d14",
+    previewAccent: "#ef4444",
+  },
+  {
     id: "oled",
     name: "OLED Pure Black",
     tag: "Pitch Black · 0% Battery Drain",
@@ -155,12 +177,12 @@ export const DARK_THEMES: DesignerTheme[] = [
 export const LIGHT_THEMES: DesignerTheme[] = [
   {
     id: "minimal-white",
-    name: "LifeLog Clean Light",
-    tag: "Warm Amber · Crisp Paper Canvas",
-    desc: "Clean light paper canvas with LifeLog's iconic warm golden-amber accents and pristine elevated surfaces.",
+    name: "LifeLog Crimson Light",
+    tag: "Signature Crimson · Crisp Paper Canvas",
+    desc: "Clean light paper canvas with LifeLog's iconic vivid crimson red accents and pristine elevated surfaces.",
     mode: "light",
-    counterpartId: "oled",
-    accent: "#d97706",
+    counterpartId: "crimson-dark",
+    accent: "#dc2626",
     bg: "#f8fafc",
     tokens: {
       panel: "#ffffff",
@@ -173,7 +195,7 @@ export const LIGHT_THEMES: DesignerTheme[] = [
       danger: "#dc2626",
     },
     previewBg: "#f8fafc",
-    previewAccent: "#d97706",
+    previewAccent: "#dc2626",
   },
   {
     id: "tokyo-day",

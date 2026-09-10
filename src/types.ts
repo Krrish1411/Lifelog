@@ -249,7 +249,7 @@ export const REPORT_WIDGETS: { key: string; label: string; desc: string }[] = [
 export const DEFAULT_SETTINGS: Settings = {
   layout: "glass",
   themeMode: "light",
-  accent: "#d97706",
+  accent: "#dc2626",
   bgDark: "#000000",
   bgLight: "#f8fafc",
   tokens: {},

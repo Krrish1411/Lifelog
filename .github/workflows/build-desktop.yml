@@ -1,6 +1,8 @@
 name: Build LifeLog Desktop Apps
 
 on:
+  push:
+    branches: [ "main" ]
   workflow_dispatch:
 
 jobs:

@@ -316,7 +316,8 @@ export function Shell() {
     derived.ok = ensureContrast(derived.ok, bg, 3);
     derived.warn = ensureContrast(derived.warn, bg, 3);
     derived.danger = ensureContrast(derived.danger, bg, 3);
-    const rawAccent = normalizeHex(s.accent) ?? (dark ? "#e8a33d" : "#d97706");
+    const accentInput = (!s.accent || s.accent.toLowerCase() === "#d97706") ? (dark ? "#ef4444" : "#dc2626") : s.accent;
+    const rawAccent = normalizeHex(accentInput) ?? (dark ? "#ef4444" : "#dc2626");
     const accent = ensureContrast(rawAccent, bg, 4.2);
     const root = document.documentElement;
     root.style.setProperty("--bg", bg);
