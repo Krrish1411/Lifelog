@@ -32,7 +32,7 @@ import {
   scheduleTaskDueNotification,
   triggerHaptic,
 } from "./utils/native";
-import { playTaskDoneSound } from "./utils/audio";
+import { playNotificationAlarmSound, playTaskDoneSound } from "./utils/audio";
 import { syncEngine } from "./sync/syncEngine";
 
 const LS_KEY = "lifelog.state.v1";
@@ -169,6 +169,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const warnedCrypto = useRef(false);
 
   const isRemoteSyncRef = useRef(false);
+  const firedRemindersRef = useRef<Set<string>>(new Set());
 
   /* ----- sync engine listener for incoming remote changes ----- */
   useEffect(() => {
@@ -329,7 +330,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const nowDone = !task.done;
         if (nowDone) {
           playTaskDoneSound();
-          if (isNative) cancelTaskDueNotification(taskId);
+          if (isNative) {
+            cancelTaskDueNotification(taskId);
+            if (task.timeBlocks) {
+              for (const b of task.timeBlocks) {
+                cancelTaskDueNotification(`${taskId}-${b.id}`);
+              }
+            }
+          }
         }
         triggerHaptic(nowDone ? "success" : "light");
         return {
@@ -347,66 +355,131 @@ export function AppProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!state) return;
     const timers: number[] = [];
-    const now = Date.now();
     const leadMin = state.settings.reminderLeadMin;
     const lead = leadMin * 60000;
+
     const notify = (title: string, body: string) => {
       pushToast(`${title} — ${body}`, "warn");
+      triggerHaptic("warning");
+      if (state.settings.soundEnabled) {
+        playNotificationAlarmSound();
+      }
       const hasPerm = typeof Notification !== "undefined" && Notification.permission === "granted";
       if (hasPerm) {
         try {
-          new Notification(title, { body });
+          if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.ready
+              .then((reg) => {
+                reg.showNotification(title, {
+                  body,
+                  icon: "/icon-192.png",
+                  badge: "/icon-192.png",
+                  vibrate: [250, 100, 250],
+                  tag: `lifelog-${Date.now()}`,
+                } as NotificationOptions);
+              })
+              .catch(() => {
+                new Notification(title, { body, icon: "/icon-192.png" });
+              });
+          } else {
+            new Notification(title, { body, icon: "/icon-192.png" });
+          }
         } catch {
           /* ignore */
         }
       }
     };
-    for (const t of state.tasks) {
-      if (t.done) {
-        if (isNative) cancelTaskDueNotification(t.id);
-        continue;
-      }
 
-      // Schedule background exact alarm via Android AlarmManager (fires even when app is killed)
-      if (state.settings.notifyEnabled && isNative && t.due && t.dueTime) {
-        scheduleTaskDueNotification(t, leadMin);
-      }
+    const checkReminders = () => {
+      const now = Date.now();
+      for (const t of state.tasks) {
+        if (t.done) {
+          if (isNative) {
+            cancelTaskDueNotification(t.id);
+            if (t.timeBlocks) {
+              for (const b of t.timeBlocks) {
+                cancelTaskDueNotification(`${t.id}-${b.id}`);
+              }
+            }
+          }
+          continue;
+        }
 
-      const targets: { at: number; what: string }[] = [];
-      if (t.due && t.dueTime) {
-        targets.push({ at: new Date(`${t.due}T${t.dueTime}:00`).getTime(), what: "Time block starting" });
-      }
-      // Support all multi-block calendar schedules
-      if (t.timeBlocks && t.timeBlocks.length > 0) {
-        for (const b of t.timeBlocks) {
-          if (!b.done && b.date && b.time) {
-            targets.push({
-              at: new Date(`${b.date}T${b.time}:00`).getTime(),
-              what: `Time block starting (${b.label || "Scheduled"})`,
-            });
-            if (state.settings.notifyEnabled && isNative) {
-              scheduleTaskDueNotification(
-                { id: `${t.id}-${b.id}`, title: `${t.title} [${b.label || "Block"}]`, due: b.date, dueTime: b.time },
-                leadMin,
-              );
+        // Schedule background exact alarm via Android AlarmManager (fires even when app is killed)
+        if (state.settings.notifyEnabled && isNative && t.due && t.dueTime) {
+          scheduleTaskDueNotification(t, leadMin);
+        }
+
+        const targets: { key: string; at: number; what: string }[] = [];
+        if (t.due && t.dueTime) {
+          targets.push({
+            key: `task-due-${t.due}-${t.dueTime}`,
+            at: new Date(`${t.due}T${t.dueTime}:00`).getTime(),
+            what: leadMin > 0 ? `Upcoming: ${t.title}` : `Time block starting: ${t.title}`,
+          });
+        }
+        // Support all multi-block calendar schedules
+        if (t.timeBlocks && t.timeBlocks.length > 0) {
+          for (const b of t.timeBlocks) {
+            if (!b.done && b.date && b.time) {
+              targets.push({
+                key: `block-${b.id}-${b.date}-${b.time}`,
+                at: new Date(`${b.date}T${b.time}:00`).getTime(),
+                what: `Time block starting (${b.label || "Scheduled"})`,
+              });
+              if (state.settings.notifyEnabled && isNative) {
+                scheduleTaskDueNotification(
+                  { id: `${t.id}-${b.id}`, title: `${t.title} [${b.label || "Block"}]`, due: b.date, dueTime: b.time },
+                  leadMin,
+                );
+              }
             }
           }
         }
-      }
-      if (t.snoozedUntil) targets.push({ at: t.snoozedUntil, what: "Snoozed task is back" });
-      for (const tg of targets) {
-        const fire = tg.at - lead;
-        if (fire > now && fire < now + 24 * 3600000) {
-          timers.push(
-            window.setTimeout(
-              () => notify(tg.what, `${t.title} · ${fmtClock(tg.at)}`),
-              fire - now,
-            ),
-          );
+        if (t.snoozedUntil) {
+          targets.push({
+            key: `snooze-${t.snoozedUntil}`,
+            at: t.snoozedUntil,
+            what: "Snoozed task is back",
+          });
+        }
+
+        for (const tg of targets) {
+          const fire = tg.at - lead;
+          const reminderId = `${t.id}-${tg.key}-${fire}`;
+
+          // Catch-up: if it fell due within the last 60 seconds and hasn't fired yet
+          if (fire <= now && now - fire < 60000) {
+            if (!firedRemindersRef.current.has(reminderId)) {
+              firedRemindersRef.current.add(reminderId);
+              notify(tg.what, `${t.title} · ${fmtClock(tg.at)}`);
+            }
+          } else if (fire > now && fire < now + 24 * 3600000) {
+            timers.push(
+              window.setTimeout(() => {
+                if (!firedRemindersRef.current.has(reminderId)) {
+                  firedRemindersRef.current.add(reminderId);
+                  notify(tg.what, `${t.title} · ${fmtClock(tg.at)}`);
+                }
+              }, fire - now),
+            );
+          }
         }
       }
-    }
-    return () => timers.forEach((t) => clearTimeout(t));
+    };
+
+    checkReminders();
+    const interval = window.setInterval(checkReminders, 25000);
+    const onVis = () => {
+      if (document.visibilityState === "visible") checkReminders();
+    };
+    document.addEventListener("visibilitychange", onVis);
+
+    return () => {
+      timers.forEach((t) => clearTimeout(t));
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVis);
+    };
   }, [state, pushToast]);
 
   /* ----- toast host auto-dismiss ----- */

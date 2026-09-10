@@ -158,6 +158,50 @@ export function playTaskDoneSound(): void {
   }
 }
 
+/**
+ * Clear, elegant harmonic bell chime for task due deadlines & calendar time blocks.
+ * Synthesized purely in Web Audio API.
+ */
+export function playNotificationAlarmSound(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    // Harmonic bell sequence: E5 (659.25Hz) -> B5 (987.77Hz) -> E6 (1318.5Hz)
+    const tones = [
+      { freq: 659.25, delay: 0.0, dur: 0.35, vol: 0.4 },
+      { freq: 987.77, delay: 0.12, dur: 0.45, vol: 0.45 },
+      { freq: 1318.5, delay: 0.24, dur: 0.85, vol: 0.5 },
+    ];
+
+    tones.forEach(({ freq, delay, dur, vol }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + delay);
+
+      const startTime = now + delay;
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(vol, startTime + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + dur);
+    });
+  } catch {
+    // Autoplay policy or muted
+  }
+}
+
+
 export type AmbientTrackId =
   | "rain"
   | "storm"

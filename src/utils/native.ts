@@ -214,7 +214,8 @@ export async function checkNativeNotificationPermission(): Promise<boolean> {
  */
 export async function scheduleTaskDueNotification(
   task: { id: string; title: string; due?: string | null; dueTime?: string | null },
-  leadMinutes = 0
+  leadMinutes = 0,
+  customTitle?: string
 ): Promise<void> {
   if (!task.due || !task.dueTime) return;
   try {
@@ -231,7 +232,7 @@ export async function scheduleTaskDueNotification(
         notifications: [
           {
             id: hashStringToInt(`task-${task.id}`),
-            title: leadMinutes > 0 ? `Task Due in ${leadMinutes}m ⏱️` : "Task Due Now ⏱️",
+            title: customTitle ?? (leadMinutes > 0 ? `Task Due in ${leadMinutes}m ⏱️` : "Task Due Now ⏱️"),
             body: task.title,
             schedule: { at: new Date(targetTime), allowWhileIdle: true },
             channelId: "task-channel-os",
@@ -256,6 +257,51 @@ export async function cancelTaskDueNotification(taskId: string): Promise<void> {
     }
   } catch {
     // Ignore if not scheduled
+  }
+}
+
+/**
+ * Triggers a test notification (Native Android or Browser) to verify audio & push alert permissions.
+ */
+export async function testNotificationAlert(): Promise<boolean> {
+  try {
+    if (isNative) {
+      await LocalNotifications.schedule({
+        notifications: [
+          {
+            id: 88888,
+            title: "🔔 LifeLog Test Alarm",
+            body: "Your notifications and alarm channel are working properly!",
+            schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true },
+            channelId: "task-channel-os",
+          },
+        ],
+      });
+      return true;
+    } else {
+      if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
+          navigator.serviceWorker.ready.then((reg) => {
+            reg.showNotification("🔔 LifeLog Test Notification", {
+              body: "Desktop notification and chime are working properly!",
+              icon: "/icon-192.png",
+            });
+          }).catch(() => {
+            new Notification("🔔 LifeLog Test Notification", {
+              body: "Desktop notification and chime are working properly!",
+            });
+          });
+        } else {
+          new Notification("🔔 LifeLog Test Notification", {
+            body: "Desktop notification and chime are working properly!",
+          });
+        }
+        return true;
+      }
+      return false;
+    }
+  } catch {
+    return false;
   }
 }
 

@@ -172,6 +172,7 @@ export interface Settings {
   breakMin: number;
   countdownMin: number;
   notifyEnabled: boolean;
+  soundEnabled?: boolean;
   tagOrder?: string[]; // ordered list of tag names
   taskSortMode?: "manual" | "due" | "priority";
   soundscape?: string;
@@ -263,6 +264,7 @@ export const DEFAULT_SETTINGS: Settings = {
   breakMin: 5,
   countdownMin: 45,
   notifyEnabled: false,
+  soundEnabled: true,
   tagOrder: [],
   taskSortMode: "manual",
   soundscape: "none",

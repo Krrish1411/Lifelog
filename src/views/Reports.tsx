@@ -347,10 +347,10 @@ export function ReportsView() {
         </div>
       )}
 
-      <div className="grid gap-4 lg:grid-cols-2 w-full min-w-0">
+      <div className="grid gap-4 lg:grid-cols-2 [grid-auto-flow:dense] w-full min-w-0">
         {w.insights && widgetCard("Productivity insights", "auto-generated", (
           insights.length === 0 ? (
-            <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>Log some focused time and insights will appear here.</div>
+            <div className="py-4 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>Log some focused time and insights will appear here.</div>
           ) : (
             <div className="flex flex-col gap-2">
               {insights.map((i, idx) => (
@@ -424,6 +424,7 @@ export function ReportsView() {
           </div>
         ), true)}
 
+        {/* Rhythm Pair: Time of day (1-col) + Weekdays (1-col) */}
         {w.timeOfDay && widgetCard("Time-of-day rhythm", "minutes per hour", (
           <div>
             <div className="flex h-[84px] items-end gap-[3px]">
@@ -437,11 +438,20 @@ export function ReportsView() {
               <span>00</span><span>06</span><span>12</span><span>18</span><span>23</span>
             </div>
           </div>
-        ), true)}
+        ))}
 
+        {w.weekdays && widgetCard("Weekday rhythm", "minutes per weekday", (
+          <div className="flex flex-col">
+            {WEEKDAYS_SHORT.map((d, i) => (
+              <BarRow key={d} label={d} value={byWeekday[i]} max={Math.max(1, ...byWeekday)} color="var(--accent)" right={fmtDur(byWeekday[i])} />
+            ))}
+          </div>
+        ))}
+
+        {/* Breakdown Pair: Projects (1-col) + Tags (1-col) */}
         {w.projects && widgetCard("Projects", "tracked in range", (
-          byProject.length === 0 ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No tracked time in range.</div> : (
-            <div className="flex max-h-[320px] flex-col overflow-y-auto pr-1">
+          byProject.length === 0 ? <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No tracked time in range.</div> : (
+            <div className="flex max-h-[300px] flex-col overflow-y-auto pr-1">
               {byProject.map(([pid, min]) => {
                 const p = state.projects.find((x) => x.id === pid);
                 return <BarRow key={pid} label={<>{p?.emoji} {p?.name ?? "Deleted project"}</>} value={min} max={byProject[0][1]} color={p?.color ?? "var(--accent)"} right={`${fmtDur(min)} · ${Math.round((min / Math.max(1, totalMin)) * 100)}%`} />;
@@ -451,8 +461,8 @@ export function ReportsView() {
         ))}
 
         {w.tags && widgetCard("Tags", "tracked via task tags", (
-          byTag.length === 0 ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No tags on tracked tasks in range.</div> : (
-            <div className="flex max-h-[320px] flex-col overflow-y-auto pr-1">
+          byTag.length === 0 ? <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No tags on tracked tasks in range.</div> : (
+            <div className="flex max-h-[300px] flex-col overflow-y-auto pr-1">
               {byTag.map(([tag, min]) => (
                 <BarRow key={tag}
                   label={<><span className="h-[8px] w-[8px] rounded-full" style={{ background: state.tagColors[tag] ?? "var(--accent)" }} /> {tag}</>}
@@ -462,9 +472,10 @@ export function ReportsView() {
           )
         ))}
 
+        {/* Progress Pair: Estimate vs actual (1-col) + Habit streaks (1-col) */}
         {w.estimates && widgetCard("Estimate vs actual", "completed tasks in range", (
           estVsActual.planned === 0 ? (
-            <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No completed tasks with estimates in this range.</div>
+            <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No completed tasks with estimates in this range.</div>
           ) : (
             <div className="flex flex-col gap-2">
               <div className="rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
@@ -484,9 +495,34 @@ export function ReportsView() {
           )
         ))}
 
+        {w.streaks && widgetCard("Habit streaks", "full stats", (
+          state.habits.length === 0 ? <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No habits yet.</div> : (
+            <div className="flex max-h-[300px] flex-col gap-1.5 overflow-y-auto pr-1">
+              {state.habits.map((h) => {
+                const st = streakStats(h.completions);
+                return (
+                  <div key={h.id} className="rounded-xl border px-3 py-2" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                    <div className="flex items-center gap-2 text-[12.5px] font-bold">
+                      <span>{h.emoji}</span><span className="truncate">{h.name}</span>
+                      <span className="ml-auto chip !py-0 text-[10px]" style={{ color: "var(--accent)" }}>{st.current}-day streak</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>
+                      <span>longest <b style={{ color: "var(--text)" }}>{st.longest}d</b></span>
+                      <span>shortest <b style={{ color: "var(--text)" }}>{st.shortest}d</b></span>
+                      <span>longest skip <b style={{ color: "var(--text)" }}>{st.longestGap}d</b></span>
+                      <span>total <b style={{ color: "var(--text)" }}>{st.total}</b></span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ))}
+
+        {/* Detailed Calibration: 2-col full width */}
         {w.estimateTasks && widgetCard("Estimate calibration", "over / under by dimension", (
           calibration.length === 0 ? (
-            <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No estimated tasks with tracked time in this range.</div>
+            <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No estimated tasks with tracked time in this range.</div>
           ) : (
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap items-center gap-2">
@@ -540,34 +576,11 @@ export function ReportsView() {
           )
         ), true)}
 
-        {w.streaks && widgetCard("Habit streaks", "full stats", (
-          state.habits.length === 0 ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No habits yet.</div> : (
-            <div className="flex max-h-[320px] flex-col gap-1.5 overflow-y-auto pr-1">
-              {state.habits.map((h) => {
-                const st = streakStats(h.completions);
-                return (
-                  <div key={h.id} className="rounded-xl border px-3 py-2" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                    <div className="flex items-center gap-2 text-[12.5px] font-bold">
-                      <span>{h.emoji}</span><span className="truncate">{h.name}</span>
-                      <span className="ml-auto chip !py-0 text-[10px]" style={{ color: "var(--accent)" }}>{st.current}-day streak</span>
-                    </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5 text-[10.5px] font-semibold" style={{ color: "var(--mut)" }}>
-                      <span>longest <b style={{ color: "var(--text)" }}>{st.longest}d</b></span>
-                      <span>shortest <b style={{ color: "var(--text)" }}>{st.shortest}d</b></span>
-                      <span>longest skip <b style={{ color: "var(--text)" }}>{st.longestGap}d</b></span>
-                      <span>total <b style={{ color: "var(--text)" }}>{st.total}</b></span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )
-        ))}
-
+        {/* Daily Pair: Energy & mood (1-col) + Top tags (1-col) */}
         {w.energy && widgetCard("Energy & mood", "daily check-ins", (
-          <div className="flex max-h-[260px] flex-col gap-1.5 overflow-y-auto pr-1">
+          <div className="flex max-h-[300px] flex-col gap-1.5 overflow-y-auto pr-1">
             {energies.length === 0 && (
-              <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No check-ins in range — log one from the dashboard.</div>
+              <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No check-ins in range — log one from the dashboard.</div>
             )}
             {[...energies].reverse().map(({ iso, log }) => (
               <div key={iso} className="rounded-lg px-2.5 py-1.5" style={{ background: "var(--bg)" }}>
@@ -583,19 +596,10 @@ export function ReportsView() {
               </div>
             ))}
           </div>
-        ), true)}
-
-
-        {w.weekdays && widgetCard("Weekday rhythm", "minutes per weekday", (
-          <div className="flex flex-col">
-            {WEEKDAYS_SHORT.map((d, i) => (
-              <BarRow key={d} label={d} value={byWeekday[i]} max={Math.max(1, ...byWeekday)} color="var(--accent)" right={fmtDur(byWeekday[i])} />
-            ))}
-          </div>
         ))}
 
         {w.topTags && widgetCard("Top tags", "share of tracked time", (
-          byTag.length === 0 ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No tag data in range.</div> : (
+          byTag.length === 0 ? <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No tag data in range.</div> : (
             <div className="flex flex-wrap gap-1.5">
               {byTag.slice(0, 10).map(([tag, min]) => (
                 <span key={tag} className="chip" style={{ borderColor: `color-mix(in srgb, ${state.tagColors[tag] ?? "var(--accent)"} 55%, var(--line))` }}>

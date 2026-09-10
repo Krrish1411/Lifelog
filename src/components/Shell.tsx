@@ -1544,10 +1544,10 @@ function MiniTimer() {
   return (
     <div
       className={cn(
-        "mini-timer fixed z-[60] left-3.5 sm:left-auto sm:right-4 border shadow-2xl backdrop-blur-xl transition-all duration-300 ease-out select-none overflow-hidden",
+        "mini-timer fixed z-[60] right-3.5 sm:right-4 rounded-2xl border shadow-2xl backdrop-blur-xl transition-all duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] select-none overflow-hidden",
         minimized
-          ? "rounded-full px-3 py-1.5 w-auto max-w-[210px] hover:scale-105"
-          : "rounded-2xl p-3 w-[calc(100%-28px)] sm:w-[295px]"
+          ? "w-[165px] px-3 py-2 hover:scale-[1.03]"
+          : "w-[calc(100%-28px)] sm:w-[295px] p-3"
       )}
       style={{
         bottom: "calc(74px + var(--safe-bottom, 12px))",
