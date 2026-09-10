@@ -13,6 +13,9 @@ import {
   Palette,
   Quote,
   Radio,
+  Coffee,
+  ExternalLink,
+  Heart,
   RotateCcw,
   ShieldCheck,
   SlidersHorizontal,
@@ -1494,6 +1497,44 @@ export function SettingsView() {
                   </div>
                   <div className="text-[11px] font-medium" style={{ color: "var(--mut)" }}>
                     Zero telemetry · 100% offline-first · Local IndexedDB storage · AES-256-GCM encryption · Tailored for Android & Desktop
+                  </div>
+                </div>
+              ),
+              true
+            )}
+
+            {/* Support LifeLog / Monetization */}
+            {section(
+              "Support LifeLog",
+              "LifeLog is 100% free, private, and open-source with zero trackers and zero ads. If LifeLog helps you stay focused and organized, consider supporting its independent development.",
+              (
+                <div className="flex flex-col gap-3">
+                  <div className="flex flex-wrap items-center gap-2.5">
+                    <a
+                      href="https://buymeacoffee.com"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[12.5px] font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
+                      style={{ background: "#FFDD00", color: "#000000" }}
+                    >
+                      <Coffee size={15} /> Buy Me a Coffee
+                    </a>
+                    <a
+                      href="https://github.com/sponsors"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-2 rounded-xl border px-4 py-2 text-[12.5px] font-bold transition-all hover:scale-[1.02] active:scale-[0.98]"
+                      style={{
+                        borderColor: "var(--line)",
+                        background: "var(--panel)",
+                        color: "var(--text)",
+                      }}
+                    >
+                      <Heart size={14} className="text-red-500 fill-red-500" /> GitHub Sponsors
+                    </a>
+                  </div>
+                  <div className="text-[11px] font-medium" style={{ color: "var(--mut)" }}>
+                    Pay what you want · 100% goes directly to development · $0 mandatory cost for users
                   </div>
                 </div>
               ),

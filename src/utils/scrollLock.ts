@@ -55,20 +55,14 @@ if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
 }
 
 /**
- * Unconditionally scrolls the window, documentElement, body, #root, and <main> to top (0, 0).
+ * Unconditionally scrolls the window to top (0, 0) without triggering layout reflow storms.
  */
 export function scrollToPageTop(behavior: ScrollBehavior = "auto"): void {
   if (typeof window === "undefined") return;
+  if (window.scrollY === 0 && window.scrollX === 0) return;
   try {
     window.scrollTo({ top: 0, left: 0, behavior });
   } catch {
     window.scrollTo(0, 0);
   }
-  if (document.documentElement) document.documentElement.scrollTop = 0;
-  if (document.body) document.body.scrollTop = 0;
-  if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
-  const root = document.getElementById("root");
-  if (root) root.scrollTop = 0;
-  const main = document.querySelector("main");
-  if (main) main.scrollTop = 0;
 }

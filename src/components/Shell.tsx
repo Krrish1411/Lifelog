@@ -271,18 +271,9 @@ export function Shell() {
     }
   }, [view]);
 
-  // Always reset scroll to top immediately when switching views
+  // Reset scroll to top when switching views
   useEffect(() => {
     scrollToPageTop("auto");
-    const raf = requestAnimationFrame(() => scrollToPageTop("auto"));
-    const t1 = setTimeout(() => scrollToPageTop("auto"), 20);
-    const t2 = setTimeout(() => scrollToPageTop("auto"), 80);
-
-    return () => {
-      cancelAnimationFrame(raf);
-      clearTimeout(t1);
-      clearTimeout(t2);
-    };
   }, [view]);
 
   /* ---------- theme variables: customizable, contrast-checked ---------- */
@@ -354,12 +345,17 @@ export function Shell() {
   };
 
   /* ---------- global session watchdog: finish countdowns wherever you are ---------- */
+  const lastTrayTitleRef = useRef<string>("");
+  const lastTrayTooltipRef = useRef<string>("");
+
   useEffect(() => {
     const t = setInterval(() => {
       const running = state.sessions.find((s) => s.status === "running");
 
-      // Live Desktop System Tray Countdown
+      // Live Desktop System Tray Countdown (deduplicated to prevent IPC event-loop flooding)
       if (isTauri) {
+        let title = "LifeLog";
+        let tooltip = "LifeLog — Focus & Productivity";
         if (running) {
           const secs = sessionSeconds(running);
           const remaining = running.plannedMin ? Math.max(0, running.plannedMin * 60 - secs) : secs;
@@ -367,12 +363,13 @@ export function Shell() {
           const ss = remaining % 60;
           const timeStr = `${mm}:${ss < 10 ? "0" : ""}${ss}`;
           const prefix = running.mode === "break" ? "☕" : "🍅";
-          updateDesktopTray(
-            `${prefix} ${timeStr}`,
-            `LifeLog: ${running.mode === "break" ? "Break" : "Focus"} (${timeStr} remaining)`
-          );
-        } else {
-          updateDesktopTray("LifeLog", "LifeLog — Focus & Productivity");
+          title = `${prefix} ${timeStr}`;
+          tooltip = `LifeLog: ${running.mode === "break" ? "Break" : "Focus"} (${timeStr} remaining)`;
+        }
+        if (title !== lastTrayTitleRef.current || tooltip !== lastTrayTooltipRef.current) {
+          lastTrayTitleRef.current = title;
+          lastTrayTooltipRef.current = tooltip;
+          updateDesktopTray(title, tooltip);
         }
       }
 
@@ -444,24 +441,38 @@ export function Shell() {
     return `pr:${taskFilter.priority}`;
   }, [taskFilter]);
 
-  const views: Record<ViewId, React.ReactNode> = {
-    dashboard: layout === "zen" ? <ZenHome /> : <Dashboard />,
-    tasks: (
-      <TasksView
-        filter={taskFilter}
-        onFilterChange={setTaskFilter}
-        onOpenDrawer={() => setMobileNavOpen(true)}
-      />
-    ),
-    focus: <FocusView />,
-    calendar: <CalendarView />,
-    habits: <HabitsView />,
-    notes: <NotesView />,
-    daylog: <DayLogView />,
-    reports: <ReportsView />,
-    review: <ReviewView />,
-    settings: <SettingsView />,
-  };
+  const activeViewContent = useMemo(() => {
+    switch (view) {
+      case "dashboard":
+        return layout === "zen" ? <ZenHome /> : <Dashboard />;
+      case "tasks":
+        return (
+          <TasksView
+            filter={taskFilter}
+            onFilterChange={setTaskFilter}
+            onOpenDrawer={() => setMobileNavOpen(true)}
+          />
+        );
+      case "focus":
+        return <FocusView />;
+      case "calendar":
+        return <CalendarView />;
+      case "habits":
+        return <HabitsView />;
+      case "notes":
+        return <NotesView />;
+      case "daylog":
+        return <DayLogView />;
+      case "reports":
+        return <ReportsView />;
+      case "review":
+        return <ReviewView />;
+      case "settings":
+        return <SettingsView />;
+      default:
+        return <Dashboard />;
+    }
+  }, [view, layout, taskFilter]);
 
   if (state.meta && !state.meta.hasSeenWelcome) {
     return (
@@ -747,7 +758,7 @@ export function Shell() {
         </aside>
 
         <main className="zoomable ml-0 w-full px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:ml-[84px] md:w-[calc(100%-84px)] md:px-6 md:py-6">
-          <div className="w-full">{views[view]}</div>
+          <div className="w-full">{activeViewContent}</div>
         </main>
 
         <Overlays
@@ -824,7 +835,7 @@ export function Shell() {
         </header>
 
         <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-6 md:py-6 md:pb-20">
-          <div className="w-full">{views[view]}</div>
+          <div className="w-full">{activeViewContent}</div>
         </main>
 
         <StatusBar
@@ -918,7 +929,7 @@ export function Shell() {
 
         <div className="ml-0 flex min-h-screen w-full flex-col md:ml-[236px] md:w-[calc(100%-236px)]">
           <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-7 md:py-6 md:pb-20">
-            <div className="w-full">{views[view]}</div>
+            <div className="w-full">{activeViewContent}</div>
           </main>
           <StatusBarDesk
             dueToday={dueToday}
@@ -1035,7 +1046,7 @@ export function Shell() {
             </div>
           )}
           <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-7 md:py-6">
-            <div className="w-full">{views[view]}</div>
+            <div className="w-full">{activeViewContent}</div>
           </main>
         </div>
 
@@ -1141,7 +1152,7 @@ export function Shell() {
       </aside>
 
       <main className="zoomable relative z-10 ml-0 w-full px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:ml-[280px] md:w-[calc(100%-280px)] md:px-8 md:py-6">
-        <div className="w-full">{views[view]}</div>
+        <div className="w-full">{activeViewContent}</div>
       </main>
 
       <Overlays
