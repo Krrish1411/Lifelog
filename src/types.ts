@@ -156,6 +156,7 @@ export type TokenKey = "text" | "mut" | "panel" | "panel2" | "line" | "ok" | "wa
 export interface Settings {
   layout: LayoutMode;
   themeMode: ThemeMode;
+  designerTheme?: string;
   accent: string;
   bgDark: string;
   bgLight: string;

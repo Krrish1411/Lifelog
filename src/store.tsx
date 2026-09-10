@@ -34,6 +34,8 @@ import {
 } from "./utils/native";
 import { playNotificationAlarmSound, playTaskDoneSound } from "./utils/audio";
 import { syncEngine } from "./sync/syncEngine";
+import { X } from "lucide-react";
+import { cn } from "./components/ui";
 
 const LS_KEY = "lifelog.state.v1";
 /** When set, a missing state file boots into a blank app instead of demo data. */
@@ -489,6 +491,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return () => clearTimeout(t);
   }, [toasts]);
 
+  const dismissToast = useCallback((id: number) => {
+    setToasts((ts) => ts.filter((t) => t.id !== id));
+  }, []);
+
   const value = useMemo<AppCtx | null>(
     () =>
       state
@@ -544,29 +550,149 @@ export function AppProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
-      {/* toast host */}
-      <div className="pointer-events-none fixed bottom-5 right-5 z-[110] flex w-[320px] flex-col gap-2">
+      {/* toast host: swipeable on Android and touch screens */}
+      <div
+        className="pointer-events-none fixed z-[110] left-3.5 right-3.5 sm:left-auto sm:right-5 sm:w-[350px] flex flex-col gap-2"
+        style={{
+          bottom: "calc(78px + var(--safe-bottom, 12px))",
+        }}
+      >
         {toasts.map((t) => (
-          <div
-            key={t.id}
-            className="pop pointer-events-auto flex items-start gap-2.5 rounded-xl border px-3.5 py-2.5 text-[13px] font-semibold shadow-xl"
-            style={{
-              background: "var(--panel2)",
-              borderColor: t.kind === "err" ? "var(--danger)" : t.kind === "warn" ? "var(--warn)" : "var(--line)",
-              color: "var(--text)",
-            }}
-          >
-            <span
-              className="mt-[3px] inline-block h-2 w-2 shrink-0 rounded-full"
-              style={{
-                background: t.kind === "err" ? "var(--danger)" : t.kind === "warn" ? "var(--warn)" : "var(--ok)",
-              }}
-            />
-            <span className="leading-snug">{t.msg}</span>
-          </div>
+          <SwipeableToast key={t.id} item={t} onDismiss={dismissToast} />
         ))}
       </div>
     </Ctx.Provider>
+  );
+}
+
+function SwipeableToast({
+  item,
+  onDismiss,
+}: {
+  item: ToastItem;
+  onDismiss: (id: number) => void;
+}) {
+  const [offsetX, setOffsetX] = useState(0);
+  const [swiping, setSwiping] = useState(false);
+  const [dismissing, setDismissing] = useState(false);
+  const startXRef = useRef(0);
+  const currentXRef = useRef(0);
+  const isDraggingRef = useRef(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    startXRef.current = e.touches[0].clientX;
+    currentXRef.current = e.touches[0].clientX;
+    setSwiping(true);
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    if (!swiping) return;
+    currentXRef.current = e.touches[0].clientX;
+    const diff = currentXRef.current - startXRef.current;
+    setOffsetX(diff);
+  };
+
+  const handleTouchEnd = () => {
+    if (!swiping) return;
+    setSwiping(false);
+    const diff = currentXRef.current - startXRef.current;
+    if (Math.abs(diff) > 55) {
+      setDismissing(true);
+      setOffsetX(diff > 0 ? 380 : -380);
+      triggerHaptic("light");
+      setTimeout(() => onDismiss(item.id), 160);
+    } else {
+      setOffsetX(0);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
+    startXRef.current = e.clientX;
+    currentXRef.current = e.clientX;
+    isDraggingRef.current = true;
+    setSwiping(true);
+  };
+
+  const handleMouseMove = (e: React.MouseEvent) => {
+    if (!isDraggingRef.current) return;
+    currentXRef.current = e.clientX;
+    setOffsetX(currentXRef.current - startXRef.current);
+  };
+
+  const handleMouseUp = () => {
+    if (!isDraggingRef.current) return;
+    isDraggingRef.current = false;
+    setSwiping(false);
+    const diff = currentXRef.current - startXRef.current;
+    if (Math.abs(diff) > 55) {
+      setDismissing(true);
+      setOffsetX(diff > 0 ? 380 : -380);
+      triggerHaptic("light");
+      setTimeout(() => onDismiss(item.id), 160);
+    } else {
+      setOffsetX(0);
+    }
+  };
+
+  const opacity = Math.max(0, 1 - Math.abs(offsetX) / 200);
+
+  return (
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove}
+      onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}
+      className={cn(
+        "pop pointer-events-auto flex items-center justify-between gap-3 rounded-2xl border px-3.5 py-2.5 text-[13px] font-semibold shadow-2xl backdrop-blur-xl select-none cursor-grab active:cursor-grabbing",
+        !swiping && "transition-all duration-200 ease-out"
+      )}
+      style={{
+        transform: `translateX(${offsetX}px)`,
+        opacity: dismissing ? 0 : opacity,
+        background: "color-mix(in srgb, var(--panel2) 96%, var(--bg))",
+        borderColor:
+          item.kind === "err"
+            ? "var(--danger)"
+            : item.kind === "warn"
+            ? "var(--warn)"
+            : "color-mix(in srgb, var(--accent) 50%, var(--line))",
+        color: "var(--text)",
+        touchAction: "pan-y",
+      }}
+    >
+      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+        <span
+          className="h-2 w-2 shrink-0 rounded-full shadow-xs"
+          style={{
+            background:
+              item.kind === "err"
+                ? "var(--danger)"
+                : item.kind === "warn"
+                ? "var(--warn)"
+                : "var(--ok)",
+          }}
+        />
+        <span className="leading-snug break-words">{item.msg}</span>
+      </div>
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setDismissing(true);
+          setOffsetX(300);
+          triggerHaptic("light");
+          setTimeout(() => onDismiss(item.id), 140);
+        }}
+        className="p-1 -mr-1 rounded-lg text-[var(--mut)] hover:text-[var(--text)] hover:bg-[var(--panel)] transition-colors shrink-0 cursor-pointer"
+        title="Dismiss notification"
+        aria-label="Dismiss notification"
+      >
+        <X size={13} />
+      </button>
+    </div>
   );
 }
 

@@ -86,147 +86,14 @@ const TABS: { id: SettingsTab; label: string; icon: typeof Palette; desc: string
   { id: "general", label: "General", icon: SlidersHorizontal, desc: "Profile, widgets & system settings" },
 ];
 
-const DESIGNER_THEMES: {
-  id: string;
-  name: string;
-  desc: string;
-  themeMode: ThemeMode;
-  accent: string;
-  bgDark?: string;
-  bgLight?: string;
-  tokens: Record<string, string>;
-  previewBg: string;
-  previewAccent: string;
-}[] = [
-  {
-    id: "default-sage",
-    name: "LifeLog Sage",
-    desc: "Default warm organic dark aesthetic with natural forest green tones.",
-    themeMode: "dark",
-    accent: "#5a9e74",
-    bgDark: "#050605",
-    tokens: {},
-    previewBg: "#050605",
-    previewAccent: "#5a9e74",
-  },
-  {
-    id: "oled-pure",
-    name: "OLED Pitch Black",
-    desc: "True #000000 black with vivid cyan highlights. Zero battery drain on OLED screens.",
-    themeMode: "dark",
-    accent: "#38bdf8",
-    bgDark: "#000000",
-    tokens: {
-      panel: "#000000",
-      panel2: "#0c0c0c",
-      line: "#1e1e1e",
-      text: "#f8fafc",
-      mut: "#94a3b8",
-    },
-    previewBg: "#000000",
-    previewAccent: "#38bdf8",
-  },
-  {
-    id: "catppuccin",
-    name: "Catppuccin Mocha",
-    desc: "Soothing pastel lavender on deep purple-slate backdrop.",
-    themeMode: "dark",
-    accent: "#cba6f7",
-    bgDark: "#1e1e2e",
-    tokens: {
-      panel: "#181825",
-      panel2: "#313244",
-      line: "#45475a",
-      text: "#cdd6f4",
-      mut: "#a6adc8",
-      ok: "#a6e3a1",
-      warn: "#f9e2af",
-      danger: "#f38ba8",
-    },
-    previewBg: "#1e1e2e",
-    previewAccent: "#cba6f7",
-  },
-  {
-    id: "tokyo-night",
-    name: "Tokyo Night",
-    desc: "Deep neon twilight inspired by dark futuristic cityscape.",
-    themeMode: "dark",
-    accent: "#7aa2f7",
-    bgDark: "#1a1b26",
-    tokens: {
-      panel: "#16161e",
-      panel2: "#24283b",
-      line: "#292e42",
-      text: "#c0caf5",
-      mut: "#787c99",
-      ok: "#9ece6a",
-      warn: "#e0af68",
-      danger: "#f7768e",
-    },
-    previewBg: "#1a1b26",
-    previewAccent: "#7aa2f7",
-  },
-  {
-    id: "nord",
-    name: "Nord Frost",
-    desc: "Arctic, north-bluish palette engineered for calm focused readability.",
-    themeMode: "dark",
-    accent: "#88c0d0",
-    bgDark: "#2e3440",
-    tokens: {
-      panel: "#242933",
-      panel2: "#3b4252",
-      line: "#434c5e",
-      text: "#eceff4",
-      mut: "#d8dee9",
-      ok: "#a3be8c",
-      warn: "#ebcb8b",
-      danger: "#bf616a",
-    },
-    previewBg: "#2e3440",
-    previewAccent: "#88c0d0",
-  },
-  {
-    id: "dracula",
-    name: "Dracula Midnight",
-    desc: "Famous gothic dark theme with electric pink, purple and mint hues.",
-    themeMode: "dark",
-    accent: "#bd93f9",
-    bgDark: "#282a36",
-    tokens: {
-      panel: "#21222c",
-      panel2: "#44475a",
-      line: "#6272a4",
-      text: "#f8f8f2",
-      mut: "#6272a4",
-      ok: "#50fa7b",
-      warn: "#f1fa8c",
-      danger: "#ff5555",
-    },
-    previewBg: "#282a36",
-    previewAccent: "#bd93f9",
-  },
-  {
-    id: "warm-sepia",
-    name: "Warm Sepia Paper",
-    desc: "Gentle bookish cream light theme with terracotta accents, easy on eyes.",
-    themeMode: "light",
-    accent: "#c2410c",
-    bgLight: "#fbf7ee",
-    tokens: {
-      panel: "#ffffff",
-      panel2: "#f4ede0",
-      line: "#e7decb",
-      text: "#2e241c",
-      mut: "#7c6c5b",
-      ok: "#2e7d32",
-      warn: "#b45309",
-      danger: "#b91c1c",
-    },
-    previewBg: "#fbf7ee",
-    previewAccent: "#c2410c",
-  },
-];
+import {
+  DARK_THEMES,
+  LIGHT_THEMES,
+  applyThemePatch,
+  getUniversalResetPatch,
+  toggleThemeModePatch,
+  type DesignerTheme,
+} from "../utils/themes";
 
 const ACCENT_PRESETS = [
   { name: "Crimson Red", hex: "#dc2626" },
@@ -323,16 +190,33 @@ export function SettingsView() {
   };
   const accentRatio = contrast(ensureContrast(normalizeHex(s.accent) ?? s.accent, bgNow, 4.5), bgNow).toFixed(1);
 
-  const applyDesignerTheme = (th: typeof DESIGNER_THEMES[number]) => {
-    patch({
-      themeMode: th.themeMode,
-      accent: th.accent,
-      ...(th.bgDark ? { bgDark: th.bgDark } : {}),
-      ...(th.bgLight ? { bgLight: th.bgLight } : {}),
-      tokens: th.tokens,
-    });
+  const applyDesignerTheme = (th: DesignerTheme) => {
+    const p = applyThemePatch(th);
+    patch(p);
     triggerHaptic("medium");
     toast(`Applied “${th.name}” theme`, "ok");
+  };
+
+  const handleModeChange = (newMode: ThemeMode) => {
+    if (newMode === s.themeMode) return;
+    const p = toggleThemeModePatch(s);
+    patch(p);
+    triggerHaptic("light");
+    toast(`Switched to ${newMode} mode`, "ok");
+  };
+
+  const handleUniversalReset = async () => {
+    const ok = await confirm({
+      title: "Reset All Themes & Visuals to 0?",
+      body: "This will reset all theme palettes, custom hex colors, backgrounds, fonts, zoom scale, and accessibility options back to factory defaults.",
+      confirmLabel: "Reset to 0",
+      danger: true,
+    });
+    if (!ok) return;
+    const resetPatch = getUniversalResetPatch();
+    patch(resetPatch);
+    triggerHaptic("medium");
+    toast("All theme and visual customizations reset to 0", "ok");
   };
 
   /* ---------------- data ---------------- */
@@ -579,17 +463,35 @@ export function SettingsView() {
         {/* ===================== TAB 1: APPEARANCE ===================== */}
         {activeTab === "appearance" && (
           <>
-            {/* 1-Tap Designer Themes */}
+            {/* Universal Theme Reset Banner */}
+            <div className="card engine-panel p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-[var(--line)] bg-[var(--bg)] lg:col-span-2">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 font-display text-[14.5px] font-bold text-[var(--text)]">
+                  <RotateCcw size={15} className="text-[var(--accent)]" />
+                  <span>Universal Theme Reset</span>
+                </div>
+                <p className="text-[11.5px] font-semibold text-[var(--mut)]">
+                  Revert all custom tokens, accents, wallpapers, fonts, and zoom scale back to factory 0.
+                </p>
+              </div>
+              <Btn
+                size="sm"
+                variant="outline"
+                onClick={handleUniversalReset}
+                className="shrink-0 gap-1.5 border-[var(--line)] text-xs font-bold hover:border-[var(--danger)] hover:text-[var(--danger)] cursor-pointer"
+              >
+                <RotateCcw size={13} /> Reset Everything to 0
+              </Btn>
+            </div>
+
+            {/* Dark Mode Themes (6 Curated Dark Palettes) */}
             {section(
-              "Designer Themes",
-              "Curated 1-tap color schemes with guaranteed contrast and harmonious palettes.",
+              "Dark Mode Themes",
+              "Curated rich night palettes with high contrast. Selecting any theme automatically activates Dark Mode.",
               (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  {DESIGNER_THEMES.map((th) => {
-                    const isCurrent =
-                      s.themeMode === th.themeMode &&
-                      s.accent.toLowerCase() === th.accent.toLowerCase() &&
-                      (th.bgDark ? s.bgDark.toLowerCase() === th.bgDark.toLowerCase() : true);
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {DARK_THEMES.map((th) => {
+                    const isCurrent = s.themeMode === "dark" && s.designerTheme === th.id;
                     return (
                       <button
                         key={th.id}
@@ -613,11 +515,71 @@ export function SettingsView() {
                             <span className="font-display text-[13px] font-bold tracking-tight truncate">
                               {th.name}
                             </span>
+                            {th.darkOnly && (
+                              <span className="chip !py-0 !px-1.5 text-[9px] font-mono text-[var(--warn)] border-[var(--warn)]/40 shrink-0">
+                                Dark Only
+                              </span>
+                            )}
                             {isCurrent && (
-                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-bold">
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-bold shrink-0">
                                 <Check size={10} />
                               </span>
                             )}
+                          </div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] mt-0.5 truncate">
+                            {th.tag}
+                          </div>
+                          <div className="text-[11px] leading-snug text-[var(--mut)] line-clamp-2 mt-0.5">
+                            {th.desc}
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              ),
+              true
+            )}
+
+            {/* Light Mode Themes (6 Curated Light Palettes) */}
+            {section(
+              "Light Mode Themes",
+              "Clean daylight palettes with crisp legibility. Selecting any theme automatically activates Light Mode.",
+              (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                  {LIGHT_THEMES.map((th) => {
+                    const isCurrent = s.themeMode === "light" && s.designerTheme === th.id;
+                    return (
+                      <button
+                        key={th.id}
+                        type="button"
+                        onClick={() => applyDesignerTheme(th)}
+                        className={cn(
+                          "flex items-start gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer relative",
+                          isCurrent
+                            ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)]"
+                            : "border-[var(--line)] bg-[var(--bg)] hover:bg-[var(--panel2)]"
+                        )}
+                      >
+                        <div
+                          className="h-8 w-8 rounded-lg shrink-0 flex items-center justify-center shadow-xs border border-black/10"
+                          style={{ background: th.previewBg }}
+                        >
+                          <span className="h-4 w-4 rounded-full" style={{ background: th.previewAccent }} />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-1">
+                            <span className="font-display text-[13px] font-bold tracking-tight truncate">
+                              {th.name}
+                            </span>
+                            {isCurrent && (
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-bold shrink-0">
+                                <Check size={10} />
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] mt-0.5 truncate">
+                            {th.tag}
                           </div>
                           <div className="text-[11px] leading-snug text-[var(--mut)] line-clamp-2 mt-0.5">
                             {th.desc}
@@ -644,7 +606,7 @@ export function SettingsView() {
                         { value: "light", label: "Light" },
                       ]}
                       value={s.themeMode}
-                      onChange={(v: ThemeMode) => patch({ themeMode: v })}
+                      onChange={(v: ThemeMode) => handleModeChange(v)}
                     />
                     <span
                       className="chip text-[10px]"

@@ -47,6 +47,7 @@ import {
 } from "../utils/core";
 import { playTimerChime } from "../utils/audio";
 import { CUSTOM_FONT_FAMILY } from "../utils/fonts";
+import { toggleThemeModePatch } from "../utils/themes";
 import { Btn, Modal, TextInput, Toggle, cn } from "./ui";
 import { TaskDialog } from "./TaskDialog";
 import { SyncDialog } from "./SyncDialog";
@@ -370,9 +371,9 @@ export function Shell() {
   }, [state.sessions, state.settings.notifyEnabled, toast, set]);
 
   const toggleTheme = () => {
-    const next = state.settings.themeMode === "dark" ? "light" : "dark";
-    set((s) => ({ ...s, settings: { ...s.settings, themeMode: next } }));
-    toast(`Switched to ${next} mode`, "ok");
+    const patch = toggleThemeModePatch(state.settings);
+    set((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+    toast(`Switched to ${patch.themeMode} mode`, "ok");
   };
 
   const today = todayIso();
