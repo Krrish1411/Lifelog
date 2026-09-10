@@ -234,13 +234,31 @@ export function SettingsView() {
       confirmLabel: "Erase everything", danger: true, requireText: "DELETE",
     });
     if (!ok) return;
-    // Clear IndexedDB first
-    await clearIDB();
-    // Then set erased flag in both IDB and localStorage for compatibility
-    await saveErasedFlag();
-    // Clear localStorage as well
-    localStorage.removeItem(LS_KEY);
-    window.location.reload();
+    try {
+      // Clear IndexedDB first
+      await clearIDB();
+    } catch {}
+
+    // Purge service worker caches (CacheStorage)
+    if (typeof window !== "undefined") {
+      try {
+        if ("caches" in window) {
+          const keys = await caches.keys();
+          await Promise.all(keys.map((k) => caches.delete(k)));
+        }
+      } catch (e) {
+        console.warn("Could not purge caches:", e);
+      }
+
+      try {
+        localStorage.clear();
+        sessionStorage.clear();
+      } catch {}
+
+      // Set erased flag so initial sample data is not regenerated
+      await saveErasedFlag();
+      window.location.reload();
+    }
   };
 
   const [nativePerm, setNativePerm] = useState(false);
@@ -437,13 +455,36 @@ export function SettingsView() {
               </div>
             </div>
 
-            <Labeled label="Custom Accent Hex" hint="custom hex always available"><ColorPicker value={s.accent} onChange={(hex) => patch({ accent: hex })} /></Labeled>
-            <div className="grid grid-cols-2 gap-3">
+            <Labeled label="Custom Accent Hex" hint="custom hex always available">
+              <div className="flex items-center gap-2">
+                <ColorPicker value={s.accent} onChange={(hex) => patch({ accent: hex })} />
+                {s.accent.toLowerCase() !== DEFAULT_SETTINGS.accent.toLowerCase() && (
+                  <Btn size="sm" variant="ghost" onClick={() => { patch({ accent: DEFAULT_SETTINGS.accent }); toast("Accent reset to default", "ok"); }} title="Reset accent to default">
+                    <RotateCcw size={12} /> Reset
+                  </Btn>
+                )}
+              </div>
+            </Labeled>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <Labeled label="Background — dark mode">
-                <ColorPicker value={s.bgDark} onChange={(hex) => patch({ bgDark: hex })} />
+                <div className="flex items-center gap-2">
+                  <ColorPicker value={s.bgDark} onChange={(hex) => patch({ bgDark: hex })} />
+                  {s.bgDark.toLowerCase() !== DEFAULT_SETTINGS.bgDark.toLowerCase() && (
+                    <Btn size="sm" variant="ghost" onClick={() => { patch({ bgDark: DEFAULT_SETTINGS.bgDark }); toast("Dark background reset", "ok"); }} title="Reset dark background to default">
+                      <RotateCcw size={12} /> Reset
+                    </Btn>
+                  )}
+                </div>
               </Labeled>
               <Labeled label="Background — light mode">
-                <ColorPicker value={s.bgLight} onChange={(hex) => patch({ bgLight: hex })} />
+                <div className="flex items-center gap-2">
+                  <ColorPicker value={s.bgLight} onChange={(hex) => patch({ bgLight: hex })} />
+                  {s.bgLight.toLowerCase() !== DEFAULT_SETTINGS.bgLight.toLowerCase() && (
+                    <Btn size="sm" variant="ghost" onClick={() => { patch({ bgLight: DEFAULT_SETTINGS.bgLight }); toast("Light background reset", "ok"); }} title="Reset light background to default">
+                      <RotateCcw size={12} /> Reset
+                    </Btn>
+                  )}
+                </div>
               </Labeled>
             </div>
           </div>

@@ -3,6 +3,7 @@ import {
   ArrowLeft,
   Coffee,
   Expand,
+  ExternalLink,
   Pause,
   Play,
   Plus,
@@ -144,11 +145,8 @@ export function FocusView() {
 
     if (kind === "done") {
       playTimerFinishSound(live.mode === "break" ? "break" : "complete");
-      if (
-        settings.notifyEnabled &&
-        "Notification" in window &&
-        Notification.permission === "granted"
-      ) {
+      const hasPerm = typeof Notification !== "undefined" && Notification.permission === "granted";
+      if (hasPerm || settings.notifyEnabled) {
         try {
           new Notification(live.mode === "break" ? "Break Finished" : "Focus Session Complete", {
             body:
@@ -188,6 +186,18 @@ export function FocusView() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, live?.id, paused]);
 
+  const popOutDesktopTimer = () => {
+    const w = 360;
+    const h = 420;
+    const left = Math.max(0, (window.screen.width - w) / 2);
+    const top = Math.max(0, (window.screen.height - h) / 2);
+    window.open(
+      `${window.location.origin}${window.location.pathname}#timer-popout`,
+      "LifeLogTimerPopout",
+      `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+    );
+  };
+
   const start = (m: TimerMode | "break") => {
     const isBreak = m === "break";
     if (!isBreak && !selTaskId) return toast("Pick a task first", "err");
@@ -208,24 +218,61 @@ export function FocusView() {
 
     const id = uid();
     const ts = Date.now();
-    set((s) => ({
-      ...s,
-      sessions: [
-        ...s.sessions,
-        {
-          id,
-          taskId: isBreak ? null : selTaskId,
-          subtaskId: isBreak ? null : selSubtaskId,
-          mode: m,
-          startedAt: ts,
-          endedAt: null,
-          plannedMin,
-          pauses: [],
-          status: "running",
-        },
-      ],
-    }));
+    const nowTime = `${String(new Date(ts).getHours()).padStart(2, "0")}:${String(new Date(ts).getMinutes()).padStart(2, "0")}`;
+    const todayStr = todayIso();
 
+    set((s) => {
+      let updatedTasks = s.tasks;
+      if (!isBreak && selTaskId) {
+        updatedTasks = s.tasks.map((t) => {
+          if (t.id !== selTaskId) return t;
+          let changed = false;
+          let newBlocks = t.timeBlocks;
+          let newDueTime = t.dueTime;
+          let newDue = t.due;
+
+          if (chosenBlock && chosenBlock.time !== nowTime) {
+            newBlocks = t.timeBlocks?.map((b) =>
+              b.id === selBlockId ? { ...b, date: todayStr, time: nowTime } : b
+            );
+            changed = true;
+          } else if (t.dueTime && t.dueTime !== nowTime) {
+            newDueTime = nowTime;
+            newDue = todayStr;
+            changed = true;
+          }
+
+          if (changed) {
+            return {
+              ...t,
+              due: newDue,
+              dueTime: newDueTime,
+              timeBlocks: newBlocks,
+            };
+          }
+          return t;
+        });
+      }
+
+      return {
+        ...s,
+        tasks: updatedTasks,
+        sessions: [
+          ...s.sessions,
+          {
+            id,
+            taskId: isBreak ? null : selTaskId,
+            subtaskId: isBreak ? null : selSubtaskId,
+            mode: m,
+            startedAt: ts,
+            endedAt: null,
+            plannedMin,
+            pauses: [],
+            status: "running",
+          },
+        ],
+      };
+    });
 
     setBreakOffer(false);
     setNow(ts);
@@ -380,6 +427,14 @@ export function FocusView() {
             <ArrowLeft size={14} /> Back
           </Btn>
           <div className="flex items-center gap-2">
+            <Btn
+              variant="outline"
+              size="sm"
+              onClick={popOutDesktopTimer}
+              title="Open desktop timer window to pin on desktop"
+            >
+              <ExternalLink size={13} /> Pop-out
+            </Btn>
             <span className="chip" style={{ color: "var(--accent)" }}>
               <Target size={12} />{" "}
               {live.mode === "break"
@@ -530,16 +585,27 @@ export function FocusView() {
             Pomodoro, countdown or open flow with smart recovery.
           </p>
         </div>
-        {live && (
-          <Btn
-            variant="primary"
-            size="lg"
-            onClick={() => setStage(true)}
-            className="ring-pulse"
-          >
-            <Expand size={15} /> Session running — open full counter
-          </Btn>
-        )}
+        <div className="flex items-center gap-2">
+          {live && (
+            <Btn
+              variant="outline"
+              onClick={popOutDesktopTimer}
+              title="Pop out desktop timer window"
+            >
+              <ExternalLink size={14} /> Pop-out
+            </Btn>
+          )}
+          {live && (
+            <Btn
+              variant="primary"
+              size="lg"
+              onClick={() => setStage(true)}
+              className="ring-pulse"
+            >
+              <Expand size={15} /> Session running — open full counter
+            </Btn>
+          )}
+        </div>
       </div>
 
       {/* Break Offer & Stretch Routine */}

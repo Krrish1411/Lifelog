@@ -27,7 +27,7 @@ import {
   uid,
 } from "../utils/core";
 import { parseNaturalLanguageTask } from "../utils/nlp";
-import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, TagInput, TextInput, Toggle, cn } from "./ui";
+import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, Select, TagInput, TextInput, Toggle, cn } from "./ui";
 
 const defaultRec = (dueIso: string): Recurrence => {
   const wd = dueIso ? (parseIso(dueIso).getDay() + 6) % 7 : 0;
@@ -365,12 +365,21 @@ export function TaskDialog() {
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <Labeled label="Project">
             <div className="flex flex-col gap-2">
-              <select className="inp" value={newProject ? "__new" : projectId} onChange={(e) => { setNewProject(e.target.value === "__new"); if (e.target.value !== "__new") setProjectId(e.target.value); }}>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.emoji} {p.name}</option>
-                ))}
-                <option value="__new">＋ New project…</option>
-              </select>
+              <Select
+                value={newProject ? "__new" : projectId}
+                onChange={(val) => {
+                  setNewProject(val === "__new");
+                  if (val !== "__new") setProjectId(val);
+                }}
+                options={[
+                  ...projects.map((p) => ({
+                    value: p.id,
+                    label: p.name,
+                    icon: <span>{p.emoji}</span>,
+                  })),
+                  { value: "__new", label: "＋ New project…" },
+                ]}
+              />
               {newProject && (
                 <div className="rise flex flex-col gap-2 rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                   <TextInput value={npName} onChange={(e) => setNpName(e.target.value)} placeholder="Project name" />
@@ -591,11 +600,16 @@ export function TaskDialog() {
                     if (!rec.interval || rec.interval < 1) setRec({ ...rec, interval: 1 });
                   }}
                 />
-                <select className="inp w-[130px]" value={rec.freq} onChange={(e) => setRec({ ...rec, freq: e.target.value as Recurrence["freq"] })}>
-                  <option value="daily">day(s)</option>
-                  <option value="weekly">week(s)</option>
-                  <option value="monthly">month(s)</option>
-                </select>
+                <Select
+                  width={130}
+                  value={rec.freq}
+                  onChange={(val) => setRec({ ...rec, freq: val as Recurrence["freq"] })}
+                  options={[
+                    { value: "daily", label: "day(s)" },
+                    { value: "weekly", label: "week(s)" },
+                    { value: "monthly", label: "month(s)" },
+                  ]}
+                />
               </div>
               {rec.freq === "weekly" && (
                 <div className="flex flex-wrap gap-1.5">
@@ -616,16 +630,24 @@ export function TaskDialog() {
                     <TextInput type="number" min={1} max={31} className="w-[70px]" value={String(rec.byMonthDay)} onChange={(e) => setRec({ ...rec, byMonthDay: Math.min(31, Math.max(1, parseInt(e.target.value || "1", 10))) })} />
                   ) : (
                     <>
-                      <select className="inp w-[110px]" value={String(rec.setPos)} onChange={(e) => setRec({ ...rec, setPos: parseInt(e.target.value, 10) })}>
-                        <option value="1">first</option>
-                        <option value="2">second</option>
-                        <option value="3">third</option>
-                        <option value="4">fourth</option>
-                        <option value="-1">last</option>
-                      </select>
-                      <select className="inp w-[120px]" value={String(rec.byWeekday[0] ?? 0)} onChange={(e) => setRec({ ...rec, byWeekday: [parseInt(e.target.value, 10)] })}>
-                        {WEEKDAYS_SHORT.map((d, i) => <option key={d} value={i}>{d}</option>)}
-                      </select>
+                      <Select
+                        width={110}
+                        value={String(rec.setPos)}
+                        onChange={(val) => setRec({ ...rec, setPos: parseInt(val, 10) })}
+                        options={[
+                          { value: "1", label: "first" },
+                          { value: "2", label: "second" },
+                          { value: "3", label: "third" },
+                          { value: "4", label: "fourth" },
+                          { value: "-1", label: "last" },
+                        ]}
+                      />
+                      <Select
+                        width={120}
+                        value={String(rec.byWeekday[0] ?? 0)}
+                        onChange={(val) => setRec({ ...rec, byWeekday: [parseInt(val, 10)] })}
+                        options={WEEKDAYS_SHORT.map((d, i) => ({ value: String(i), label: d }))}
+                      />
                     </>
                   )}
                   <span className="text-[12px]" style={{ color: "var(--mut)" }}>= {setPosLabel(rec.setPos)} occurrence</span>

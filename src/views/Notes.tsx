@@ -4,7 +4,7 @@ import {
   Highlighter, ImageIcon, Italic, Link2, List, ListOrdered, ListTodo,
   Lock, Maximize2, Mic, Minimize2, Minus, PanelLeft,
   Paperclip, Pencil, Pin, PinOff, Plus, Quote, Square, Strikethrough,
-  Trash2, Underline, X, Loader2
+  Trash2, Underline, X, Loader2, BookOpen, Clock, FileText
 } from "lucide-react";
 import type { Attachment, Note } from "../types";
 import { useApp } from "../store";
@@ -13,7 +13,7 @@ import { fmtClock, fmtDayShort, fmtNoteName, todayIso, uid } from "../utils/core
 import { applyLinePrefix, applyWrap, renderMarkdown } from "../utils/markdown";
 import { consumeDailyNote } from "../utils/nav";
 import { useBodyScrollLock } from "../utils/scrollLock";
-import { Btn, EmptyState, Modal, SearchInput, Seg, TextInput, cn } from "../components/ui";
+import { Btn, EmptyState, Modal, SearchInput, Seg, Select, TextInput, cn } from "../components/ui";
 
 interface Draft { title: string; text: string }
 const MAX_ATTACH = 50 * 1024 * 1024; // 50 MB per attachment
@@ -51,23 +51,19 @@ export function NotesView() {
   const loadedFor = useRef<string | null>(null);
   const dirty = useRef(false);
 
-  /* ensure today's daily note + cross-view request */
+  /* ensure today's daily note draft + cross-view request */
+  const draftDailyId = `draft-daily-${today}`;
+
   useEffect(() => {
-    if (!state.notes.some((n) => n.daily && n.day === today)) {
-      const note: Note = { id: uid(), title: fmtNoteName(today), folderId: "f-daily", createdAt: Date.now(), updatedAt: Date.now(), blob: { plain: "" }, daily: true, day: today };
-      set((s) => (s.notes.some((n) => n.daily && n.day === today) ? s : { ...s, notes: [note, ...s.notes] }));
-    }
     const requested = consumeDailyNote();
     const targetIso = requested ?? today;
     const existing = state.notes.find((n) => n.daily && n.day === targetIso);
     if (existing) {
       setSelId(existing.id);
     } else if (requested) {
-      const id = uid();
-      set((s) => ({ ...s, notes: [{ id, title: fmtNoteName(requested), folderId: "f-daily", createdAt: Date.now(), updatedAt: Date.now(), blob: { plain: "" }, daily: true, day: requested }, ...s.notes] }));
-      setSelId(id);
-    } else if (!selId && state.notes.length > 0) {
-      setSelId(state.notes[0].id);
+      setSelId(`draft-daily-${requested}`);
+    } else {
+      setSelId(draftDailyId);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -87,15 +83,40 @@ export function NotesView() {
     const curId = selIdRef.current;
     if (!curId || !dirty.current) return;
     const curDraft = draftRef.current;
+    const isBlank = !curDraft.text.trim() && (!curDraft.title.trim() || curDraft.title === fmtNoteName(today));
+    if (isBlank) {
+      dirty.current = false;
+      return;
+    }
     dirty.current = false;
     try {
       const key = await getDeviceKey();
       const blob = await encryptText(key, curDraft.text);
-      set((s) => ({
-        ...s,
-        notes: s.notes.map((n) => (n.id === curId ? { ...n, title: curDraft.title.trim() || n.title, blob, updatedAt: Date.now() } : n)),
-      }));
+      if (curId.startsWith("draft-daily-")) {
+        const dayIso = curId.replace("draft-daily-", "") || today;
+        const newId = uid();
+        const newNote: Note = {
+          id: newId,
+          title: curDraft.title.trim() || fmtNoteName(dayIso),
+          folderId: "f-daily",
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+          blob,
+          daily: true,
+          day: dayIso,
+        };
+        set((s) => ({ ...s, notes: [newNote, ...s.notes] }));
+        selIdRef.current = newId;
+        loadedFor.current = newId;
+        setSelId(newId);
+      } else {
+        set((s) => ({
+          ...s,
+          notes: s.notes.map((n) => (n.id === curId ? { ...n, title: curDraft.title.trim() || n.title, blob, updatedAt: Date.now() } : n)),
+        }));
+      }
       setSaveState("saved");
+      setTimeout(() => setSaveState("idle"), 1800);
     } catch {
       // ignore
     }
@@ -104,46 +125,48 @@ export function NotesView() {
   /* flush pending save on unmount */
   useEffect(() => () => { flushSave(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* load + decrypt selected note */
+  /* load + decrypt selected note (only when switching notes!) */
   const prevSelId = useRef<string | null>(null);
   useEffect(() => {
     if (prevSelId.current && prevSelId.current !== selId && dirty.current) {
       flushSave();
     }
+    const isSwitching = prevSelId.current !== selId;
     prevSelId.current = selId;
 
     if (!selId) return;
-    if (taRef.current) taRef.current.scrollTop = 0;
-    const note = state.notes.find((n) => n.id === selId);
-    if (!note || loadedFor.current === selId) return;
-    loadedFor.current = selId;
-    dirty.current = false;
-    setDraft({ title: note.title, text: "" });
-    getDeviceKey().then((k) => decryptText(k, note.blob)).then((text) => {
-      setDraft((d) => (loadedFor.current === selId ? { ...d, text } : d));
-    });
-  }, [selId, state.notes]);
+    if (isSwitching && taRef.current) {
+      taRef.current.scrollTop = 0;
+    }
+
+    if (isSwitching || loadedFor.current !== selId) {
+      if (selId.startsWith("draft-daily-")) {
+        const dayIso = selId.replace("draft-daily-", "") || today;
+        loadedFor.current = selId;
+        dirty.current = false;
+        setDraft({ title: fmtNoteName(dayIso), text: "" });
+        return;
+      }
+      const note = state.notes.find((n) => n.id === selId);
+      if (!note) return;
+      loadedFor.current = selId;
+      dirty.current = false;
+      setDraft({ title: note.title, text: "" });
+      getDeviceKey().then((k) => decryptText(k, note.blob)).then((text) => {
+        setDraft((d) => (loadedFor.current === selId ? { ...d, text } : d));
+      });
+    }
+  }, [selId]);
 
   /* autosave (debounced, re-encrypts) */
   useEffect(() => {
-    if (!selId || loadedFor.current !== selId) return;
-    const note = state.notes.find((n) => n.id === selId);
-    if (!note) return;
-    const titleChanged = draft.title.trim() !== "" && draft.title !== note.title;
-    if (!titleChanged && !dirty.current) return;
+    if (!selId || loadedFor.current !== selId || !dirty.current) return;
     setSaveState("saving");
     const t = setTimeout(async () => {
-      const key = await getDeviceKey();
-      const blob = await encryptText(key, draft.text);
-      set((s) => ({
-        ...s,
-        notes: s.notes.map((n) => (n.id === selId ? { ...n, title: draft.title.trim() || n.title, blob, updatedAt: Date.now() } : n)),
-      }));
-      dirty.current = false;
-      setSaveState("saved");
+      await flushSave();
     }, 700);
     return () => clearTimeout(t);
-  }, [draft, selId, state.notes, set]);
+  }, [draft.title, draft.text, selId]);
 
   /* stop recording on unmount */
   useEffect(() => () => { stopRecording(false); }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -153,10 +176,41 @@ export function NotesView() {
     if (folderSel !== "all") list = list.filter((n) => n.folderId === folderSel);
     const q = query.trim().toLowerCase();
     if (q) list = list.filter((n) => n.title.toLowerCase().includes(q));
-    return [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt);
-  }, [state.notes, folderSel, query]);
+    const sorted = [...list].sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.updatedAt - a.updatedAt);
+    if (selId?.startsWith("draft-daily-") && (folderSel === "all" || folderSel === "f-daily")) {
+      const dayIso = selId.replace("draft-daily-", "") || today;
+      const draftNote: Note = {
+        id: selId,
+        title: draft.title || fmtNoteName(dayIso),
+        folderId: "f-daily",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        blob: { plain: "" },
+        daily: true,
+        day: dayIso,
+      };
+      return [draftNote, ...sorted];
+    }
+    return sorted;
+  }, [state.notes, folderSel, query, selId, draft.title, today]);
 
-  const selNote = state.notes.find((n) => n.id === selId);
+  const selNote = useMemo(() => {
+    if (!selId) return undefined;
+    if (selId.startsWith("draft-daily-")) {
+      const dayIso = selId.replace("draft-daily-", "") || today;
+      return {
+        id: selId,
+        title: draft.title || fmtNoteName(dayIso),
+        folderId: "f-daily",
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        blob: { plain: "" },
+        daily: true,
+        day: dayIso,
+      } as Note;
+    }
+    return state.notes.find((n) => n.id === selId);
+  }, [selId, draft.title, state.notes, today]);
   const selFolder = state.folders.find((f) => f.id === selNote?.folderId);
   const currentFolderName = folderSel === "all" ? "All Notes" : (state.folders.find((f) => f.id === folderSel)?.name ?? "Folder");
 
@@ -526,9 +580,11 @@ export function NotesView() {
     </div>
   );
 
-  /* ---------------- Note Editor Canvas ---------------- */
+  /* ---------------- Note Editor Canvas (Notion / Obsidian Style) ---------------- */
   const editor = (popout: boolean) => {
     const wordCount = draft.text.trim() ? draft.text.trim().split(/\s+/).length : 0;
+    const readingMin = Math.max(1, Math.ceil(wordCount / 200));
+    const isDaily = selNote?.daily;
     const noteDate = selNote?.daily && selNote?.day
       ? `Daily Note · ${fmtDayShort(selNote.day)}`
       : selNote ? `${fmtDayShort(isoOf(selNote.updatedAt))} at ${fmtClock(selNote.updatedAt)}` : "";
@@ -636,118 +692,121 @@ export function NotesView() {
               </div>
             </div>
 
-            {/* Note Title & Header Metadata */}
-            <div className="pt-3 pb-1 shrink-0">
-              <input
-                value={draft.title}
-                onChange={(e) => {
-                  setDraft((d) => ({ ...d, title: e.target.value }));
-                  dirty.current = true;
-                }}
-                placeholder="Note title"
-                className={cn(
-                  "w-full bg-transparent border-none outline-none font-extrabold font-display tracking-tight text-[var(--text)] placeholder:text-[var(--mut)]/30 p-0 focus:outline-none focus:ring-0",
-                  popout ? "text-3xl" : "text-2xl sm:text-3xl"
-                )}
-              />
-              <div className="mt-1 flex items-center gap-2 text-[11px] font-medium text-[var(--mut)] flex-wrap">
-                <span>{noteDate}</span>
-                <span>•</span>
-                <select
-                  value={selNote.folderId}
+            {/* Centered Document Canvas (Obsidian / Notion Page) */}
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain">
+              <div className={cn("mx-auto w-full max-w-[760px] flex flex-col min-h-full px-2 sm:px-6 pt-5 pb-8", popout && "max-w-[860px]")}>
+                {/* Notion-style Page Icon */}
+                <div className="text-3xl mb-1 select-none flex items-center gap-2">
+                  <span>{isDaily ? "📅" : "📝"}</span>
+                  {selNote.pinned && <span className="text-xs chip text-[var(--accent)] font-bold">Pinned</span>}
+                </div>
+
+                {/* Borderless Title */}
+                <input
+                  value={draft.title}
                   onChange={(e) => {
-                    const folderId = e.target.value;
-                    set((s) => ({
-                      ...s,
-                      notes: s.notes.map((n) => (n.id === selNote.id ? { ...n, folderId, updatedAt: Date.now() } : n)),
-                    }));
-                    toast("Folder updated", "ok");
+                    setDraft((d) => ({ ...d, title: e.target.value }));
+                    dirty.current = true;
                   }}
-                  className="bg-transparent border border-[var(--line)] rounded px-1.5 py-0.5 text-[10.5px] font-bold text-[var(--mut)] hover:text-[var(--text)] cursor-pointer outline-none"
-                  title="Change folder"
-                >
-                  {state.folders.map((f) => (
-                    <option key={f.id} value={f.id} className="bg-[var(--panel)] text-[var(--text)]">
-                      {f.id === "f-daily" ? "📅 " : "📁 "} {f.name}
-                    </option>
-                  ))}
-                </select>
-                <span>•</span>
-                <span>{wordCount} words</span>
-                <span>•</span>
-                <span className="inline-flex items-center gap-1 text-[var(--accent)] font-semibold">
-                  <Lock size={10} /> AES-256
-                </span>
-                {saveState === "saving" && (
-                  <span className="sm:hidden text-[var(--warn)] font-semibold flex items-center gap-1">
-                    • <Loader2 size={10} className="animate-spin" /> Saving
+                  placeholder="Note title"
+                  className={cn(
+                    "w-full bg-transparent border-none outline-none font-extrabold font-display tracking-tight text-[var(--text)] placeholder:text-[var(--mut)]/30 p-0 focus:outline-none focus:ring-0 leading-tight",
+                    popout ? "text-3xl sm:text-4xl" : "text-2xl sm:text-3xl"
+                  )}
+                />
+
+                {/* Obsidian-style Metadata Properties Bar */}
+                <div className="mt-3 flex items-center gap-2 text-[11px] font-medium text-[var(--mut)] flex-wrap pb-3 border-b border-[var(--line)]">
+                  <Select
+                    size="sm"
+                    value={selNote.folderId}
+                    onChange={(folderId) => {
+                      if (selNote.id.startsWith("draft-daily-")) return;
+                      set((s) => ({
+                        ...s,
+                        notes: s.notes.map((n) => (n.id === selNote.id ? { ...n, folderId, updatedAt: Date.now() } : n)),
+                      }));
+                      toast("Folder updated", "ok");
+                    }}
+                    options={state.folders.map((f) => ({
+                      value: f.id,
+                      label: f.name,
+                      icon: <span>{f.id === "f-daily" ? "📅" : "📁"}</span>,
+                    }))}
+                  />
+                  <span className="chip !py-0.5 text-[10.5px]">
+                    📅 {noteDate}
                   </span>
+                  <span className="chip !py-0.5 text-[10.5px]">
+                    <BookOpen size={11} className="inline mr-1 opacity-70" />
+                    {wordCount} words · {readingMin}m read
+                  </span>
+                  <span className="chip !py-0.5 text-[10.5px] text-[var(--accent)] font-semibold">
+                    <Lock size={10} className="inline mr-1" /> AES-256
+                  </span>
+                  {saveState === "saving" && (
+                    <span className="sm:hidden text-[var(--warn)] font-semibold flex items-center gap-1">
+                      <Loader2 size={10} className="animate-spin" /> Saving
+                    </span>
+                  )}
+                </div>
+
+                {/* Linked Tasks */}
+                {linkedTasks.length > 0 && (
+                  <div className="mt-3 flex items-center gap-1.5 flex-wrap rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs shrink-0">
+                    <span className="font-bold text-blue-500 flex items-center gap-1 shrink-0">
+                      <CheckSquare size={12} /> Linked Tasks ({linkedTasks.length}):
+                    </span>
+                    {linkedTasks.map((t) => (
+                      <button
+                        key={t.id}
+                        onClick={() => openTaskDialog({ taskId: t.id })}
+                        className="chip text-[11px] !py-0.5 hover:border-accent cursor-pointer flex items-center gap-1 transition-all"
+                        title="Click to view task"
+                      >
+                        <span>{t.emoji ?? "▸"}</span>
+                        <span className={cn("font-medium", t.done && "line-through opacity-60")}>
+                          {t.title}
+                        </span>
+                        {t.done && <span className="text-emerald-500 font-bold">✓</span>}
+                      </button>
+                    ))}
+                  </div>
                 )}
+
+                {/* Note Body Textarea or Markdown View */}
+                {preview === "write" ? (
+                  <textarea
+                    ref={taRef}
+                    className="note-page flex-1 min-h-[320px] w-full resize-none border-0 !bg-transparent text-[15px] sm:text-[15.5px] leading-[1.75] text-[var(--text)] placeholder:text-[var(--mut)]/30 focus:outline-none focus:ring-0 !p-0 mt-4 pb-28"
+                    value={draft.text}
+                    onChange={(e) => {
+                      setDraft((d) => ({ ...d, text: e.target.value }));
+                      dirty.current = true;
+                    }}
+                    placeholder={
+                      selNote.daily
+                        ? "# Intentions\n- [ ] Finish hero wireframe\n\n# Log\n==Highlight== what mattered today…"
+                        : "# Start writing freely\n**Bold**, *italic*, ==highlight==, checklists, lists…"
+                    }
+                  />
+                ) : (
+                  <div className="note-page flex-1 min-h-[320px] w-full overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--bg)]/40 p-5 mt-4 leading-relaxed pb-28">
+                    {draft.text.trim() ? (
+                      renderMarkdown(draft.text)
+                    ) : (
+                      <div style={{ color: "var(--mut)" }}>Nothing to preview yet — switch to Write and start typing.</div>
+                    )}
+                  </div>
+                )}
+
+                {/* Attachment tiles */}
+                {attachmentTiles}
               </div>
             </div>
 
-            {/* Linked Tasks */}
-            {linkedTasks.length > 0 && (
-              <div className="mt-2 flex items-center gap-1.5 flex-wrap rounded-xl border border-blue-500/20 bg-blue-500/5 px-3 py-1.5 text-xs shrink-0">
-                <span className="font-bold text-blue-500 flex items-center gap-1 shrink-0">
-                  <CheckSquare size={12} /> Linked Tasks ({linkedTasks.length}):
-                </span>
-                {linkedTasks.map((t) => (
-                  <button
-                    key={t.id}
-                    onClick={() => openTaskDialog({ taskId: t.id })}
-                    className="chip text-[11px] !py-0.5 hover:border-accent cursor-pointer flex items-center gap-1 transition-all"
-                    title="Click to view task"
-                  >
-                    <span>{t.emoji ?? "▸"}</span>
-                    <span className={cn("font-medium", t.done && "line-through opacity-60")}>
-                      {t.title}
-                    </span>
-                    {t.done && <span className="text-emerald-500 font-bold">✓</span>}
-                  </button>
-                ))}
-              </div>
-            )}
-
-            {/* Note Body Textarea or Markdown View */}
-            {preview === "write" ? (
-              <textarea
-                ref={taRef}
-                className={cn(
-                  "note-page flex-1 min-h-0 w-full resize-none border-0 !bg-transparent text-[14.5px] sm:text-[15px] leading-relaxed text-[var(--text)] placeholder:text-[var(--mut)]/35 focus:outline-none focus:ring-0 !p-0 mt-3",
-                  popout && "mx-auto max-w-[800px]"
-                )}
-                value={draft.text}
-                onChange={(e) => {
-                  setDraft((d) => ({ ...d, text: e.target.value }));
-                  dirty.current = true;
-                }}
-                placeholder={
-                  selNote.daily
-                    ? "# Intentions\n- [ ] Finish hero wireframe\n\n# Log\n==Highlight== what mattered today…"
-                    : "# Start writing freely\n**Bold**, *italic*, ==highlight==, checklists, lists…"
-                }
-              />
-            ) : (
-              <div
-                className={cn(
-                  "note-page flex-1 min-h-0 w-full overflow-y-auto rounded-xl border border-[var(--line)] bg-[var(--bg)]/40 p-4 mt-3",
-                  popout && "mx-auto max-w-[800px]"
-                )}
-              >
-                {draft.text.trim() ? (
-                  renderMarkdown(draft.text)
-                ) : (
-                  <div style={{ color: "var(--mut)" }}>Nothing to preview yet — switch to Write and start typing.</div>
-                )}
-              </div>
-            )}
-
-            {/* Attachment tiles */}
-            {attachmentTiles}
-
             {/* Formatting & Media Toolbar */}
-            <div className="mt-2 pt-2 border-t border-[var(--line)] flex flex-col gap-1.5 w-full min-w-0 shrink-0">
+            <div className="pt-2 border-t border-[var(--line)] flex flex-col gap-1.5 w-full min-w-0 shrink-0 bg-[var(--panel)]">
               {toolbar}
               {attachmentsBar}
             </div>

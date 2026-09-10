@@ -106,12 +106,10 @@ export function HabitsView() {
                   </div>
                 </div>
                 <div className="flex flex-wrap items-center justify-between gap-2 w-full sm:w-auto sm:ml-auto">
-                  <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-1.5 w-full sm:w-auto">
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto">
                     {[
-                      { k: "Current streak", v: st.current > 0 ? `${st.current} days` : "0", strong: true },
-                      { k: "Longest streak", v: `${st.longest} days` },
-                      { k: "Shortest streak", v: `${st.shortest} day${st.shortest === 1 ? "" : "s"}` },
-                      { k: "Longest skip", v: `${st.longestGap} days` },
+                      { k: "Longest streak", v: `${st.longest}d`, strong: true },
+                      { k: "Longest skip", v: `${st.longestGap}d` },
                     ].map((x) => (
                       <div key={x.k} className="rounded-xl border px-2.5 py-1 text-center min-w-0" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                         <div className="font-mono text-[13px] font-bold tnum truncate" style={{ color: x.strong ? "var(--accent)" : "var(--text)" }}>{x.v}</div>
@@ -170,9 +168,10 @@ export function HabitsView() {
                               onMouseLeave={() => setHoverDay(null)}
                               disabled={locked}
                               title={`${fmtDayShort(iso)}${future ? " · future (locked)" : locked ? " · locked — use Edit past days" : done ? " · done" : ""}`}
-                              className="h-[13px] w-[13px] rounded-[3.5px] transition-all"
+                              className="h-[14px] w-[14px] rounded-[3.5px] transition-all"
                               style={{
                                 background: done ? h.color : "var(--panel2)",
+                                border: done ? `1px solid color-mix(in srgb, ${h.color} 80%, black)` : "1px solid var(--line)",
                                 outline: isToday ? `1.5px solid ${done ? "var(--text)" : h.color}` : "none",
                                 outlineOffset: 1.5,
                                 opacity: future ? 0.28 : locked && !done ? 0.75 : 1,

@@ -1,6 +1,17 @@
 import type { State, Task, Note, Habit, Project, Session, DayLog } from "../types";
 import type { SyncMessage, SyncStatus, SyncPeerInfo, PartialStateDelta, EncryptedSyncPacket, SyncTransport } from "./syncTypes";
 import { encryptSyncMessage, decryptSyncMessage } from "./syncCrypto";
+import { getDeviceKey, decryptText } from "../utils/crypto";
+
+const SYNC_STORAGE_KEY = "lifelog.sync.activeSession";
+
+interface SavedSyncSession {
+  pin: string;
+  secret: string;
+  role: "host" | "joiner";
+  deviceName: string;
+  peer?: SyncPeerInfo | null;
+}
 
 function detectPlatform(): SyncPeerInfo["platform"] {
   if (typeof navigator === "undefined") return "web";
@@ -51,6 +62,49 @@ class WebRTCSyncEngine {
   private localStateGetter: (() => State | null) | null = null;
   private processedMessageIds: Set<string> = new Set();
 
+  constructor() {
+    if (typeof window !== "undefined") {
+      setTimeout(() => this.tryAutoReconnect(), 600);
+    }
+  }
+
+  public tryAutoReconnect(): void {
+    try {
+      const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SYNC_STORAGE_KEY) : null;
+      if (!raw) return;
+      const session: SavedSyncSession = JSON.parse(raw);
+      if (!session.pin || !session.secret) return;
+      this.isHost = session.role === "host";
+      this.activePin = session.pin;
+      this.sharedSecret = session.secret;
+      this.transportType = "relay";
+      this.outgoingTopic = this.isHost ? `lifelog-sync-${session.pin}-h2j` : `lifelog-sync-${session.pin}-j2h`;
+      this.incomingTopic = this.isHost ? `lifelog-sync-${session.pin}-j2h` : `lifelog-sync-${session.pin}-h2j`;
+      const selfPeer: SyncPeerInfo = {
+        deviceId: (this.isHost ? "host-" : "joiner-") + Date.now().toString(36),
+        deviceName: session.deviceName || "Device",
+        platform: detectPlatform(),
+        connectedAt: Date.now(),
+      };
+      this.startRelayListener(this.incomingTopic, selfPeer);
+      this.setStatus("connected", session.peer || undefined);
+
+      setTimeout(() => {
+        this.sendRelayMessage({
+          type: "HANDSHAKE",
+          peer: selfPeer,
+          lastSyncTs: Date.now(),
+        }).catch(() => {});
+        if (this.localStateGetter) {
+          const s = this.localStateGetter();
+          if (s) this.broadcastFullState(s).catch(() => {});
+        }
+      }, 1200);
+    } catch (e) {
+      console.warn("[Sync] Auto reconnect error:", e);
+    }
+  }
+
   public getStatus(): SyncStatus {
     return this.status;
   }
@@ -81,6 +135,18 @@ class WebRTCSyncEngine {
   private setStatus(status: SyncStatus, peer?: SyncPeerInfo | null) {
     this.status = status;
     if (peer !== undefined) this.connectedPeer = peer;
+    if (status === "connected" && this.activePin && this.sharedSecret && typeof localStorage !== "undefined") {
+      try {
+        const saved: SavedSyncSession = {
+          pin: this.activePin,
+          secret: this.sharedSecret,
+          role: this.isHost ? "host" : "joiner",
+          deviceName: this.connectedPeer?.deviceName || "Peer",
+          peer: this.connectedPeer,
+        };
+        localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(saved));
+      } catch {}
+    }
     for (const l of this.statusListeners) {
       l(this.status, this.connectedPeer ?? undefined);
     }
@@ -464,9 +530,30 @@ class WebRTCSyncEngine {
     if (this.status !== "connected") return;
     this.setStatus("syncing");
     try {
+      let payloadState = state;
+      if (state.notes && state.notes.length > 0) {
+        try {
+          const key = await getDeviceKey();
+          const safeNotes = await Promise.all(
+            state.notes.map(async (n) => {
+              if (n.blob && n.blob.plain === undefined && (n.blob.d || n.blob.iv)) {
+                try {
+                  const text = await decryptText(key, n.blob);
+                  if (text && !text.startsWith("(decryption failed)")) {
+                    return { ...n, blob: { ...n.blob, plain: text } };
+                  }
+                } catch {}
+              }
+              return n;
+            })
+          );
+          payloadState = { ...state, notes: safeNotes };
+        } catch {}
+      }
+
       await this.sendMessage({
         type: "FULL_STATE",
-        state,
+        state: payloadState,
         timestamp: Date.now(),
       });
     } finally {
@@ -544,6 +631,10 @@ class WebRTCSyncEngine {
       this.pc = null;
     }
 
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(SYNC_STORAGE_KEY);
+    }
+
     this.outgoingTopic = "";
     this.incomingTopic = "";
     this.activePin = null;
@@ -555,6 +646,19 @@ class WebRTCSyncEngine {
 }
 
 /**
+ * Returns latest timestamp for a session including all pauses and resumes.
+ */
+export function getSessionLatestTs(s: Session): number {
+  let ts = s.startedAt;
+  if (s.endedAt) ts = Math.max(ts, s.endedAt);
+  for (const p of s.pauses) {
+    ts = Math.max(ts, p.at);
+    if (p.resumeAt) ts = Math.max(ts, p.resumeAt);
+  }
+  return ts;
+}
+
+/**
  * Merge two full states using Last-Write-Wins (LWW) per entity ID.
  */
 export function mergeFullState(local: State, remote: State): State {
@@ -562,7 +666,7 @@ export function mergeFullState(local: State, remote: State): State {
   const mergedNotes = mergeList(local.notes, remote.notes, (n) => n.updatedAt ?? n.createdAt);
   const mergedProjects = mergeList(local.projects, remote.projects, (p) => p.createdAt);
   const mergedHabits = mergeList(local.habits, remote.habits, (h) => h.createdAt);
-  const mergedSessions = mergeList(local.sessions, remote.sessions, (s) => s.endedAt ?? s.startedAt);
+  const mergedSessions = mergeList(local.sessions, remote.sessions, getSessionLatestTs);
 
   const mergedDayLogs = { ...local.dayLogs };
   for (const [day, rLog] of Object.entries(remote.dayLogs ?? {})) {
@@ -603,7 +707,7 @@ export function mergeDelta(local: State, delta: PartialStateDelta): State {
     next.habits = mergeList(next.habits, delta.habits, (h) => h.createdAt);
   }
   if (delta.sessions) {
-    next.sessions = mergeList(next.sessions, delta.sessions, (s) => s.endedAt ?? s.startedAt);
+    next.sessions = mergeList(next.sessions, delta.sessions, getSessionLatestTs);
   }
   if (delta.dayLogs) {
     next.dayLogs = { ...next.dayLogs, ...delta.dayLogs };

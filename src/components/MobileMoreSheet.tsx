@@ -59,7 +59,7 @@ export const MobileMoreSheet: React.FC<MobileMoreSheetProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end md:hidden animate-fade-in"
+      className="fixed inset-0 z-[100] flex flex-col justify-end md:hidden animate-fade-in"
       style={{
         background: "rgba(0, 0, 0, 0.65)",
         backdropFilter: "blur(6px)",

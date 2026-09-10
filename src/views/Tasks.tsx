@@ -1167,9 +1167,9 @@ function TaskCard({
           </button>
         </div>
       )}
-      <div className="flex flex-col p-3 sm:p-3.5 gap-2 w-full max-w-full min-w-0">
+      <div className="flex flex-col p-2.5 sm:p-3 gap-1.5 w-full max-w-full min-w-0">
         {/* Row 1: Left Checkbox + Middle Title (full width) + Right Actions */}
-        <div className="flex items-start gap-3 w-full min-w-0">
+        <div className="flex items-start gap-2.5 w-full min-w-0">
           {/* Reordering in manual mode */}
           {!done && sortMode === "manual" && (
             <div className="flex items-center gap-0.5 shrink-0 pt-0.5">
@@ -1177,7 +1177,7 @@ function TaskCard({
                 className="cursor-grab active:cursor-grabbing p-1 rounded text-[var(--color-mut)] hover:text-accent hover:bg-[var(--panel2)] transition-opacity opacity-0 group-hover/card:opacity-100 shrink-0 hidden md:block"
                 title="Drag to reorder task"
               >
-                <GripVertical size={14} />
+                <GripVertical size={13} />
               </div>
               {onMove && (
                 <div className="flex flex-col md:hidden -my-1">
@@ -1189,11 +1189,11 @@ function TaskCard({
                       triggerHaptic("light");
                       onMove("up");
                     }}
-                    className="p-1 rounded text-[var(--color-mut)] active:text-[var(--accent)] active:bg-[var(--panel2)] disabled:opacity-15 cursor-pointer"
+                    className="p-0.5 rounded text-[var(--color-mut)] active:text-[var(--accent)] active:bg-[var(--panel2)] disabled:opacity-15 cursor-pointer"
                     title="Move up"
                     aria-label="Move task up"
                   >
-                    <ChevronUp size={13} />
+                    <ChevronUp size={12} />
                   </button>
                   <button
                     type="button"
@@ -1203,11 +1203,11 @@ function TaskCard({
                       triggerHaptic("light");
                       onMove("down");
                     }}
-                    className="p-1 rounded text-[var(--color-mut)] active:text-[var(--accent)] active:bg-[var(--panel2)] disabled:opacity-15 cursor-pointer"
+                    className="p-0.5 rounded text-[var(--color-mut)] active:text-[var(--accent)] active:bg-[var(--panel2)] disabled:opacity-15 cursor-pointer"
                     title="Move down"
                     aria-label="Move task down"
                   >
-                    <ChevronDown size={13} />
+                    <ChevronDown size={12} />
                   </button>
                 </div>
               )}
@@ -1224,7 +1224,7 @@ function TaskCard({
                 onToggle();
               }}
               className={cn(
-                "flex h-[24px] w-[24px] shrink-0 items-center justify-center rounded-lg border-[2px] transition-transform active:scale-85 hover:scale-105"
+                "flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-md border-[2px] transition-transform active:scale-85 hover:scale-105"
               )}
               style={{
                 borderColor: done ? "var(--ok)" : proj?.color ?? "var(--accent)",
@@ -1235,17 +1235,17 @@ function TaskCard({
               title={done ? "Reopen task" : "Complete task"}
               aria-label="Toggle done"
             >
-              {done && <Check size={14} strokeWidth={2.8} style={{ color: "var(--on-accent)" }} />}
+              {done && <Check size={12} strokeWidth={2.8} style={{ color: "var(--on-accent)" }} />}
             </button>
           </div>
 
-          {/* Full-width Title Area: multiline, clear typography, never truncated to 2 letters! */}
+          {/* Full-width Title Area: multiline, clear typography */}
           <div className="min-w-0 flex-1 cursor-pointer" onClick={onEdit}>
             <div className="flex items-start gap-1.5">
-              {t.emoji && <span className="text-[15px] shrink-0">{t.emoji}</span>}
+              {t.emoji && <span className="text-[14px] shrink-0">{t.emoji}</span>}
               <p
                 className={cn(
-                  "text-[14.5px] sm:text-[15px] font-semibold leading-snug break-words text-[var(--text)]",
+                  "text-[13.5px] sm:text-[14px] font-semibold leading-snug break-words text-[var(--text)]",
                   done && "line-through opacity-60"
                 )}
               >
@@ -1255,18 +1255,18 @@ function TaskCard({
           </div>
 
           {/* Quick Action Buttons */}
-          <div className="flex items-center gap-1 shrink-0 ml-auto pt-0.5">
+          <div className="flex items-center gap-1 shrink-0 ml-auto">
             <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
                 onEdit();
               }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--mut)] hover:bg-[var(--panel2)] active:scale-90 cursor-pointer"
+              className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--mut)] hover:bg-[var(--panel2)] active:scale-90 cursor-pointer"
               aria-label="Edit task"
               title="Edit task"
             >
-              <Pencil size={14} />
+              <Pencil size={13} />
             </button>
             {!done && (
               <button
@@ -1275,11 +1275,11 @@ function TaskCard({
                   e.stopPropagation();
                   onFocus();
                 }}
-                className="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--accent)] bg-[var(--accent-soft)] hover:opacity-80 active:scale-90 cursor-pointer"
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-[var(--accent)] bg-[var(--accent-soft)] hover:opacity-80 active:scale-90 cursor-pointer"
                 title="Focus on task"
                 aria-label="Start focus"
               >
-                <Play size={13} fill="currentColor" />
+                <Play size={12} fill="currentColor" />
               </button>
             )}
           </div>

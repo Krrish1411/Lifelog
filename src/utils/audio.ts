@@ -116,6 +116,48 @@ export function playTimerChime(type: "complete" | "break" = "complete"): void {
   playTimerFinishSound(type);
 }
 
+/**
+ * Satisfying, crisp completion chime when a task is checked off (like Todoist / Things 3).
+ */
+export function playTaskDoneSound(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    // Cheerful upward chime: D5 (587.33Hz) -> A5 (880.0Hz) -> D6 (1174.66Hz)
+    const tones = [
+      { freq: 587.33, delay: 0.0, dur: 0.22, vol: 0.35 },
+      { freq: 880.0, delay: 0.06, dur: 0.25, vol: 0.4 },
+      { freq: 1174.66, delay: 0.12, dur: 0.45, vol: 0.45 },
+    ];
+
+    tones.forEach(({ freq, delay, dur, vol }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + delay);
+
+      const startTime = now + delay;
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(vol, startTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + dur);
+    });
+  } catch {
+    // Autoplay policy or muted
+  }
+}
+
 export type AmbientTrackId =
   | "rain"
   | "storm"

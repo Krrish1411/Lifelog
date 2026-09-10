@@ -9,6 +9,9 @@ import {
   LayoutDashboard,
   ListTodo,
   Menu,
+  ExternalLink,
+  Maximize2,
+  Minimize2,
   Moon,
   Pause,
   PenLine,
@@ -59,6 +62,7 @@ import {
   initNativeSystemBars,
   triggerHaptic,
   initNotificationChannels,
+  initRunningTimerTrayListener,
 } from "../utils/native";
 import { Dashboard } from "../views/Dashboard";
 import { TasksView } from "../views/Tasks";
@@ -214,6 +218,27 @@ export function Shell() {
     configureStatusBar(state.settings.themeMode === "dark");
     initNotificationChannels();
   }, [state.settings.themeMode]);
+
+  // Android Running Timer Notification in notification shade tray on minimize
+  useEffect(() => {
+    const cleanup = initRunningTimerTrayListener(() => {
+      const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
+      if (!sess) return null;
+      const isPaused = sess.pauses.length > 0 && !sess.pauses[sess.pauses.length - 1].resumeAt;
+      if (isPaused) return null;
+      const task = state.tasks.find((t) => t.id === sess.taskId);
+      const remainingSec = sess.plannedMin
+        ? Math.max(0, sess.plannedMin * 60 - sessionSeconds(sess))
+        : undefined;
+      return {
+        running: true,
+        taskTitle: task?.title ?? "Focus Session",
+        mode: sess.mode,
+        remainingSec,
+      };
+    });
+    return cleanup;
+  }, [state.sessions, state.tasks]);
 
   // Sync view with URL hash
   useEffect(() => {
@@ -1428,12 +1453,46 @@ function StatusBarDesk({
 
 /* ============================ FLOATING MINI-TIMER ============================ */
 function MiniTimer() {
-  const { state, set, setView, toast } = useApp();
+  const { state, set, view, setView, toast } = useApp();
   const [, force] = useState(0);
+  const [minimized, setMinimized] = useState(() => {
+    try {
+      return localStorage.getItem("lifelog.minitimer.minimized") === "1";
+    } catch {
+      return false;
+    }
+  });
+
   useEffect(() => {
-    const t = setInterval(() => force((x) => x + 1), 1000);
+    const t = setInterval(() => force((x) => x + 1), 250);
     return () => clearInterval(t);
   }, []);
+
+  const toggleMinimize = () => {
+    setMinimized((m) => {
+      const next = !m;
+      try {
+        localStorage.setItem("lifelog.minitimer.minimized", next ? "1" : "0");
+      } catch {}
+      return next;
+    });
+  };
+
+  const popOutDesktopTimer = () => {
+    const w = 360;
+    const h = 420;
+    const left = Math.max(0, (window.screen.width - w) / 2);
+    const top = Math.max(0, (window.screen.height - h) / 2);
+    window.open(
+      `${window.location.origin}${window.location.pathname}#timer-popout`,
+      "LifeLogTimerPopout",
+      `width=${w},height=${h},left=${left},top=${top},menubar=no,toolbar=no,location=no,status=no,resizable=yes`
+    );
+  };
+
+  // Never show floating mini-timer when user is already viewing the full Focus view
+  if (view === "focus") return null;
+
   const running = state.sessions.find((s) => s.status === "running");
   if (!running) return null;
 
@@ -1482,9 +1541,49 @@ function MiniTimer() {
 
   const big = remainingSec !== null ? fmtHMS(remainingSec) : fmtHMS(elapsedSec);
 
+  if (minimized) {
+    return (
+      <div
+        className="mini-timer fixed z-[60] left-3.5 sm:left-auto sm:right-4 rounded-full border px-3 py-1.5 shadow-2xl backdrop-blur-xl flex items-center gap-2.5 transition-all hover:scale-105 select-none"
+        style={{
+          bottom: "calc(74px + var(--safe-bottom, 12px))",
+          background: "color-mix(in srgb, var(--panel2) 95%, transparent)",
+          borderColor: "color-mix(in srgb, var(--accent) 55%, var(--line))",
+        }}
+        title={`${label} · Click to expand`}
+      >
+        <span
+          className={cn("h-[8px] w-[8px] rounded-full shrink-0", !openPause && "ring-pulse")}
+          style={{ background: openPause ? "var(--warn)" : "var(--ok)" }}
+        />
+        <span className="font-mono text-[13.5px] font-bold tnum cursor-pointer" onClick={toggleMinimize} style={{ color: "var(--text)" }}>
+          {big}
+        </span>
+        <button
+          type="button"
+          onClick={togglePause}
+          className="p-1 text-[var(--accent)] hover:opacity-75 transition-opacity cursor-pointer"
+          title={openPause ? "Resume" : "Pause"}
+          aria-label={openPause ? "Resume" : "Pause"}
+        >
+          {openPause ? <Play size={12} /> : <Pause size={12} />}
+        </button>
+        <button
+          type="button"
+          onClick={toggleMinimize}
+          className="p-1 text-[var(--mut)] hover:text-[var(--text)] transition-colors cursor-pointer"
+          title="Expand mini timer"
+          aria-label="Expand mini timer"
+        >
+          <Maximize2 size={12} />
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div
-      className="mini-timer fixed z-[80] w-[calc(100%-28px)] sm:w-[280px] left-3.5 sm:left-auto sm:right-4 rounded-2xl border p-3 shadow-2xl backdrop-blur-xl"
+      className="mini-timer fixed z-[60] w-[calc(100%-28px)] sm:w-[290px] left-3.5 sm:left-auto sm:right-4 rounded-2xl border p-3 shadow-2xl backdrop-blur-xl transition-all"
       style={{
         bottom: "calc(74px + var(--safe-bottom, 12px))",
         background: "color-mix(in srgb, var(--panel2) 95%, transparent)",
@@ -1493,7 +1592,7 @@ function MiniTimer() {
     >
       <div className="flex items-center gap-2">
         <span
-          className={cn("h-[9px] w-[9px] rounded-full", !openPause && "ring-pulse")}
+          className={cn("h-[9px] w-[9px] rounded-full shrink-0", !openPause && "ring-pulse")}
           style={{ background: openPause ? "var(--warn)" : "var(--ok)" }}
         />
         <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--accent)" }}>
@@ -1502,6 +1601,26 @@ function MiniTimer() {
         <span className="ml-auto font-mono text-[18px] font-bold tnum" style={{ color: "var(--text)" }}>
           {big}
         </span>
+        <div className="flex items-center gap-0.5 ml-1">
+          <button
+            type="button"
+            onClick={popOutDesktopTimer}
+            className="p-1 rounded text-[var(--mut)] hover:text-[var(--accent)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
+            title="Pop out desktop timer window"
+            aria-label="Desktop popout"
+          >
+            <ExternalLink size={12} />
+          </button>
+          <button
+            type="button"
+            onClick={toggleMinimize}
+            className="p-1 rounded text-[var(--mut)] hover:text-[var(--text)] hover:bg-[var(--panel)] transition-colors cursor-pointer"
+            title="Minimize mini timer"
+            aria-label="Minimize mini timer"
+          >
+            <Minimize2 size={12} />
+          </button>
+        </div>
       </div>
       <div className="mt-1 truncate text-[12px] font-bold" title={label}>
         {label}

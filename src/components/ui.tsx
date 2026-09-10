@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode } from "react";
-import { Plus, Search, X } from "lucide-react";
+import { Plus, Search, X, ChevronDown, Check } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { normalizeHex } from "../utils/core";
 import { useBodyScrollLock } from "../utils/scrollLock";
@@ -195,6 +195,123 @@ export function Seg<T extends string>({
           </button>
         );
       })}
+    </div>
+  );
+}
+
+/* ---------------- Themed Select Dropdown ---------------- */
+export interface SelectOption<T extends string = string> {
+  value: T;
+  label: ReactNode;
+  icon?: ReactNode;
+  disabled?: boolean;
+}
+
+export function Select<T extends string = string>({
+  value,
+  onChange,
+  options,
+  placeholder = "Select…",
+  className,
+  size = "md",
+  disabled = false,
+  width,
+}: {
+  value: T;
+  onChange: (v: T) => void;
+  options: SelectOption<T>[];
+  placeholder?: string;
+  className?: string;
+  size?: "sm" | "md";
+  disabled?: boolean;
+  width?: string | number;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [open]);
+
+  const selectedOption = options.find((o) => o.value === value);
+
+  return (
+    <div
+      ref={ref}
+      className={cn("relative inline-block text-left", className)}
+      style={{ width: width ? (typeof width === "number" ? `${width}px` : width) : undefined }}
+    >
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => setOpen((prev) => !prev)}
+        className={cn(
+          "w-full flex items-center justify-between gap-2 rounded-xl border font-bold transition-all cursor-pointer select-none",
+          size === "sm" ? "px-2.5 py-1 text-[11.5px]" : "px-3 py-2 text-[13px]",
+          open ? "border-[var(--accent)] ring-1 ring-[var(--accent)]" : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]",
+          disabled && "opacity-50 cursor-not-allowed"
+        )}
+        style={{ color: "var(--text)", background: "var(--panel2)" }}
+      >
+        <span className="flex items-center gap-1.5 truncate">
+          {selectedOption?.icon}
+          <span className="truncate">{selectedOption ? selectedOption.label : placeholder}</span>
+        </span>
+        <ChevronDown
+          size={size === "sm" ? 12 : 14}
+          className={cn("shrink-0 text-[var(--mut)] transition-transform duration-150", open && "rotate-180 text-[var(--accent)]")}
+        />
+      </button>
+
+      {open && (
+        <div
+          className="absolute z-50 mt-1 max-h-[240px] w-full min-w-[140px] overflow-y-auto rounded-xl border border-[var(--line)] bg-[var(--panel)] p-1 shadow-xl animate-in fade-in zoom-in-95 duration-100"
+          style={{ background: "var(--panel)" }}
+        >
+          {options.map((opt) => {
+            const isSelected = opt.value === value;
+            return (
+              <button
+                key={opt.value}
+                type="button"
+                disabled={opt.disabled}
+                onClick={() => {
+                  onChange(opt.value);
+                  setOpen(false);
+                }}
+                className={cn(
+                  "flex w-full items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 text-left font-semibold transition-colors cursor-pointer select-none",
+                  size === "sm" ? "text-[11.5px]" : "text-[12.5px]",
+                  isSelected
+                    ? "bg-[var(--accent-soft)] text-[var(--accent)] font-bold"
+                    : "text-[var(--text)] hover:bg-[var(--panel2)]",
+                  opt.disabled && "opacity-40 cursor-not-allowed"
+                )}
+              >
+                <span className="flex items-center gap-1.5 truncate">
+                  {opt.icon}
+                  <span className="truncate">{opt.label}</span>
+                </span>
+                {isSelected && <Check size={13} className="shrink-0 text-[var(--accent)]" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

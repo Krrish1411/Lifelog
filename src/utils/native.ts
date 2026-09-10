@@ -325,3 +325,78 @@ export async function sendNativeTestNotification(): Promise<void> {
     });
   }
 }
+
+const RUNNING_TIMER_NOTIF_ID = 88888;
+
+/**
+ * Show a persistent/running timer status notification in the Android notification shade tray.
+ * Displays the current task name and mode when the app is minimized.
+ */
+export async function showRunningTimerNotification(
+  taskTitle: string,
+  mode: string,
+  remainingSeconds?: number
+): Promise<void> {
+  if (!isNative) return;
+  try {
+    const modeLabel = mode === "break" ? "☕ Break" : "🎯 Focus";
+    const timeStr = remainingSeconds !== undefined ? ` · ${Math.floor(remainingSeconds / 60)}m left` : "";
+    await LocalNotifications.schedule({
+      notifications: [
+        {
+          id: RUNNING_TIMER_NOTIF_ID,
+          title: `⏱️ ${modeLabel} Running: ${taskTitle || "Focus Session"}`,
+          body: `Focus session in progress${timeStr}. Tap to open LifeLog.`,
+          schedule: { at: new Date(Date.now() + 50) },
+          channelId: "focus-channel-os",
+          ongoing: true,
+        },
+      ],
+    });
+  } catch (err) {
+    console.warn("Could not show running timer notification:", err);
+  }
+}
+
+/**
+ * Dismiss the running timer notification when user returns to app or stops/pauses timer.
+ */
+export async function dismissRunningTimerNotification(): Promise<void> {
+  if (!isNative) return;
+  try {
+    await LocalNotifications.cancel({
+      notifications: [{ id: RUNNING_TIMER_NOTIF_ID }],
+    });
+  } catch {
+    // Ignore
+  }
+}
+
+/**
+ * Register App State Change listener so when app is minimized,
+ * if a timer is running, a running notification is posted to the Android tray,
+ * and removed when returning to the app.
+ */
+export function initRunningTimerTrayListener(
+  getActiveTimer: () => { running: boolean; taskTitle: string; mode: string; remainingSec?: number } | null
+): () => void {
+  if (!isNative) return () => {};
+
+  const handle = CapApp.addListener("appStateChange", (state) => {
+    if (!state.isActive) {
+      // App was minimized or backgrounded
+      const timer = getActiveTimer();
+      if (timer && timer.running) {
+        showRunningTimerNotification(timer.taskTitle, timer.mode, timer.remainingSec);
+      }
+    } else {
+      // App brought back to foreground
+      dismissRunningTimerNotification();
+    }
+  });
+
+  return () => {
+    handle.then((h) => h.remove()).catch(() => {});
+  };
+}
+

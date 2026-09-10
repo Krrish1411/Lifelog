@@ -32,6 +32,7 @@ import {
   scheduleTaskDueNotification,
   triggerHaptic,
 } from "./utils/native";
+import { playTaskDoneSound } from "./utils/audio";
 import { syncEngine } from "./sync/syncEngine";
 
 const LS_KEY = "lifelog.state.v1";
@@ -326,7 +327,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
           };
         }
         const nowDone = !task.done;
-        if (nowDone && isNative) cancelTaskDueNotification(taskId);
+        if (nowDone) {
+          playTaskDoneSound();
+          if (isNative) cancelTaskDueNotification(taskId);
+        }
         triggerHaptic(nowDone ? "success" : "light");
         return {
           ...s,
@@ -339,7 +343,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [pushToast],
   );
 
-  /* ----- reminder scheduler (blocks + snoozes + Android AlarmManager exact alarms) ----- */
+  /* ----- reminder scheduler (blocks + multi-blocks + snoozes + Android AlarmManager exact alarms) ----- */
   useEffect(() => {
     if (!state) return;
     const timers: number[] = [];
@@ -348,11 +352,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const lead = leadMin * 60000;
     const notify = (title: string, body: string) => {
       pushToast(`${title} — ${body}`, "warn");
-      if (
-        state.settings.notifyEnabled &&
-        typeof Notification !== "undefined" &&
-        Notification.permission === "granted"
-      ) {
+      const hasPerm = typeof Notification !== "undefined" && Notification.permission === "granted";
+      if (hasPerm) {
         try {
           new Notification(title, { body });
         } catch {
@@ -374,6 +375,23 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const targets: { at: number; what: string }[] = [];
       if (t.due && t.dueTime) {
         targets.push({ at: new Date(`${t.due}T${t.dueTime}:00`).getTime(), what: "Time block starting" });
+      }
+      // Support all multi-block calendar schedules
+      if (t.timeBlocks && t.timeBlocks.length > 0) {
+        for (const b of t.timeBlocks) {
+          if (!b.done && b.date && b.time) {
+            targets.push({
+              at: new Date(`${b.date}T${b.time}:00`).getTime(),
+              what: `Time block starting (${b.label || "Scheduled"})`,
+            });
+            if (state.settings.notifyEnabled && isNative) {
+              scheduleTaskDueNotification(
+                { id: `${t.id}-${b.id}`, title: `${t.title} [${b.label || "Block"}]`, due: b.date, dueTime: b.time },
+                leadMin,
+              );
+            }
+          }
+        }
       }
       if (t.snoozedUntil) targets.push({ at: t.snoozedUntil, what: "Snoozed task is back" });
       for (const tg of targets) {

@@ -40,10 +40,24 @@ export function ReportsView() {
   const w = state.settings.reportWidgets;
   const anyWidget = Object.values(w).some(Boolean);
 
-  /* ---- time of day ---- */
+  /* ---- time of day (sliced proportionally across hourly boundaries) ---- */
   const hourBuckets = useMemo(() => {
     const b = Array(24).fill(0) as number[];
-    for (const s of workSessions) b[new Date(s.startedAt).getHours()] += sessionMinutes(s);
+    for (const s of workSessions) {
+      if (!s.startedAt) continue;
+      const endTs = s.endedAt ?? (s.startedAt + sessionMinutes(s) * 60000);
+      let curr = s.startedAt;
+      while (curr < endTs) {
+        const d = new Date(curr);
+        d.setMinutes(60, 0, 0); // start of next hour
+        const nextHourTs = d.getTime();
+        const sliceEnd = Math.min(endTs, nextHourTs);
+        const mins = Math.max(0, (sliceEnd - curr) / 60000);
+        const h = new Date(curr).getHours();
+        b[h] += Math.round(mins);
+        curr = sliceEnd;
+      }
+    }
     return b;
   }, [workSessions]);
   const peakHour = hourBuckets.indexOf(Math.max(...hourBuckets));
@@ -164,11 +178,12 @@ export function ReportsView() {
     const mins = workSessions.map((s) => sessionMinutes(s));
     const avg = Math.round(mins.reduce((a, b) => a + b, 0) / mins.length);
     const longestIdx = mins.indexOf(Math.max(...mins));
-    const longestTask = state.tasks.find((t) => t.id === workSessions[longestIdx].taskId);
-    const deepMin = mins.filter((m) => m >= 25).reduce((a, b) => a + b, 0);
+    const longestTask = state.tasks.find((t) => t.id === workSessions[longestIdx]?.taskId);
+    const deepThreshold = Math.min(25, Math.max(15, state.settings.pomodoroMin || 25));
+    const deepMin = mins.filter((m) => m >= deepThreshold).reduce((a, b) => a + b, 0);
     const pauses = workSessions.reduce((a, s) => a + s.pauses.length, 0);
-    return { avg, longest: Math.max(...mins), longestTask: longestTask?.title ?? "task", deepMin, pauses };
-  }, [workSessions, state.tasks]);
+    return { avg, longest: mins.length > 0 ? Math.max(...mins) : 0, longestTask: longestTask?.title ?? "task", deepMin, pauses };
+  }, [workSessions, state.tasks, state.settings.pomodoroMin]);
 
   /* ---- weekdays ---- */
   const byWeekday = useMemo(() => {
@@ -269,6 +284,43 @@ export function ReportsView() {
           <input type="date" className="inp !w-[130px] sm:!w-[138px] shrink-0 text-center text-xs" value={from} max={to} onChange={(e) => { setFrom(e.target.value); setPreset("custom"); }} />
           <span className="shrink-0">→</span>
           <input type="date" className="inp !w-[130px] sm:!w-[138px] shrink-0 text-center text-xs" value={to} min={from} onChange={(e) => { setTo(e.target.value); setPreset("custom"); }} />
+        </div>
+      </div>
+
+      {/* Hero Overview Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full min-w-0">
+        <div className="card card-hover engine-panel p-4 flex flex-col justify-between border-l-4 border-l-[var(--accent)]">
+          <div className="flex items-center justify-between text-xs font-bold text-[var(--mut)] uppercase tracking-wider">
+            <span>Total Time Focused</span>
+            <span className="chip !py-0.5 text-[10px] text-[var(--accent)]">
+              {quality && totalMin > 0 ? `${Math.round((quality.deepMin / totalMin) * 100)}% deep work` : "0% deep work"}
+            </span>
+          </div>
+          <div className="font-mono text-3xl sm:text-4xl font-extrabold text-[var(--accent)] my-1.5 tnum">
+            {fmtDur(totalMin)}
+          </div>
+          <div className="text-xs font-semibold text-[var(--mut)] flex items-center gap-1.5 flex-wrap">
+            <span>Daily avg: <b className="text-[var(--text)]">{fmtDur(Math.round(totalMin / Math.max(1, days.length)))}</b></span>
+            <span>•</span>
+            <span>{new Set(workSessions.map((s) => isoDate(new Date(s.startedAt)))).size} active focus days</span>
+          </div>
+        </div>
+
+        <div className="card card-hover engine-panel p-4 flex flex-col justify-between border-l-4 border-l-[var(--ok)]">
+          <div className="flex items-center justify-between text-xs font-bold text-[var(--mut)] uppercase tracking-wider">
+            <span>Total Sessions Logged</span>
+            <span className="chip !py-0.5 text-[10px] text-[var(--ok)]">
+              {completedIn.length} completed
+            </span>
+          </div>
+          <div className="font-mono text-3xl sm:text-4xl font-extrabold text-[var(--text)] my-1.5 tnum">
+            {workSessions.length} <span className="text-lg font-bold text-[var(--mut)]">sessions</span>
+          </div>
+          <div className="text-xs font-semibold text-[var(--mut)] flex items-center gap-1.5 flex-wrap">
+            <span>Avg session: <b className="text-[var(--text)]">{quality ? fmtDur(quality.avg) : "0m"}</b></span>
+            <span>•</span>
+            <span>{quality?.pauses ?? 0} pause{(quality?.pauses ?? 0) === 1 ? "" : "s"} logged</span>
+          </div>
         </div>
       </div>
 
@@ -390,7 +442,7 @@ export function ReportsView() {
 
         {w.projects && widgetCard("Projects", "tracked in range", (
           byProject.length === 0 ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No tracked time in range.</div> : (
-            <div className="flex flex-col">
+            <div className="flex max-h-[320px] flex-col overflow-y-auto pr-1">
               {byProject.map(([pid, min]) => {
                 const p = state.projects.find((x) => x.id === pid);
                 return <BarRow key={pid} label={<>{p?.emoji} {p?.name ?? "Deleted project"}</>} value={min} max={byProject[0][1]} color={p?.color ?? "var(--accent)"} right={`${fmtDur(min)} · ${Math.round((min / Math.max(1, totalMin)) * 100)}%`} />;
@@ -401,8 +453,8 @@ export function ReportsView() {
 
         {w.tags && widgetCard("Tags", "tracked via task tags", (
           byTag.length === 0 ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No tags on tracked tasks in range.</div> : (
-            <div className="flex flex-col">
-              {byTag.slice(0, 8).map(([tag, min]) => (
+            <div className="flex max-h-[320px] flex-col overflow-y-auto pr-1">
+              {byTag.map(([tag, min]) => (
                 <BarRow key={tag}
                   label={<><span className="h-[8px] w-[8px] rounded-full" style={{ background: state.tagColors[tag] ?? "var(--accent)" }} /> {tag}</>}
                   value={min} max={byTag[0][1]} color={state.tagColors[tag] ?? "var(--accent)"} right={fmtDur(min)} />
@@ -447,8 +499,8 @@ export function ReportsView() {
                 <span className="chip !py-0 text-[10.5px]" style={{ color: "var(--ok)" }}>{calibSummary.under} under</span>
                 <span className="chip !py-0 text-[10.5px]" style={{ color: "var(--mut)" }}>{calibSummary.accurate} on target</span>
               </div>
-              <div className="flex flex-col gap-2">
-                {calibration.slice(0, 8).map((r) => {
+              <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">
+                {calibration.map((r) => {
                   const max = Math.max(r.planned, r.actual, 1);
                   const col = r.status === "over" ? "var(--danger)" : r.status === "under" ? "var(--ok)" : "var(--accent)";
                   return (
@@ -491,7 +543,7 @@ export function ReportsView() {
 
         {w.streaks && widgetCard("Habit streaks", "full stats", (
           state.habits.length === 0 ? <div className="text-[12.5px]" style={{ color: "var(--mut)" }}>No habits yet.</div> : (
-            <div className="flex flex-col gap-1.5">
+            <div className="flex max-h-[320px] flex-col gap-1.5 overflow-y-auto pr-1">
               {state.habits.map((h) => {
                 const st = streakStats(h.completions);
                 return (

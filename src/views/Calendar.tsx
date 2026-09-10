@@ -84,12 +84,11 @@ export function CalendarView() {
     const m = new Map<string, CalendarItem[]>();
 
     for (const t of state.tasks) {
-      if (t.done) continue;
-
       if (t.timeBlocks && t.timeBlocks.length > 0) {
         // Multi-block task
         for (const b of t.timeBlocks) {
-          if (!b.date || !b.time || b.done) continue;
+          if (!b.date || !b.time) continue;
+          const isDone = !!b.done || !!t.done;
           const item: CalendarItem = {
             id: `b-${b.id}`,
             taskId: t.id,
@@ -102,6 +101,7 @@ export function CalendarView() {
             time: b.time,
             durationMin: b.durationMin || 60,
             snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
+            done: isDone,
           };
           const arr = m.get(b.date) ?? [];
           arr.push(item);
@@ -120,6 +120,7 @@ export function CalendarView() {
           time: t.dueTime,
           durationMin: t.durationMin || 60,
           snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
+          done: !!t.done,
         };
         const arr = m.get(t.due) ?? [];
         arr.push(item);
@@ -388,8 +389,11 @@ export function CalendarView() {
                         <div
                           key={b.id}
                           onClick={() => openTaskDialog({ taskId: b.taskId })}
-                          className="flex items-center gap-2 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border-l-4"
-                          style={{ borderLeftColor: p?.color ?? "var(--accent)" }}
+                          className={cn(
+                            "flex items-center gap-2 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border-l-4",
+                            b.done && "opacity-60 bg-[var(--panel)]"
+                          )}
+                          style={{ borderLeftColor: b.done ? "var(--ok)" : (p?.color ?? "var(--accent)") }}
                         >
                           <div className="flex flex-col shrink-0 min-w-[50px]">
                             <span className="text-[11.5px] font-bold tnum">{b.time}</span>
@@ -399,8 +403,11 @@ export function CalendarView() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 truncate">
+                              {b.done && <Check size={12} className="text-emerald-500 font-bold shrink-0" />}
                               {b.emoji && <span className="text-[12px]">{b.emoji}</span>}
-                              <span className="text-[12.5px] font-semibold truncate">{b.title}</span>
+                              <span className={cn("text-[12.5px] font-semibold truncate", b.done && "line-through opacity-75")}>
+                                {b.title}
+                              </span>
                               {b.label && (
                                 <span className="chip !text-[9.5px] !py-0 !px-1 shrink-0">
                                   {b.label}
@@ -817,8 +824,9 @@ export function CalendarView() {
                     return (
                       <div
                         key={b.id}
-                        draggable
+                        draggable={!b.done}
                         onDragStart={(e) => {
+                          if (b.done) return;
                           e.dataTransfer.setData(
                             "lifelog/drag",
                             JSON.stringify({ taskId: b.taskId, blockId: b.blockId })
@@ -830,29 +838,37 @@ export function CalendarView() {
                           e.stopPropagation();
                           openTaskDialog({ taskId: b.taskId });
                         }}
-                        className="absolute left-1 right-1 z-[5] overflow-hidden rounded-lg border-l-[3px] px-2 py-1 transition-transform hover:scale-[1.015]"
+                        className={cn(
+                          "absolute left-1 right-1 z-[5] overflow-hidden rounded-lg border-l-[3px] px-2 py-1 transition-transform hover:scale-[1.015]",
+                          b.done && "opacity-65"
+                        )}
                         style={{
                           top,
                           height: h,
-                          background: `color-mix(in srgb, ${p?.color ?? "#888"} ${
-                            b.snoozed ? 10 : 22
-                          }%, var(--panel2))`,
-                          borderLeftColor: p?.color,
-                          cursor: "grab",
-                          opacity: b.snoozed ? 0.6 : 1,
+                          background: b.done
+                            ? "color-mix(in srgb, var(--ok) 14%, var(--panel2))"
+                            : `color-mix(in srgb, ${p?.color ?? "#888"} ${
+                                b.snoozed ? 10 : 22
+                              }%, var(--panel2))`,
+                          borderLeftColor: b.done ? "var(--ok)" : p?.color,
+                          cursor: b.done ? "pointer" : "grab",
                           boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
                         }}
-                        title={`${b.title}${b.label ? ` · ${b.label}` : ""} (${b.durationMin}m) · ${b.time}–${minToTime(start + b.durationMin)}`}
+                        title={`${b.title}${b.label ? ` · ${b.label}` : ""} (${b.durationMin}m)${b.done ? " [COMPLETED]" : ""} · ${b.time}–${minToTime(start + b.durationMin)}`}
                       >
                         <div className="flex items-center gap-1 leading-tight">
-                          {b.blockId && <Layers size={10} className="text-accent shrink-0" />}
-                          <span className="truncate text-[11px] font-bold">
+                          {b.done ? (
+                            <Check size={11} className="text-emerald-500 font-bold shrink-0" />
+                          ) : b.blockId ? (
+                            <Layers size={10} className="text-accent shrink-0" />
+                          ) : null}
+                          <span className={cn("truncate text-[11px] font-bold", b.done && "line-through opacity-70")}>
                             {b.emoji ? `${b.emoji} ` : ""}
                             {b.title}
                           </span>
                         </div>
                         {b.label && (
-                          <div className="text-[9.5px] font-medium text-accent truncate">
+                          <div className={cn("text-[9.5px] font-medium text-accent truncate", b.done && "opacity-60")}>
                             {b.label}
                           </div>
                         )}
