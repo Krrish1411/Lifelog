@@ -75,10 +75,7 @@ jobs:
 
           # Configure GTK window controls (minimize, maximize, close) for Linux environments
           mkdir -p squashfs-root/etc/xdg/gtk-3.0
-          cat << 'GTKCFG' > squashfs-root/etc/xdg/gtk-3.0/settings.ini
-[Settings]
-gtk-decoration-layout=menu:minimize,maximize,close
-GTKCFG
+          printf "[Settings]\ngtk-decoration-layout=menu:minimize,maximize,close\n" > squashfs-root/etc/xdg/gtk-3.0/settings.ini
           sed -i '3i export XDG_CONFIG_DIRS="$APPDIR/etc/xdg:$XDG_CONFIG_DIRS"' squashfs-root/AppRun
 
           # 4. Repack the fixed Universal AppImage
