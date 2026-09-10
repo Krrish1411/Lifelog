@@ -335,6 +335,9 @@ export function Shell() {
     root.dataset.theme = dark ? "dark" : "light";
     root.dataset.engine = s.layout;
     root.style.background = bg;
+    root.style.color = derived.text;
+    document.body.style.background = bg;
+    document.body.style.color = derived.text;
     root.dataset.reduceMotion = String(s.reduceMotion);
     root.dataset.reduceTransparency = String(s.reduceTransparency);
     root.dataset.highContrast = String(s.highContrast);
@@ -1079,9 +1082,15 @@ export function Shell() {
       <aside
         className="fixed inset-y-4 left-4 z-40 hidden w-[256px] flex-col rounded-3xl border p-4 backdrop-blur-2xl md:flex select-none"
         style={{
-          background: "color-mix(in srgb, var(--panel) 58%, transparent)",
-          borderColor: "color-mix(in srgb, var(--text) 13%, transparent)",
-          boxShadow: "inset 0 1px 0 color-mix(in srgb, var(--text) 14%, transparent), 0 24px 60px -30px rgba(0,0,0,0.6)",
+          background: state.settings.themeMode === "dark"
+            ? "color-mix(in srgb, var(--panel) 62%, transparent)"
+            : "color-mix(in srgb, var(--panel) 82%, transparent)",
+          borderColor: state.settings.themeMode === "dark"
+            ? "color-mix(in srgb, var(--text) 13%, transparent)"
+            : "var(--line)",
+          boxShadow: state.settings.themeMode === "dark"
+            ? "inset 0 1px 0 color-mix(in srgb, var(--text) 14%, transparent), 0 24px 60px -30px rgba(0,0,0,0.6)"
+            : "inset 0 1px 0 rgba(255,255,255,0.8), 0 16px 40px -20px rgba(0,0,0,0.08)",
         }}
       >
         <Logo />
@@ -1135,8 +1144,10 @@ export function Shell() {
           <div
             className="rounded-2xl border px-3 py-2.5 backdrop-blur-xl"
             style={{
-              borderColor: "color-mix(in srgb, var(--text) 12%, transparent)",
-              background: "color-mix(in srgb, var(--bg) 55%, transparent)",
+              borderColor: "var(--line)",
+              background: state.settings.themeMode === "dark"
+                ? "color-mix(in srgb, var(--panel2) 70%, transparent)"
+                : "var(--panel)",
             }}
           >
             <Clock />
