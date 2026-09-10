@@ -2,9 +2,11 @@ name: Build LifeLog Android APK
 
 on:
   push:
-    branches: [ "**" ]
-  pull_request:
-    branches: [ "**" ]
+    branches: [ "main" ]
+    paths:
+      - 'android/**'
+      - '.github/workflows/build-apk.yml'
+      - 'capacitor.config.*'
   workflow_dispatch:
 
 jobs:

@@ -6,6 +6,7 @@ node_modules/
 # Web Build Output
 dist/
 build/
+Build/
 
 # Android build & local settings
 android/.gradle/

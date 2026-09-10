@@ -50,26 +50,67 @@ jobs:
       - name: Build Tauri Desktop (AppImage, Deb, RPM)
         run: npx tauri build
 
-      - name: Create Portable Linux tar.gz Bundle (Arch & Fedora Ready)
+      - name: Patch Universal AppImage & Create Standalone Portable tar.gz
         run: |
-          mkdir -p lifelog-linux-portable
-          cp src-tauri/target/release/lifelog lifelog-linux-portable/
-          cp src-tauri/icons/icon.png lifelog-linux-portable/icon.png
-          cat << 'EOF' > lifelog-linux-portable/run.sh
+          # 1. Download appimagetool for repacking AppImage
+          curl -sL https://github.com/AppImage/appimagetool/releases/download/continuous/appimagetool-x86_64.AppImage -o /tmp/appimagetool
+          chmod +x /tmp/appimagetool
+          (cd /tmp && ./appimagetool --appimage-extract && mv squashfs-root appimagetool-extracted)
+
+          # 2. Locate and extract Tauri-generated AppImage
+          cd src-tauri/target/release/bundle/appimage
+          APPIMAGE_FILE=$(ls *.AppImage | head -n 1)
+          chmod +x "$APPIMAGE_FILE"
+          ./"$APPIMAGE_FILE" --appimage-extract
+
+          # 3. Patch AppDir for Modern Linux Distros (Arch, Fedora, CachyOS, Ubuntu 24, Wayland & Mesa 24+)
+          # Remove bundled Ubuntu libwayland to eliminate 'EGL_BAD_PARAMETER' Mesa abort
+          rm -f squashfs-root/usr/lib/libwayland*.so*
+
+          # Allow native Wayland with automatic X11 fallback
+          sed -i 's/export GDK_BACKEND=x11/export GDK_BACKEND="${GDK_BACKEND:-wayland,x11}"/g' squashfs-root/apprun-hooks/linuxdeploy-plugin-gtk.sh 2>/dev/null || true
+
+          # Enforce hardware rendering safety fallback (prevents black screen on DMABUF)
+          sed -i '2i export WEBKIT_DISABLE_DMABUF_RENDERER=1' squashfs-root/AppRun
+
+          # 4. Repack the fixed Universal AppImage
+          rm -f "$APPIMAGE_FILE"
+          ARCH=x86_64 /tmp/appimagetool-extracted/AppRun squashfs-root "$APPIMAGE_FILE"
+          chmod +x "$APPIMAGE_FILE"
+
+          # 5. Create Standalone Portable Linux Bundle (contains full AppDir with WebKitGTK and AppIndicator)
+          mkdir -p "$GITHUB_WORKSPACE/lifelog-linux-portable"
+          cp -r squashfs-root/* "$GITHUB_WORKSPACE/lifelog-linux-portable/"
+
+          cat << 'EOF' > "$GITHUB_WORKSPACE/lifelog-linux-portable/run.sh"
           #!/bin/sh
           DIR="$(cd "$(dirname "$0")" && pwd)"
           export WEBKIT_DISABLE_DMABUF_RENDERER=1
-          exec "$DIR/lifelog" "$@"
+          exec "$DIR/AppRun" "$@"
           EOF
-          cat << 'EOF' > lifelog-linux-portable/install.sh
+
+          cat << 'EOF' > "$GITHUB_WORKSPACE/lifelog-linux-portable/install.sh"
           #!/bin/sh
           set -e
           DIR="$(cd "$(dirname "$0")" && pwd)"
-          mkdir -p "$HOME/.local/bin" "$HOME/.local/share/applications" "$HOME/.local/share/icons/hicolor/512x512/apps"
-          cp "$DIR/lifelog" "$HOME/.local/bin/lifelog"
-          chmod +x "$HOME/.local/bin/lifelog"
-          cp "$DIR/icon.png" "$HOME/.local/share/icons/hicolor/512x512/apps/lifelog.png"
-          cat << 'DESK' > "$HOME/.local/share/applications/lifelog.desktop"
+          DEST="$HOME/.local/share/lifelog"
+          BIN_DIR="$HOME/.local/bin"
+          APPS_DIR="$HOME/.local/share/applications"
+          ICONS_DIR="$HOME/.local/share/icons/hicolor/512x512/apps"
+
+          echo "Installing LifeLog to $DEST..."
+          mkdir -p "$DEST" "$BIN_DIR" "$APPS_DIR" "$ICONS_DIR"
+          cp -r "$DIR"/* "$DEST/"
+          chmod +x "$DEST/AppRun" "$DEST/run.sh"
+
+          ln -sf "$DEST/AppRun" "$BIN_DIR/lifelog"
+          if [ -f "$DEST/LifeLog.png" ]; then
+            cp "$DEST/LifeLog.png" "$ICONS_DIR/lifelog.png"
+          elif [ -f "$DEST/lifelog.png" ]; then
+            cp "$DEST/lifelog.png" "$ICONS_DIR/lifelog.png"
+          fi
+
+          cat << 'DESK' > "$APPS_DIR/lifelog.desktop"
           [Desktop Entry]
           Name=LifeLog
           Comment=Minimal, private, offline-first productivity & focus OS
@@ -78,23 +119,16 @@ jobs:
           Terminal=false
           Type=Application
           Categories=Utility;Office;Productivity;
+          StartupWMClass=lifelog
           DESK
-          update-desktop-database "$HOME/.local/share/applications" 2>/dev/null || true
-          echo "LifeLog installed successfully to $HOME/.local/bin/lifelog!"
-          echo "You can now launch LifeLog from your application menu or run 'lifelog' in terminal."
+
+          update-desktop-database "$APPS_DIR" 2>/dev/null || true
+          echo "LifeLog installed successfully!"
+          echo "You can launch it from your application menu or by running 'lifelog' in your terminal."
           EOF
-          cat << 'EOF' > lifelog-linux-portable/lifelog.desktop
-          [Desktop Entry]
-          Name=LifeLog
-          Comment=Minimal, private, offline-first productivity & focus OS
-          Exec=lifelog
-          Icon=icon
-          Terminal=false
-          Type=Application
-          Categories=Utility;Office;Productivity;
-          EOF
-          chmod +x lifelog-linux-portable/lifelog lifelog-linux-portable/run.sh lifelog-linux-portable/install.sh
-          tar -czvf LifeLog-Linux-x64-portable.tar.gz -C lifelog-linux-portable .
+
+          chmod +x "$GITHUB_WORKSPACE/lifelog-linux-portable/run.sh" "$GITHUB_WORKSPACE/lifelog-linux-portable/install.sh" "$GITHUB_WORKSPACE/lifelog-linux-portable/AppRun"
+          tar -czvf "$GITHUB_WORKSPACE/LifeLog-Linux-x64-portable.tar.gz" -C "$GITHUB_WORKSPACE/lifelog-linux-portable" .
 
       - name: Upload Universal AppImage Artifact
         uses: actions/upload-artifact@v4
@@ -104,7 +138,7 @@ jobs:
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Upload Linux Deb & RPM Packages
+      - name: Upload Linux Deb & RPM Packages & Portable Bundle
         uses: actions/upload-artifact@v4
         with:
           name: LifeLog-Linux-Packages
