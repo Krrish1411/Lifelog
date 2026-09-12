@@ -73,23 +73,20 @@
         "deb",
         "tar.gz"
       ],
-      "category": "Utility",
-      "icon": "public/icon-512.png"
+      "category": "Utility"
     },
     "win": {
       "target": [
         "nsis",
         "portable"
-      ],
-      "icon": "public/icon-512.png"
+      ]
     },
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.productivity",
-      "icon": "public/icon-512.png"
+      "category": "public.app-category.productivity"
     }
   }
 }

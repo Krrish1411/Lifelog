@@ -24,13 +24,13 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web Production Assets
         run: npm run build
 
       - name: Build Linux Desktop Packages
-        run: npx electron-builder --linux AppImage deb tar.gz
+        run: npx electron-builder --linux
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -40,6 +40,7 @@ jobs:
             release/*.AppImage
             release/*.deb
             release/*.tar.gz
+          if-no-files-found: warn
           retention-days: 30
 
   build-windows:
@@ -56,19 +57,20 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web Production Assets
         run: npm run build
 
       - name: Build Windows Desktop Packages
-        run: npx electron-builder --win nsis portable
+        run: npx electron-builder --win
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: LifeLog-Desktop-Windows
           path: release/*.exe
+          if-no-files-found: warn
           retention-days: 30
 
   build-macos:
@@ -85,13 +87,13 @@ jobs:
           cache: 'npm'
 
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
 
       - name: Build Web Production Assets
         run: npm run build
 
       - name: Build macOS Desktop Packages
-        run: npx electron-builder --mac dmg zip
+        run: npx electron-builder --mac
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -100,4 +102,5 @@ jobs:
           path: |
             release/*.dmg
             release/*.zip
+          if-no-files-found: warn
           retention-days: 30
