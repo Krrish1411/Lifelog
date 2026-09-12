@@ -3,6 +3,7 @@ import { Check, Flame, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { Habit } from "../types";
 import { useApp } from "../store";
 import { addDaysIso, fmtDayShort, fmtNoteName, streakStats, todayIso, uid, weekStartIso } from "../utils/core";
+import { playHabitChime, playTimerToggleSound } from "../utils/audio";
 import { Btn, ColorPicker, EmojiPicker, EmptyState, Labeled, Modal, TextInput, cn } from "../components/ui";
 
 export function HabitsView() {
@@ -52,6 +53,15 @@ export function HabitsView() {
   const toggleDay = (h: Habit, iso: string) => {
     if (iso > today) return; // future locked
     const has = h.completions.includes(iso);
+    if (!has) {
+      if (state.settings.soundFeedback !== false) {
+        playHabitChime();
+      }
+    } else {
+      if (state.settings.soundFeedback !== false) {
+        playTimerToggleSound(true);
+      }
+    }
     set((s) => ({
       ...s,
       habits: s.habits.map((x) =>

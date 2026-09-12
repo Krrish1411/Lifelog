@@ -201,6 +201,98 @@ export function playNotificationAlarmSound(): void {
   }
 }
 
+/**
+ * Joyful, rewarding harmonic arpeggio when a habit is checked off.
+ */
+export function playHabitChime(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    // C Major crystal arpeggio: C5 (523.25Hz) -> E5 (659.25Hz) -> G5 (783.99Hz) -> C6 (1046.5Hz)
+    const tones = [
+      { freq: 523.25, delay: 0.0, dur: 0.35, vol: 0.35 },
+      { freq: 659.25, delay: 0.07, dur: 0.38, vol: 0.38 },
+      { freq: 783.99, delay: 0.14, dur: 0.45, vol: 0.42 },
+      { freq: 1046.5, delay: 0.21, dur: 0.65, vol: 0.48 },
+    ];
+
+    tones.forEach(({ freq, delay, dur, vol }) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = "sine";
+      osc.frequency.setValueAtTime(freq, now + delay);
+
+      const startTime = now + delay;
+      gain.gain.setValueAtTime(0, startTime);
+      gain.gain.linearRampToValueAtTime(vol, startTime + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + dur);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startTime);
+      osc.stop(startTime + dur);
+    });
+  } catch {
+    // Autoplay restrictions
+  }
+}
+
+/**
+ * Subtle, tactile acoustic click when toggling timer pause/resume.
+ */
+export function playTimerToggleSound(isPausing = false): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    if (isPausing) {
+      osc.frequency.setValueAtTime(420, now);
+      osc.frequency.exponentialRampToValueAtTime(220, now + 0.05);
+    } else {
+      osc.frequency.setValueAtTime(320, now);
+      osc.frequency.exponentialRampToValueAtTime(640, now + 0.05);
+    }
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.2, now + 0.008);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.06);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.06);
+  } catch {
+    // Muted or restricted
+  }
+}
+
+/**
+ * Tactile pop feedback when checking or unchecking a task item.
+ */
+export function playTaskToggleSound(done = true): void {
+  if (done) {
+    playTaskDoneSound();
+  } else {
+    playTimerToggleSound(true);
+  }
+}
+
 
 export type AmbientTrackId =
   | "rain"

@@ -24,6 +24,11 @@ import {
   Trash2,
   Upload,
   Volume2,
+  Calendar,
+  Clock,
+  Cloud,
+  History,
+  CheckSquare,
 } from "lucide-react";
 import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey } from "../types";
 import {
@@ -69,9 +74,12 @@ import {
 } from "../components/ui";
 import { cleanSeedData, isSeedTask } from "../utils/cleanSeed";
 import {
+  playHabitChime,
   playNotificationAlarmSound,
+  playTaskToggleSound,
   playTimerFinishSound,
   playTimerStartSound,
+  playTimerToggleSound,
 } from "../utils/audio";
 import {
   checkNativeNotificationPermission,
@@ -1156,12 +1164,22 @@ export function SettingsView() {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                     <div>
-                      <div className="text-[13px] font-bold">Sound Feedback Enabled</div>
+                      <div className="text-[13px] font-bold">Timer & Alarm Chimes</div>
                       <div className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
-                        Plays crisp chimes on timer starts, completions, and task ticks.
+                        Plays synthesized audio chimes on timer starts, completions, and schedule alarms.
                       </div>
                     </div>
                     <Toggle checked={s.soundEnabled ?? true} onChange={(v) => patch({ soundEnabled: v })} />
+                  </div>
+
+                  <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                    <div>
+                      <div className="text-[13px] font-bold">Tactile & Habit Audio Feedback</div>
+                      <div className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
+                        Acoustic pops on task completion, subtle clicks on pause/resume, and crystal C-major arpeggio on habit check-offs.
+                      </div>
+                    </div>
+                    <Toggle checked={s.soundFeedback ?? true} onChange={(v) => patch({ soundFeedback: v })} />
                   </div>
 
                   <div className="flex flex-wrap items-center gap-2 pt-1">
@@ -1174,7 +1192,7 @@ export function SettingsView() {
                       }}
                       className="gap-1.5 text-[11.5px]"
                     >
-                      <Volume2 size={13} /> Test Start Chime
+                      <Volume2 size={13} /> Start Chime
                     </Btn>
                     <Btn
                       size="sm"
@@ -1185,7 +1203,40 @@ export function SettingsView() {
                       }}
                       className="gap-1.5 text-[11.5px]"
                     >
-                      <Volume2 size={13} /> Test Finish Chime
+                      <Volume2 size={13} /> Finish Chime
+                    </Btn>
+                    <Btn
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        playHabitChime();
+                        toast("Played habit crystal arpeggio", "ok");
+                      }}
+                      className="gap-1.5 text-[11.5px]"
+                    >
+                      <Sparkles size={13} className="text-amber-400" /> Habit Chime
+                    </Btn>
+                    <Btn
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        playTaskToggleSound(true);
+                        toast("Played task done pop", "ok");
+                      }}
+                      className="gap-1.5 text-[11.5px]"
+                    >
+                      <CheckSquare size={13} className="text-emerald-400" /> Task Pop
+                    </Btn>
+                    <Btn
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        playTimerToggleSound(false);
+                        toast("Played timer toggle click", "ok");
+                      }}
+                      className="gap-1.5 text-[11.5px]"
+                    >
+                      <Clock size={13} /> Timer Click
                     </Btn>
                     <Btn
                       size="sm"
@@ -1196,7 +1247,7 @@ export function SettingsView() {
                       }}
                       className="gap-1.5 text-[11.5px]"
                     >
-                      <Bell size={13} /> Test Alarm Chime
+                      <Bell size={13} /> Alarm Chime
                     </Btn>
                   </div>
                 </div>
@@ -1461,6 +1512,64 @@ export function SettingsView() {
               ),
               true
             )}
+
+            {/* Upcoming Pro Cloud Infrastructure */}
+            {section(
+              "Upcoming Pro Cloud Infrastructure",
+              "Advanced zero-knowledge cloud synchronization and time-travel recovery planned for the commercial Pro edition.",
+              (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text)]">
+                      <Sparkles size={14} className="text-amber-500" />
+                      <span>Commercial Pro Upgrade Roadmap</span>
+                    </div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
+                      Paid Pro Feature
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                    <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
+                          <Cloud size={14} className="text-blue-400" /> 2.1 Async Cloud Drop
+                        </span>
+                        <span className="text-[9px] font-mono px-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">PRO</span>
+                      </div>
+                      <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                        Sync devices asynchronously without requiring both to be online simultaneously. Encrypted with your local passkey via GitHub Gist or Cloudflare KV.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
+                          <History size={14} className="text-purple-400" /> 2.3 Time-Machine
+                        </span>
+                        <span className="text-[9px] font-mono px-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">PRO</span>
+                      </div>
+                      <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                        Rolling hourly cryptographic snapshot checkpoints. Roll back corrupted edits or unintended task wipes with instant point-in-time recovery.
+                      </p>
+                    </div>
+
+                    <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
+                          <Calendar size={14} className="text-emerald-400" /> 4.3 Calendar .ICS Sync
+                        </span>
+                        <span className="text-[9px] font-mono px-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PRO</span>
+                      </div>
+                      <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                        Two-way iCalendar (.ics) feed synchronization. Seamlessly project your LifeLog time-blocks and habits directly to Google Calendar, Apple Calendar & Outlook.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ),
+              true
+            )}
           </>
         )}
 
@@ -1511,6 +1620,25 @@ export function SettingsView() {
                   <span className="text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>
                     Applies across the Life Log routine tracker, calendar blocks, task timestamps, and session history.
                   </span>
+                </div>
+              )
+            )}
+
+            {/* Tasks & Habits Workflow */}
+            {section(
+              "Tasks & Habits Workflow",
+              "Connect daily habits with your task queue and unified agenda.",
+              (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                    <div>
+                      <div className="text-[13px] font-bold">Project Habits into Today Tasks</div>
+                      <div className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
+                        Show today's active recurring habits in your Today task list so you can check them off directly without switching tabs.
+                      </div>
+                    </div>
+                    <Toggle checked={s.showHabitsInTasks !== false} onChange={(v) => patch({ showHabitsInTasks: v })} />
+                  </div>
                 </div>
               )
             )}

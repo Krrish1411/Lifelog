@@ -16,6 +16,10 @@ import {
   Lock,
   Trash2,
   CheckCircle2,
+  Cloud,
+  History,
+  GitMerge,
+  Sparkles,
 } from "lucide-react";
 import { useApp } from "../store";
 import { syncEngine } from "../sync/syncEngine";
@@ -23,6 +27,7 @@ import type { SyncStatus, SyncPeerInfo } from "../sync/syncTypes";
 import { Modal, Btn, TextInput, Seg, cn } from "./ui";
 import { triggerHaptic } from "../utils/native";
 import { cleanSeedData, isSeedTask } from "../utils/cleanSeed";
+import { DiffConflictModal } from "./DiffConflictModal";
 
 interface SyncDialogProps {
   open: boolean;
@@ -66,6 +71,7 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
   // UI state
   const [copied, setCopied] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [diffModalOpen, setDiffModalOpen] = useState(false);
 
   // Listen to live sync status changes
   useEffect(() => {
@@ -548,16 +554,26 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
                     ? `Bidirectional synchronization is active with deletion tracking and demo item filtration. Settings remain isolated on each device.`
                     : `This device is authoritative. Changes replicate continuously to ${peer?.deviceName || "peer"}. Settings remain isolated on each device.`}
                 </p>
-                <div className="pt-1">
+                <div className="pt-1 flex items-center gap-2">
                   <Btn
                     variant="outline"
                     size="sm"
-                    className="w-full justify-center gap-1.5 text-xs"
+                    className="flex-1 justify-center gap-1.5 text-xs"
                     onClick={handleExecuteSync}
                     disabled={isApplyingSync}
                   >
                     {isApplyingSync ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />}
                     <span>{isApplyingSync ? "Syncing..." : "Force Sync Now"}</span>
+                  </Btn>
+                  <Btn
+                    variant="soft"
+                    size="sm"
+                    className="justify-center gap-1.5 text-xs border border-amber-500/30 text-amber-500 bg-amber-500/10 hover:bg-amber-500/20"
+                    onClick={() => setDiffModalOpen(true)}
+                    title="Inspect and resolve 3-way differences"
+                  >
+                    <GitMerge size={13} />
+                    <span>Conflict Diff</span>
                   </Btn>
                 </div>
               </div>
@@ -852,7 +868,52 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
             )}
           </div>
         )}
+
+        {/* Upcoming Cloud & Pro Features banner */}
+        <div className="mt-4 pt-4 border-t border-[var(--line)] space-y-2.5">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text)]">
+              <Sparkles size={14} className="text-amber-500" />
+              <span>Upcoming Pro Cloud Infrastructure</span>
+            </div>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
+              Paid Pro Feature
+            </span>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--panel2)] space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[var(--text)] flex items-center gap-1">
+                  <Cloud size={13} className="text-blue-400" /> 2.1 Async Cloud Drop-Box
+                </span>
+                <span className="text-[9px] font-mono px-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">PRO</span>
+              </div>
+              <p className="text-[11px] text-[var(--mut)] leading-snug">
+                Sync across devices asynchronously without both needing to be online at the same time. Encrypted with your passkey via GitHub Gist or Cloudflare KV.
+              </p>
+            </div>
+
+            <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--panel2)] space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-[var(--text)] flex items-center gap-1">
+                  <History size={13} className="text-purple-400" /> 2.3 Time-Machine Rollback
+                </span>
+                <span className="text-[9px] font-mono px-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">PRO</span>
+              </div>
+              <p className="text-[11px] text-[var(--mut)] leading-snug">
+                Rolling hourly cryptographic snapshot checkpoints. Roll back corrupted edits or unintended wipes with instant time-travel restoration.
+              </p>
+            </div>
+          </div>
+        </div>
       </div>
+
+      <DiffConflictModal
+        open={diffModalOpen}
+        onClose={() => setDiffModalOpen(false)}
+        peerDeviceName={peer?.deviceName || "Paired Device"}
+      />
     </Modal>
   );
 };

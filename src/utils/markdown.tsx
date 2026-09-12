@@ -10,8 +10,8 @@ import type { ReactNode } from "react";
 
 function inline(text: string, keyBase: string): ReactNode[] {
   const out: ReactNode[] = [];
-  // token regex, ordered: code, bold, underline(++), highlight, italic, strike, link
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\+\+[^+]+\+\+)|(==[^=]+==)|(\*[^*]+\*)|(~~[^~]+~~)|(\[[^\]]+\]\((?:https?:\/\/)[^)\s]+\))/g;
+  // token regex, ordered: code, bold, underline(++), highlight, italic, strike, link, wiki [[note]], @task, #project
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(\+\+[^+]+\+\+)|(==[^=]+==)|(\*[^*]+\*)|(~~[^~]+~~)|(\[[^\]]+\]\((?:https?:\/\/)[^)\s]+\))|(\[\[[^\]]+\]\])|(@[a-zA-Z0-9_\-]+)|(#[a-zA-Z0-9_\-]+)/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
@@ -25,7 +25,64 @@ function inline(text: string, keyBase: string): ReactNode[] {
     else if (tok.startsWith("==")) out.push(<mark key={key} className="md-mark">{inline(tok.slice(2, -2), key)}</mark>);
     else if (tok.startsWith("~~")) out.push(<s key={key}>{inline(tok.slice(2, -2), key)}</s>);
     else if (tok.startsWith("*")) out.push(<em key={key}>{inline(tok.slice(1, -1), key)}</em>);
-    else {
+    else if (tok.startsWith("[[") && tok.endsWith("]]")) {
+      const inner = tok.slice(2, -2);
+      const parts = inner.split("|");
+      const target = parts[0].trim();
+      const label = parts[1]?.trim() || target;
+      out.push(
+        <span
+          key={key}
+          className="md-wikilink inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold cursor-pointer transition-all hover:scale-105"
+          style={{
+            background: "var(--accent-soft)",
+            color: "var(--accent)",
+            border: "1px solid color-mix(in srgb, var(--accent) 30%, transparent)",
+          }}
+          data-wiki-type="note"
+          data-wiki-target={target}
+          title={`Open note: ${target}`}
+        >
+          📄 {label}
+        </span>
+      );
+    } else if (tok.startsWith("@") && tok.length > 1) {
+      const taskName = tok.slice(1);
+      out.push(
+        <span
+          key={key}
+          className="md-tasklink inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold cursor-pointer transition-all hover:scale-105"
+          style={{
+            background: "rgba(59, 130, 246, 0.12)",
+            color: "#3b82f6",
+            border: "1px solid rgba(59, 130, 246, 0.3)",
+          }}
+          data-wiki-type="task"
+          data-wiki-target={taskName}
+          title={`Reference task: ${taskName}`}
+        >
+          ☑️ @{taskName}
+        </span>
+      );
+    } else if (tok.startsWith("#") && tok.length > 1) {
+      const projName = tok.slice(1);
+      out.push(
+        <span
+          key={key}
+          className="md-projlink inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-semibold cursor-pointer transition-all hover:scale-105"
+          style={{
+            background: "rgba(16, 185, 129, 0.12)",
+            color: "#10b981",
+            border: "1px solid rgba(16, 185, 129, 0.3)",
+          }}
+          data-wiki-type="project"
+          data-wiki-target={projName}
+          title={`Project: ${projName}`}
+        >
+          📁 #{projName}
+        </span>
+      );
+    } else {
       const mm = /\[([^\]]+)\]\(([^)]+)\)/.exec(tok);
       if (mm) out.push(<a key={key} href={mm[2]} target="_blank" rel="noreferrer" className="md-link">{mm[1]}</a>);
       else out.push(tok);

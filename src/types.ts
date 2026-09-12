@@ -176,6 +176,9 @@ export interface Settings {
   countdownMin: number;
   notifyEnabled: boolean;
   soundEnabled?: boolean;
+  soundFeedback?: boolean;
+  showHabitsInTasks?: boolean;
+  onboardingTourSeen?: boolean;
   tagOrder?: string[]; // ordered list of tag names
   taskSortMode?: "manual" | "due" | "priority";
   soundscape?: string;
@@ -317,6 +320,9 @@ export const DEFAULT_SETTINGS: Settings = {
   countdownMin: 45,
   notifyEnabled: false,
   soundEnabled: true,
+  soundFeedback: true,
+  showHabitsInTasks: true,
+  onboardingTourSeen: false,
   tagOrder: [],
   taskSortMode: "manual",
   soundscape: "none",

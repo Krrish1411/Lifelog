@@ -33,7 +33,7 @@ import {
   scheduleTaskDueNotification,
   triggerHaptic,
 } from "./utils/native";
-import { playNotificationAlarmSound, playTaskDoneSound } from "./utils/audio";
+import { playNotificationAlarmSound, playTaskDoneSound, playTimerToggleSound } from "./utils/audio";
 import { syncEngine } from "./sync/syncEngine";
 import { broadcastWindowState, onWindowStateSync, requestLatestState } from "./utils/windowSync";
 import { X } from "lucide-react";
@@ -87,6 +87,7 @@ export interface TaskDialogState {
   projectId?: string;
   presetDate?: string | null;
   presetTime?: string | null;
+  initialTitle?: string;
 }
 
 interface AppCtx {
@@ -432,7 +433,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }
         const nowDone = !task.done;
         if (nowDone) {
-          playTaskDoneSound();
+          if (s.settings.soundFeedback !== false) {
+            playTaskDoneSound();
+          }
           if (isNative) {
             cancelTaskDueNotification(taskId);
             if (task.timeBlocks) {
@@ -440,6 +443,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
                 cancelTaskDueNotification(`${taskId}-${b.id}`);
               }
             }
+          }
+        } else {
+          if (s.settings.soundFeedback !== false) {
+            playTimerToggleSound(true);
           }
         }
         triggerHaptic(nowDone ? "success" : "light");

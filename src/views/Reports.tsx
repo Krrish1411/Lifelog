@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Flame, Lightbulb, Settings2, Target, Clock } from "lucide-react";
+import { Flame, Lightbulb, Settings2, Target, Clock, Printer } from "lucide-react";
 import { useApp } from "../store";
 import {
   MONTHS, WEEKDAYS_SHORT, addDaysIso, fmtDayShort, fmtDur, isoDate, listDates, parseIso,
@@ -302,11 +302,17 @@ export function ReportsView() {
             Look back at any stretch — every number is computed from your local history. Day-by-day detail lives in the Day Log.
           </p>
         </div>
-        <Btn variant="outline" onClick={() => setView("settings")} className="shrink-0"><Settings2 size={13} /> Choose widgets</Btn>
+        <div className="flex items-center gap-2 shrink-0 no-print">
+          <Btn variant="primary" onClick={() => window.print()} className="gap-1.5 text-xs font-bold shadow-sm">
+            <Printer size={13} />
+            <span>Export PDF / Print</span>
+          </Btn>
+          <Btn variant="outline" onClick={() => setView("settings")}><Settings2 size={13} /> Widgets</Btn>
+        </div>
       </div>
 
       {/* range bar */}
-      <div className="card engine-panel flex flex-wrap items-center gap-2 p-3 w-full min-w-0 overflow-hidden">
+      <div className="card engine-panel flex flex-wrap items-center gap-2 p-3 w-full min-w-0 overflow-hidden no-print">
         {([["week", "This week"], ["last7", "Last 7 days"], ["month", "This month"], ["last30", "Last 30 days"], ["all", "All time"]] as [Preset, string][]).map(([p, l]) => (
           <button key={p} onClick={() => applyPreset(p)} className="rounded-lg px-2.5 py-1 text-[12px] font-bold transition-all"
             style={preset === p ? { background: "var(--accent)", color: "var(--on-accent)", cursor: "pointer" } : { color: "var(--mut)", background: "var(--bg)", cursor: "pointer" }}>

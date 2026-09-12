@@ -27,6 +27,8 @@ import {
   Timer,
   Trash2,
   X,
+  Coffee,
+  Sparkles,
 } from "lucide-react";
 import type { Priority, TokenKey, ViewId } from "../types";
 import { FONT_PAIRS, QUOTES, SHORTCUT_ACTIONS } from "../types";
@@ -43,6 +45,7 @@ import {
   readableOn,
   sessionSeconds,
   streakStats,
+  calculateFocusDayStreak,
   todayIso,
   trackedByDay,
 } from "../utils/core";
@@ -53,6 +56,7 @@ import { useApplyTheme } from "../utils/useApplyTheme";
 import { Btn, Modal, TextInput, Toggle, cn } from "./ui";
 import { TaskDialog } from "./TaskDialog";
 import { SyncDialog } from "./SyncDialog";
+import { OnboardingTourModal } from "./OnboardingTourModal";
 import { CommandPalette } from "./CommandPalette";
 import { LiveAnnouncer } from "./LiveAnnouncer";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -361,9 +365,9 @@ export function Shell() {
     [state.tasks, today]
   );
   const tracked = useMemo(() => trackedByDay(state.sessions), [state.sessions]);
-  const bestStreak = useMemo(
-    () => Math.max(0, ...state.habits.map((h) => streakStats(h.completions).current)),
-    [state.habits]
+  const focusStreak = useMemo(
+    () => calculateFocusDayStreak(state.sessions, today),
+    [state.sessions, today]
   );
 
   const selectedTaskFilterKey = useMemo(() => {
@@ -572,6 +576,18 @@ export function Shell() {
             )}
           </button>
 
+          {/* Buy Me a Coffee button */}
+          <a
+            href="https://www.buymeacoffee.com/Krrish1411"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-9 w-9 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-transform active:scale-95 cursor-pointer"
+            title="Support LifeLog on Buy Me a Coffee"
+            aria-label="Buy Me a Coffee"
+          >
+            <Coffee size={15} />
+          </a>
+
           {/* Theme quick toggle */}
           <button
             type="button"
@@ -673,6 +689,16 @@ export function Shell() {
             >
               {state.settings.themeMode === "dark" ? <Sun size={15} /> : <Moon size={15} />}
             </button>
+            <a
+              href="https://www.buymeacoffee.com/Krrish1411"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Support on Buy Me a Coffee"
+              aria-label="Buy Me a Coffee"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
+            >
+              <Coffee size={15} />
+            </a>
             <button
               onClick={() => setPaletteOpen(true)}
               title="Command Palette (Ctrl+K / K)"
@@ -765,6 +791,18 @@ export function Shell() {
               {state.settings.themeMode === "dark" ? <Sun size={14} /> : <Moon size={14} />}
             </button>
 
+            <a
+              href="https://www.buymeacoffee.com/Krrish1411"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Support on Buy Me a Coffee"
+              aria-label="Buy Me a Coffee"
+              className="flex h-8 px-2.5 items-center gap-1.5 rounded-lg border text-xs font-semibold transition-all hover:scale-105 cursor-pointer text-amber-500 bg-amber-500/10 border-amber-500/30"
+            >
+              <Coffee size={13} />
+              <span className="hidden sm:inline">Coffee</span>
+            </a>
+
             <button
               onClick={() => setPaletteOpen(true)}
               className="flex h-8 w-8 items-center justify-center rounded-lg border transition-all cursor-pointer"
@@ -789,7 +827,7 @@ export function Shell() {
         <StatusBar
           dueToday={dueToday}
           todayMin={tracked.get(today) ?? 0}
-          bestStreak={bestStreak}
+          focusStreak={focusStreak}
           goFocus={() => setView("focus")}
         />
 
@@ -843,6 +881,17 @@ export function Shell() {
               {state.settings.themeMode === "dark" ? <Sun size={14} /> : <Moon size={14} />}
             </button>
 
+            <a
+              href="https://www.buymeacoffee.com/Krrish1411"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-8 w-8 items-center justify-center rounded-lg border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
+              title="Support on Buy Me a Coffee"
+              aria-label="Buy Me a Coffee"
+            >
+              <Coffee size={14} />
+            </a>
+
             <button
               onClick={() => setPaletteOpen(true)}
               className="flex h-8 w-8 items-center justify-center rounded-lg border transition-all cursor-pointer"
@@ -881,7 +930,7 @@ export function Shell() {
         <StatusBarDesk
           dueToday={dueToday}
           todayMin={tracked.get(today) ?? 0}
-          bestStreak={bestStreak}
+          focusStreak={focusStreak}
           goFocus={() => setView("focus")}
         />
 
@@ -934,6 +983,17 @@ export function Shell() {
             >
               {state.settings.themeMode === "dark" ? <Sun size={15} /> : <Moon size={15} />}
             </button>
+
+            <a
+              href="https://www.buymeacoffee.com/Krrish1411"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
+              title="Support on Buy Me a Coffee"
+              aria-label="Buy Me a Coffee"
+            >
+              <Coffee size={15} />
+            </a>
           </div>
 
           <div className="mt-3 flex w-full flex-col items-center gap-1 px-1.5">
@@ -1059,6 +1119,17 @@ export function Shell() {
           >
             {state.settings.themeMode === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </button>
+
+          <a
+            href="https://www.buymeacoffee.com/Krrish1411"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex h-8 w-8 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
+            title="Support on Buy Me a Coffee"
+            aria-label="Buy Me a Coffee"
+          >
+            <Coffee size={14} />
+          </a>
 
           <button
             onClick={() => setPaletteOpen(true)}
@@ -1269,8 +1340,8 @@ function ZenHome() {
                 { k: "Done", v: String(doneToday) },
                 { k: "Due", v: String(dueTasks.length) },
                 {
-                  k: "Top streak",
-                  v: `${Math.max(0, ...state.habits.map((h) => streakStats(h.completions).current))}d`,
+                  k: "Focus streak",
+                  v: `${calculateFocusDayStreak(state.sessions, today)}d`,
                 },
               ].map((x) => (
                 <div
@@ -1358,12 +1429,12 @@ function ZenHome() {
 function StatusBar({
   dueToday,
   todayMin,
-  bestStreak,
+  focusStreak,
   goFocus,
 }: {
   dueToday: number;
   todayMin: number;
-  bestStreak: number;
+  focusStreak: number;
   goFocus: () => void;
 }) {
   const { state } = useApp();
@@ -1387,7 +1458,7 @@ function StatusBar({
         <ListTodo size={11} style={{ color: "var(--mut)" }} /> {dueToday} due
       </span>
       <span className="chip !py-0.5 text-[11px]">
-        <Check size={11} style={{ color: "var(--ok)" }} /> streak {bestStreak}d
+        <Flame size={11} style={{ color: "var(--accent)" }} /> {focusStreak}d focus streak
       </span>
 
       {running && (
@@ -1415,12 +1486,12 @@ function StatusBar({
 function StatusBarDesk({
   dueToday,
   todayMin,
-  bestStreak,
+  focusStreak,
   goFocus,
 }: {
   dueToday: number;
   todayMin: number;
-  bestStreak: number;
+  focusStreak: number;
   goFocus: () => void;
 }) {
   const { state } = useApp();
@@ -1447,7 +1518,7 @@ function StatusBarDesk({
         <ListTodo size={11} style={{ color: "var(--mut)" }} /> {dueToday} due
       </span>
       <span className="chip !py-0.5 text-[11px]">
-        <Check size={11} style={{ color: "var(--ok)" }} /> streak {bestStreak}d
+        <Flame size={11} style={{ color: "var(--accent)" }} /> {focusStreak}d focus streak
       </span>
 
       {running && (
@@ -1706,7 +1777,15 @@ function Overlays({
   const [confirmText, setConfirmText] = useState("");
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [help, setHelp] = useState(false);
+  const [tourOpen, setTourOpen] = useState(false);
   const [namePromptInput, setNamePromptInput] = useState(state.settings.profileName || "");
+
+  useEffect(() => {
+    if (state.meta?.hasSeenWelcome && !state.settings.onboardingTourSeen) {
+      const t = setTimeout(() => setTourOpen(true), 800);
+      return () => clearTimeout(t);
+    }
+  }, [state.meta?.hasSeenWelcome, state.settings.onboardingTourSeen]);
   const showNamePrompt = Boolean(state.meta && state.meta.hasSeenWelcome && !state.meta.hasCompletedNamePrompt);
 
   const submitNamePrompt = (skip = false) => {
@@ -2122,11 +2201,25 @@ function Overlays({
             </div>
           </div>
 
-          <div className="mt-1 text-[11px] font-medium text-center" style={{ color: "var(--mut)" }}>
-            Remap any key anytime in <span className="font-bold text-[var(--text)]">Settings → Shortcuts</span>. Disabled inside text inputs.
+          <div className="mt-2 pt-3 border-t border-[var(--line)] flex items-center justify-between">
+            <span className="text-[11.5px] text-[var(--mut)]">Discover all 5 engines & architecture</span>
+            <Btn
+              variant="soft"
+              size="sm"
+              onClick={() => {
+                setHelp(false);
+                setTourOpen(true);
+              }}
+              className="gap-1.5 text-xs text-[var(--accent)] font-semibold"
+            >
+              <Sparkles size={13} /> Interactive Tour
+            </Btn>
           </div>
         </div>
       </Modal>
+
+      {/* Interactive 5-Slide Onboarding Tour */}
+      <OnboardingTourModal open={tourOpen} onClose={() => setTourOpen(false)} />
 
       {/* Mobile Android Bottom Dock & Hub Sheet (< md) */}
       <MobileBottomNav

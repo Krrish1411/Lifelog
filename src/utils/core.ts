@@ -539,3 +539,69 @@ export function isSleepTask(t: { tags?: string[]; title?: string; emoji?: string
   return false;
 }
 
+/**
+ * Calculates the current consecutive day streak of completed deep focus sessions.
+ * Accurately tracks days with at least 1 focus session (excluding breaks),
+ * preserving the streak if today hasn't had a session yet but yesterday did.
+ */
+export function calculateFocusDayStreak(sessions: Session[], today = todayIso()): number {
+  if (!sessions || sessions.length === 0) return 0;
+  const focusDates = new Set<string>();
+  for (const s of sessions) {
+    if (s.mode !== "break" && sessionMinutes(s) >= 1) {
+      focusDates.add(isoDate(new Date(s.startedAt)));
+    }
+  }
+  return streakStats(Array.from(focusDates)).current;
+}
+
+export interface WikiLink {
+  type: "note" | "project" | "task";
+  raw: string;
+  target: string;
+  label?: string;
+}
+
+/**
+ * Extracts bi-directional wiki backlinks: [[Note Title]], #Project, and @Task.
+ */
+export function extractWikiLinks(text: string): WikiLink[] {
+  if (!text) return [];
+  const links: WikiLink[] = [];
+  // [[Note Title]] or [[Note Title|Custom Label]]
+  const noteRegex = /\[\[(.*?)(?:\|(.*?))?\]\]/g;
+  let match: RegExpExecArray | null;
+  while ((match = noteRegex.exec(text)) !== null) {
+    const target = match[1].trim();
+    if (target) {
+      links.push({
+        type: "note",
+        raw: match[0],
+        target,
+        label: match[2]?.trim() || target,
+      });
+    }
+  }
+  // #Project
+  const projRegex = /(?:^|\s)#([a-zA-Z0-9_\-]+)/g;
+  while ((match = projRegex.exec(text)) !== null) {
+    links.push({
+      type: "project",
+      raw: `#${match[1]}`,
+      target: match[1],
+      label: match[1],
+    });
+  }
+  // @Task
+  const taskRegex = /(?:^|\s)@([a-zA-Z0-9_\-]+)/g;
+  while ((match = taskRegex.exec(text)) !== null) {
+    links.push({
+      type: "task",
+      raw: `@${match[1]}`,
+      target: match[1],
+      label: match[1],
+    });
+  }
+  return links;
+}
+

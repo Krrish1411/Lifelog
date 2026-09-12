@@ -25,6 +25,7 @@ import {
   SlidersHorizontal,
   Filter,
   Moon,
+  Flame,
 } from "lucide-react";
 import type { Priority, Project, Subtask, Task, LifeLogCategory } from "../types";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
@@ -37,6 +38,7 @@ import {
   isoDate,
   normalizeHex,
   sessionMinutes,
+  streakStats,
   todayIso,
   uid,
   calcDurationBetweenTimes,
@@ -48,6 +50,7 @@ import {
   checkTimeClash,
   isSleepTask,
 } from "../utils/core";
+import { playHabitChime, playTimerToggleSound } from "../utils/audio";
 import {
   Btn,
   ColorPicker,
@@ -1558,6 +1561,101 @@ export function TasksView({
               </EmptyState>
             </div>
           )}
+
+          {/* Projected Today's Habits Section */}
+          {sel === "today" && state.settings.showHabitsInTasks !== false && state.habits.length > 0 && (
+            <div className="mb-4 space-y-2">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--mut)]">
+                  <Flame size={13} className="text-[var(--accent)]" />
+                  <span>Today's Habits & Daily Targets ({state.habits.filter((h) => h.completions.includes(today)).length}/{state.habits.length})</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    window.location.hash = "habits";
+                    window.dispatchEvent(new CustomEvent("lifelog:nav-view", { detail: "habits" }));
+                  }}
+                  className="text-[11px] font-bold text-[var(--accent)] hover:underline cursor-pointer"
+                >
+                  View All
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {state.habits.map((h) => {
+                  const isDone = h.completions.includes(today);
+                  const streak = streakStats(h.completions).current;
+                  return (
+                    <div
+                      key={h.id}
+                      onClick={() => {
+                        triggerHaptic("medium");
+                        const nextCompletions = isDone
+                          ? h.completions.filter((d) => d !== today)
+                          : [...h.completions, today];
+                        set((s) => ({
+                          ...s,
+                          habits: s.habits.map((x) => (x.id === h.id ? { ...x, completions: nextCompletions } : x)),
+                        }));
+                        if (!isDone) {
+                          if (state.settings.soundFeedback !== false) {
+                            playHabitChime();
+                          }
+                          toast(`“${h.name}” completed today! 🔥 ${streak + 1}d streak`, "ok");
+                        } else {
+                          if (state.settings.soundFeedback !== false) {
+                            playTimerToggleSound(true);
+                          }
+                          toast(`“${h.name}” unchecked for today`, "warn");
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer select-none",
+                        isDone
+                          ? "border-emerald-500/30 bg-emerald-500/10 text-[var(--text)]"
+                          : "border-[var(--line)] bg-[var(--panel)] hover:border-[var(--accent)]/50 text-[var(--text)]"
+                      )}
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <button
+                          type="button"
+                          className={cn(
+                            "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border transition-all",
+                            isDone
+                              ? "border-emerald-500 bg-emerald-500 text-white"
+                              : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--accent)]"
+                          )}
+                        >
+                          {isDone && <Check size={12} strokeWidth={3} />}
+                        </button>
+                        <div className="truncate">
+                          <div className={cn("text-xs font-bold truncate", isDone && "line-through opacity-70")}>
+                            <span className="mr-1.5">{h.emoji}</span>
+                            <span>{h.name}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span
+                          className="chip !py-0.5 text-[10.5px] font-mono font-bold"
+                          style={{
+                            color: isDone ? "var(--ok)" : "var(--accent)",
+                            borderColor: isDone ? "rgba(16, 185, 129, 0.3)" : "var(--line)",
+                          }}
+                        >
+                          <Flame size={10} className={isDone ? "text-emerald-500" : "text-[var(--accent)]"} />
+                          {streak}d
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {list.map((t, idx) => (
             <TaskCard
               key={t.id}
@@ -2205,6 +2303,33 @@ function TaskCard({
               )}
             </span>
           )}
+
+          {/* Note Backlinks Badge */}
+          {(() => {
+            const linked = state.notes.filter(
+              (n) =>
+                (t.linkedNoteIds && t.linkedNoteIds.includes(n.id)) ||
+                (n.title && t.title && n.title.toLowerCase().includes(t.title.toLowerCase()))
+            );
+            if (linked.length === 0) return null;
+            return (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  window.location.hash = "notes";
+                  window.dispatchEvent(
+                    new CustomEvent("lifelog:open-note", { detail: { noteId: linked[0].id } })
+                  );
+                }}
+                className="chip !py-0.5 text-[10px] font-bold text-blue-500 border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 transition-all cursor-pointer flex items-center gap-1"
+                title={`Referenced in note: ${linked[0].title} — click to view`}
+              >
+                <FileText size={10} className="shrink-0" />
+                <span className="truncate max-w-[120px]">Note: {linked[0].title}</span>
+              </button>
+            );
+          })()}
         </div>
       </div>
 

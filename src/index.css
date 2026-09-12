@@ -994,3 +994,65 @@ html[data-theme="dark"][data-engine="glass"] .inp:focus {
   transition: transform 0.15s ease, border-color 0.15s ease;
 }
 .attach-tile:hover { transform: translateY(-2px); border-color: var(--accent); }
+
+/* ---------- Print Styles for Reports and Clean PDF Generation ---------- */
+@media print {
+  *, *::before, *::after {
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  html, body, #root {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    min-height: auto !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Hide navigation, sidebars, headers, floating bars, modals, mini-timer */
+  header,
+  nav,
+  aside,
+  footer,
+  .ambient,
+  .mini-timer,
+  .no-print,
+  [data-no-print],
+  button.no-print,
+  div[role="dialog"],
+  .fixed,
+  .sticky {
+    display: none !important;
+  }
+
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .card, .engine-panel, .attach-tile {
+    border: 1px solid #e2e8f0 !important;
+    background: #ffffff !important;
+    color: #0f172a !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    page-break-after: avoid !important;
+    break-after: avoid !important;
+    color: #0f172a !important;
+  }
+
+  /* Maintain legible contrast on progress and bar charts */
+  .bg-accent, [style*="var(--accent)"] {
+    print-color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+  }
+}

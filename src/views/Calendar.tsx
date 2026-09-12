@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Check, ChevronLeft, ChevronRight, Clock3, Inbox, Layers, Plus } from "lucide-react";
+import { Check, ChevronLeft, ChevronRight, Clock3, Inbox, Layers, Plus, Sparkles } from "lucide-react";
 import type { Task, TaskTimeBlock } from "../types";
 import { useApp } from "../store";
 import {
@@ -128,11 +128,34 @@ export function CalendarView() {
       }
     }
 
+    // Project daily habits onto Calendar as reminder blocks (Feature 1.3)
+    for (const h of state.habits) {
+      const habitDays = new Set([...h.completions, todayIso()]);
+      for (const d of habitDays) {
+        const isDone = h.completions.includes(d);
+        const item: CalendarItem = {
+          id: `h-${h.id}-${d}`,
+          taskId: h.id,
+          title: h.name,
+          label: "Daily Habit",
+          emoji: h.emoji,
+          projectId: "habits-stream",
+          date: d,
+          time: "08:00",
+          durationMin: 20,
+          done: isDone,
+        };
+        const arr = m.get(d) ?? [];
+        arr.push(item);
+        m.set(d, arr);
+      }
+    }
+
     for (const arr of m.values()) {
       arr.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
     }
     return m;
-  }, [state.tasks]);
+  }, [state.tasks, state.habits]);
 
   const days: string[] = useMemo(() => {
     if (view === "day") return [anchor];
@@ -966,6 +989,22 @@ function Header({
         <Btn variant="soft" size="sm" onClick={() => navigate(1)} aria-label="Next">
           <ChevronRight size={14} />
         </Btn>
+
+        {/* Feature 4.3 Two-Way .ICS Calendar Sync (Upcoming Paid Pro Feature) */}
+        <button
+          type="button"
+          onClick={() => {
+            alert("Feature 4.3: Two-Way External Calendar .ICS Sync (Google Calendar, Apple iCal, Outlook) is an upcoming Paid Pro feature!");
+          }}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold text-amber-500 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-all"
+          title="Two-Way External Calendar .ICS Sync (Upcoming Pro Feature)"
+        >
+          <Sparkles size={12} />
+          <span className="hidden sm:inline">.ICS Sync</span>
+          <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1 rounded bg-amber-500/20 text-amber-500">
+            PRO
+          </span>
+        </button>
         <div className="ml-auto sm:ml-0">
           <Seg
             options={[

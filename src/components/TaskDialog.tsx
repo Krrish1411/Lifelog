@@ -158,7 +158,7 @@ export function TaskDialog() {
       const preset = taskDialog.presetDate ?? "";
       const presetTime = taskDialog.presetTime ?? "";
       const isLifeLogDialog = (taskDialog.projectId ?? state.projects[0]?.id) === LIFE_LOG_PROJECT_ID;
-      setTitle("");
+      setTitle(taskDialog.initialTitle ?? "");
       setProjectId(taskDialog.projectId ?? state.projects[0]?.id ?? "");
       setEmoji(isLifeLogDialog ? "🌊" : "");
       setPriority("medium");

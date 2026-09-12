@@ -9,7 +9,7 @@ import {
 import type { Attachment, Note } from "../types";
 import { useApp } from "../store";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
-import { fmtClock, fmtDayShort, fmtNoteName, todayIso, uid } from "../utils/core";
+import { fmtClock, fmtDayShort, fmtNoteName, todayIso, uid, extractWikiLinks } from "../utils/core";
 import { applyLinePrefix, applyWrap, renderMarkdown } from "../utils/markdown";
 import { consumeDailyNote } from "../utils/nav";
 import { useBodyScrollLock } from "../utils/scrollLock";
@@ -1042,9 +1042,114 @@ export function NotesView() {
                     }
                   />
                 ) : (
-                  <div className="note-page flex-1 min-h-[320px] w-full overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--bg)]/40 p-5 mt-4 leading-relaxed pb-28">
+                  <div
+                    className="note-page flex-1 min-h-[320px] w-full overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--bg)]/40 p-5 mt-4 leading-relaxed pb-28"
+                    onClick={(e) => {
+                      const target = e.target as HTMLElement;
+                      const chip = target.closest<HTMLElement>("[data-wiki-type]");
+                      if (!chip) return;
+                      const wikiType = chip.getAttribute("data-wiki-type");
+                      const wikiTarget = chip.getAttribute("data-wiki-target");
+                      if (!wikiTarget) return;
+
+                      if (wikiType === "note") {
+                        const match = state.notes.find(
+                          (n) => n.title.toLowerCase() === wikiTarget.toLowerCase() || n.day === wikiTarget
+                        );
+                        if (match) {
+                          setFolderSel("all");
+                          setSelId(match.id);
+                          toast(`Opened note: ${match.title}`, "ok");
+                        } else {
+                          const newId = uid();
+                          set((s) => ({
+                            ...s,
+                            notes: [
+                              ...s.notes,
+                              {
+                                id: newId,
+                                title: wikiTarget,
+                                folderId: "f-inbox",
+                                createdAt: Date.now(),
+                                updatedAt: Date.now(),
+                                blob: { ciphertext: "", iv: "", salt: "" },
+                                daily: false,
+                                day: null,
+                              },
+                            ],
+                          }));
+                          setFolderSel("all");
+                          setSelId(newId);
+                          toast(`Created new note: ${wikiTarget}`, "ok");
+                        }
+                      } else if (wikiType === "task") {
+                        const task = state.tasks.find(
+                          (t) => t.title.toLowerCase().includes(wikiTarget.toLowerCase()) || t.id === wikiTarget
+                        );
+                        if (task) {
+                          openTaskDialog({ taskId: task.id });
+                        } else {
+                          openTaskDialog({ initialTitle: wikiTarget });
+                        }
+                      } else if (wikiType === "project") {
+                        const proj = state.projects.find(
+                          (p) => p.name.toLowerCase() === wikiTarget.toLowerCase() || p.id === wikiTarget
+                        );
+                        if (proj) {
+                          window.location.hash = "tasks";
+                          window.dispatchEvent(new CustomEvent("lifelog:filter-project", { detail: { projectId: proj.id } }));
+                          toast(`Switched to Project #${proj.name}`, "ok");
+                        } else {
+                          toast(`Project #${wikiTarget} not found`, "warn");
+                        }
+                      }
+                    }}
+                  >
                     {draft.text.trim() ? (
-                      renderMarkdown(draft.text)
+                      <>
+                        {renderMarkdown(draft.text)}
+                        {/* Bi-Directional Wiki Backlinks & References Tray */}
+                        {(() => {
+                          const links = extractWikiLinks(draft.text);
+                          if (links.length === 0) return null;
+                          return (
+                            <div className="mt-8 pt-4 border-t border-[var(--line)] space-y-2 select-none">
+                              <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--mut)] uppercase tracking-wider">
+                                <Link2 size={13} className="text-[var(--accent)]" />
+                                <span>Wiki References ({links.length})</span>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {links.map((lnk, idx) => (
+                                  <button
+                                    key={idx}
+                                    type="button"
+                                    data-wiki-type={lnk.type}
+                                    data-wiki-target={lnk.target}
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg border text-xs font-semibold transition-all hover:scale-105 cursor-pointer"
+                                    style={{
+                                      background:
+                                        lnk.type === "note"
+                                          ? "var(--accent-soft)"
+                                          : lnk.type === "task"
+                                          ? "rgba(59, 130, 246, 0.12)"
+                                          : "rgba(16, 185, 129, 0.12)",
+                                      color:
+                                        lnk.type === "note"
+                                          ? "var(--accent)"
+                                          : lnk.type === "task"
+                                          ? "#3b82f6"
+                                          : "#10b981",
+                                      borderColor: "var(--line)",
+                                    }}
+                                  >
+                                    {lnk.type === "note" ? "📄" : lnk.type === "task" ? "☑️" : "📁"} {lnk.raw}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          );
+                        })()}
+                      </>
                     ) : (
                       <div style={{ color: "var(--mut)" }}>Nothing to preview yet — switch to Write and start typing.</div>
                     )}
