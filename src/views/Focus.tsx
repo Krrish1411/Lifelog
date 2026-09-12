@@ -114,7 +114,7 @@ export function FocusView() {
 
   useEffect(() => {
     if (!live) return;
-    const t = setInterval(() => setNow(Date.now()), 250);
+    const t = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(t);
   }, [live?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

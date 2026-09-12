@@ -5,6 +5,9 @@ const fs = require('fs');
 let mainWindow = null;
 let popoutWindow = null;
 
+// Optimize Chromium memory & V8 garbage collection footprint
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+
 // Ensure persistent local storage directory and encrypted attachments folder
 function getStoragePaths() {
   const userData = app.getPath('userData');
@@ -36,6 +39,8 @@ function createMainWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      backgroundThrottling: true,
+      spellcheck: false,
     },
   });
 
@@ -95,6 +100,8 @@ function createTimerPopoutWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      backgroundThrottling: true,
+      spellcheck: false,
     },
   });
 

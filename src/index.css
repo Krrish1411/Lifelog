@@ -148,7 +148,6 @@ body {
   top: -16vw;
   background: radial-gradient(circle, color-mix(in srgb, var(--accent) 18%, transparent) 0%, transparent 70%);
   opacity: 0.65;
-  animation: drift-a 42s ease-in-out infinite alternate;
 }
 .ambient::after {
   width: 46vw;
@@ -157,7 +156,6 @@ body {
   bottom: -15vw;
   background: radial-gradient(circle, rgba(56, 189, 248, 0.14) 0%, transparent 70%);
   opacity: 0.6;
-  animation: drift-b 50s ease-in-out infinite alternate;
 }
 .ambient .grid-lines {
   position: absolute;
@@ -497,23 +495,11 @@ html[data-engine="zen"] .card {
 }
 
 /* ---------- Mini timer widget ---------- */
-@keyframes minibob {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
-}
 .mini-timer {
-  animation: minibob 3.2s ease-in-out infinite;
-}
-.mini-timer:hover {
-  animation-play-state: paused;
-}
-@keyframes ringpulse {
-  0% { box-shadow: 0 0 0 0 var(--ring); }
-  70% { box-shadow: 0 0 0 9px transparent; }
-  100% { box-shadow: 0 0 0 0 transparent; }
+  /* Static crisp floating widget */
 }
 .ring-pulse {
-  animation: ringpulse 1.8s ease-out infinite;
+  box-shadow: 0 0 0 2px var(--ring);
 }
 
 /* ---------- Notes page view ---------- */
@@ -572,97 +558,81 @@ html:not([data-theme="dark"]) .liquid-field {
 .liquid-field .blob {
   position: absolute;
   border-radius: 50%;
-  filter: blur(85px);
-  will-change: transform;
-  transform: translate3d(0, 0, 0);
-  backface-visibility: hidden;
   pointer-events: none;
 }
 
-/* Dark Mode Liquid Blobs (Rich, vibrant fluid luminescence behind glass) */
+/* Dark Mode Liquid Blobs (Static, zero-GPU-overhead fluid luminescence) */
 html[data-theme="dark"] .liquid-field .blob.b1 {
-  width: 58vw;
-  height: 58vw;
+  width: 65vw;
+  height: 65vw;
   left: -10vw;
   top: -12vw;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 45%, transparent) 0%, transparent 68%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 36%, transparent) 0%, transparent 68%);
   opacity: 0.75;
-  animation: liquid-a 26s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
 html[data-theme="dark"] .liquid-field .blob.b2 {
-  width: 50vw;
-  height: 50vw;
+  width: 55vw;
+  height: 55vw;
   right: -8vw;
   top: 12vh;
-  background: radial-gradient(circle, rgba(56, 189, 248, 0.35) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.28) 0%, transparent 65%);
   opacity: 0.68;
-  animation: liquid-b 32s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
 html[data-theme="dark"] .liquid-field .blob.b3 {
-  width: 44vw;
-  height: 44vw;
+  width: 50vw;
+  height: 50vw;
   left: 18vw;
   bottom: -10vw;
-  background: radial-gradient(circle, rgba(192, 132, 252, 0.32) 0%, transparent 65%);
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.25) 0%, transparent 65%);
   opacity: 0.62;
-  animation: liquid-c 38s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
 html[data-theme="dark"] .liquid-field .blob.b4 {
-  width: 40vw;
-  height: 40vw;
+  width: 45vw;
+  height: 45vw;
   right: 18vw;
   bottom: 12vh;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 30%, rgba(245, 158, 11, 0.3)) 0%, transparent 65%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 24%, rgba(245, 158, 11, 0.22)) 0%, transparent 65%);
   opacity: 0.55;
-  animation: liquid-d 42s cubic-bezier(0.4, 0, 0.2, 1) infinite alternate;
 }
 
-/* Light Mode Liquid Blobs (Radiant pastel chromatic glow for high-contrast Apple frosted glass) */
+/* Light Mode Liquid Blobs (Static radiant chromatic glow for frosted glass) */
 html:not([data-theme="dark"]) .liquid-field .blob.b1 {
-  width: 58vw;
-  height: 58vw;
+  width: 65vw;
+  height: 65vw;
   left: -8vw;
   top: -10vw;
-  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 32%, #f43f5e) 0%, rgba(254, 205, 211, 0.65) 42%, transparent 70%);
+  background: radial-gradient(circle, color-mix(in srgb, var(--accent) 25%, #f43f5e) 0%, rgba(254, 205, 211, 0.50) 42%, transparent 70%);
   opacity: 0.68;
-  filter: blur(95px);
-  animation: liquid-a 28s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b2 {
-  width: 48vw;
-  height: 48vw;
+  width: 55vw;
+  height: 55vw;
   right: -6vw;
   top: 16vh;
-  background: radial-gradient(circle, rgba(14, 165, 233, 0.38) 0%, rgba(186, 230, 253, 0.65) 44%, transparent 70%);
+  background: radial-gradient(circle, rgba(14, 165, 233, 0.28) 0%, rgba(186, 230, 253, 0.50) 44%, transparent 70%);
   opacity: 0.62;
-  filter: blur(95px);
-  animation: liquid-b 34s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b3 {
-  width: 44vw;
-  height: 44vw;
+  width: 50vw;
+  height: 50vw;
   left: 20vw;
   bottom: -8vw;
-  background: radial-gradient(circle, rgba(168, 85, 247, 0.32) 0%, rgba(233, 213, 255, 0.60) 45%, transparent 70%);
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.24) 0%, rgba(233, 213, 255, 0.45) 45%, transparent 70%);
   opacity: 0.58;
-  filter: blur(95px);
-  animation: liquid-c 40s ease-in-out infinite alternate;
 }
 
 html:not([data-theme="dark"]) .liquid-field .blob.b4 {
-  width: 40vw;
-  height: 40vw;
+  width: 45vw;
+  height: 45vw;
   right: 18vw;
   bottom: 8vh;
-  background: radial-gradient(circle, rgba(245, 158, 11, 0.30) 0%, rgba(254, 240, 138, 0.58) 48%, transparent 70%);
+  background: radial-gradient(circle, rgba(245, 158, 11, 0.22) 0%, rgba(254, 240, 138, 0.45) 48%, transparent 70%);
   opacity: 0.56;
-  filter: blur(95px);
-  animation: liquid-d 44s ease-in-out infinite alternate;
 }
 
 @keyframes liquid-a {

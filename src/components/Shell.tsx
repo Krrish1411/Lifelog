@@ -1328,7 +1328,7 @@ function StatusBar({
   const [, force] = useState(0);
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => force((x) => x + 1), 500);
+    const t = setInterval(() => force((x) => x + 1), 1000);
     return () => clearInterval(t);
   }, [running]);
 
@@ -1385,7 +1385,7 @@ function StatusBarDesk({
   const [, force] = useState(0);
   useEffect(() => {
     if (!running) return;
-    const t = setInterval(() => force((x) => x + 1), 500);
+    const t = setInterval(() => force((x) => x + 1), 1000);
     return () => clearInterval(t);
   }, [running]);
 
@@ -1440,10 +1440,13 @@ function MiniTimer() {
     }
   });
 
+  const running = state.sessions.find((s) => s.status === "running");
+
   useEffect(() => {
-    const t = setInterval(() => force((x) => x + 1), 250);
+    if (!running) return;
+    const t = setInterval(() => force((x) => x + 1), 1000);
     return () => clearInterval(t);
-  }, []);
+  }, [running]);
 
   const toggleMinimize = () => {
     setMinimized((m) => {
@@ -1461,8 +1464,6 @@ function MiniTimer() {
 
   // Never show floating mini-timer when user is already viewing the full Focus view
   if (view === "focus") return null;
-
-  const running = state.sessions.find((s) => s.status === "running");
   if (!running) return null;
 
   const openPause = running.pauses.length > 0 && running.pauses[running.pauses.length - 1].resumeAt === null;

@@ -16,12 +16,13 @@ export function TimerPopout() {
   // Apply user theme, tokens, fonts, and dark/light modes
   useApplyTheme(state.settings);
 
-  useEffect(() => {
-    const t = setInterval(() => force((x) => x + 1), 250);
-    return () => clearInterval(t);
-  }, []);
-
   const running = state.sessions.find((s) => s.status === "running");
+
+  useEffect(() => {
+    if (!running) return;
+    const t = setInterval(() => force((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [running]);
   const openPause =
     running &&
     running.pauses.length > 0 &&
