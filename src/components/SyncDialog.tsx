@@ -362,7 +362,8 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
   };
 
   return (
-    <Modal
+    <>
+      <Modal
       open={open}
       onClose={() => {
         if (!isConnectedOrSyncing) {
@@ -866,12 +867,13 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
           </div>
         )}
       </div>
-
-      <DiffConflictModal
-        open={diffModalOpen}
-        onClose={() => setDiffModalOpen(false)}
-        peerDeviceName={peer?.deviceName || "Paired Device"}
-      />
     </Modal>
-  );
+
+    <DiffConflictModal
+      open={diffModalOpen}
+      onClose={() => setDiffModalOpen(false)}
+      peerDeviceName={peer?.deviceName || "Paired Device"}
+    />
+  </>
+);
 };

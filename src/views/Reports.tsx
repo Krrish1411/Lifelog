@@ -20,11 +20,11 @@ export function ReportsView() {
   });
   const [to, setTo] = useState(() => todayIso());
   const [exportModalOpen, setExportModalOpen] = useState(false);
-  const [pdfScope, setPdfScope] = useState<"summary" | "top5" | "custom" | "all">("summary");
+  const [pdfScope, setPdfScope] = useState<"summary" | "top5" | "custom" | "all">("top5");
   const [selectedTaskKeys, setSelectedTaskKeys] = useState<Set<string>>(new Set());
   const [taskSearchQuery, setTaskSearchQuery] = useState("");
   const [isPrinting, setIsPrinting] = useState(false);
-  const [activePrintScope, setActivePrintScope] = useState<"summary" | "top5" | "custom" | "all">("summary");
+  const [activePrintScope, setActivePrintScope] = useState<"summary" | "top5" | "custom" | "all">("top5");
 
   const applyPreset = (p: Preset) => {
     setPreset(p);
@@ -531,6 +531,8 @@ export function ReportsView() {
                           : "var(--panel2)",
                         boxShadow: isCur && wk.min > 0 ? "0 0 10px -2px var(--accent)" : undefined,
                         opacity: wk.min > 0 || isCur ? 1 : 0.6,
+                        WebkitPrintColorAdjust: "exact",
+                        printColorAdjust: "exact",
                       }}
                     />
                   </div>
@@ -667,12 +669,12 @@ export function ReportsView() {
                 <span className="chip !py-0 text-[10.5px]" style={{ color: "var(--ok)" }}>{calibSummary.under} under</span>
                 <span className="chip !py-0 text-[10.5px]" style={{ color: "var(--mut)" }}>{calibSummary.accurate} on target</span>
               </div>
-              <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">
+              <div className="flex max-h-[360px] print:max-h-none flex-col gap-2 overflow-y-auto print:overflow-visible pr-1">
                 {displayedCalibration.map((r) => {
                   const max = Math.max(r.planned, r.actual, 1);
-                  const col = r.status === "over" ? "var(--danger)" : r.status === "under" ? "var(--ok)" : "var(--accent)";
+                  const col = r.status === "over" ? "#dc2626" : r.status === "under" ? "#16a34a" : "var(--accent)";
                   return (
-                    <div key={r.key} className="rounded-xl border px-3 py-2.5 transition-all hover:-translate-y-px hover:border-[var(--accent)]"
+                    <div key={r.key} className="rounded-xl border px-3 py-2.5 transition-all hover:-translate-y-px hover:border-[var(--accent)] print:border-slate-300 print:bg-white"
                       style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                       <div className="flex items-center gap-2 text-[12.5px] font-bold">
                         {r.emoji && <span>{r.emoji}</span>}
@@ -682,18 +684,40 @@ export function ReportsView() {
                           {r.status === "over" ? `▲ ${r.pct}% over` : r.status === "under" ? `▼ ${Math.abs(r.pct)}% under` : "● on target"}
                         </span>
                       </div>
-                      <div className="mt-2 flex flex-col gap-1">
+                      <div className="mt-2 flex flex-col gap-1.5">
                         <div className="flex items-center gap-2">
                           <span className="w-[56px] shrink-0 text-[9.5px] font-bold uppercase tracking-wide" style={{ color: "var(--mut)" }}>Planned</span>
-                          <div className="h-[7px] flex-1 overflow-hidden rounded-full" style={{ background: "var(--panel2)" }}>
-                            <div className="h-full rounded-full" style={{ width: `${(r.planned / max) * 100}%`, background: "color-mix(in srgb, var(--mut) 65%, transparent)" }} />
+                          <div
+                            className="h-[8px] flex-1 overflow-hidden rounded-full border border-[var(--line)] print:border-slate-300"
+                            style={{ background: "var(--panel2)", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+                          >
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${Math.max(2, (r.planned / max) * 100)}%`,
+                                background: "#94a3b8",
+                                WebkitPrintColorAdjust: "exact",
+                                printColorAdjust: "exact",
+                              }}
+                            />
                           </div>
                           <span className="tnum w-[56px] shrink-0 text-right font-mono text-[10.5px] font-bold" style={{ color: "var(--mut)" }}>{fmtDur(r.planned)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="w-[56px] shrink-0 text-[9.5px] font-bold uppercase tracking-wide" style={{ color: "var(--accent)" }}>Actual</span>
-                          <div className="h-[7px] flex-1 overflow-hidden rounded-full" style={{ background: "var(--panel2)" }}>
-                            <div className="h-full rounded-full transition-all duration-500" style={{ width: `${(r.actual / max) * 100}%`, background: col }} />
+                          <div
+                            className="h-[8px] flex-1 overflow-hidden rounded-full border border-[var(--line)] print:border-slate-300"
+                            style={{ background: "var(--panel2)", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+                          >
+                            <div
+                              className="h-full rounded-full transition-all duration-500"
+                              style={{
+                                width: `${Math.max(2, (r.actual / max) * 100)}%`,
+                                background: col,
+                                WebkitPrintColorAdjust: "exact",
+                                printColorAdjust: "exact",
+                              }}
+                            />
                           </div>
                           <span className="tnum w-[56px] shrink-0 text-right font-mono text-[10.5px] font-bold">{fmtDur(r.actual)}</span>
                         </div>
@@ -711,16 +735,32 @@ export function ReportsView() {
 
         {/* Daily Pair: Energy & mood (1-col) + Top tags (1-col) */}
         {w.energy && widgetCard("Energy & mood", "daily check-ins", (
-          <div className="flex max-h-[300px] flex-col gap-1.5 overflow-y-auto pr-1">
+          <div className="flex max-h-[300px] print:max-h-none flex-col gap-1.5 overflow-y-auto print:overflow-visible pr-1">
             {energies.length === 0 && (
               <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No check-ins in range — log one from the dashboard.</div>
             )}
             {[...energies].reverse().map(({ iso, log }) => (
-              <div key={iso} className="rounded-lg px-2.5 py-1.5" style={{ background: "var(--bg)" }}>
+              <div key={iso} className="rounded-lg px-2.5 py-1.5 print:border print:border-slate-200" style={{ background: "var(--bg)" }}>
                 <div className="flex items-center gap-2.5">
                   <span className="w-[76px] shrink-0 text-[10.5px] font-bold tnum" style={{ color: "var(--mut)" }}>{fmtDayShort(iso)}</span>
-                  <div className="h-[7px] flex-1 overflow-hidden rounded-full" style={{ background: "var(--panel2)" }}>
-                    <div className="h-full rounded-full" style={{ width: `${(log!.energy ?? 0) * 20}%`, background: (log!.energy ?? 0) >= 4 ? "var(--ok)" : (log!.energy ?? 0) >= 3 ? "var(--warn)" : "var(--danger)" }} />
+                  <div
+                    className="h-[8px] flex-1 overflow-hidden rounded-full border border-[var(--line)] print:border-slate-300"
+                    style={{ background: "var(--panel2)", WebkitPrintColorAdjust: "exact", printColorAdjust: "exact" }}
+                  >
+                    <div
+                      className="h-full rounded-full"
+                      style={{
+                        width: `${Math.max(4, (log!.energy ?? 0) * 20)}%`,
+                        background:
+                          (log!.energy ?? 0) >= 4
+                            ? "#16a34a"
+                            : (log!.energy ?? 0) >= 3
+                            ? "#d97706"
+                            : "#dc2626",
+                        WebkitPrintColorAdjust: "exact",
+                        printColorAdjust: "exact",
+                      }}
+                    />
                   </div>
                   <span className="w-[30px] shrink-0 text-right font-mono text-[11px] font-bold tnum">{log!.energy != null ? `${log!.energy}/5` : "—"}</span>
                   <span className="w-[20px] shrink-0 text-center text-[13px]">{log!.moodEmoji ?? ""}</span>
@@ -760,24 +800,24 @@ export function ReportsView() {
           <div className="flex flex-col gap-2">
             {[
               {
-                id: "summary",
-                title: "⚡ Executive Summary (Instant, 0 Lag)",
-                desc: "Includes summary totals, category breakdowns, habit streaks, and top tags. Omits detailed per-task rows.",
-              },
-              {
                 id: "top5",
-                title: "🎯 Summary + Top 5 Misses",
-                desc: "High-level summary plus the top 5 largest estimate variances for quick audit.",
-              },
-              {
-                id: "custom",
-                title: "📋 Custom Task Selection",
-                desc: "Choose specific tasks or projects to include in the breakdown.",
+                title: "🎯 Summary + Key Tasks (Recommended, 0 Lag)",
+                desc: "High-level summary, rhythm charts, streaks, and top tags, plus top 5 estimate vs actual tasks with their complete progress bars.",
               },
               {
                 id: "all",
                 title: `📜 Full Detailed (${calibration.length} items)`,
-                desc: "Includes every single estimated item in this date range.",
+                desc: "Includes all estimated items in this date range with their complete progress bars.",
+              },
+              {
+                id: "custom",
+                title: "📋 Custom Task Selection",
+                desc: "Choose specific tasks or projects to include in the breakdown with their progress bars.",
+              },
+              {
+                id: "summary",
+                title: "⚡ Overview Only (No Task Table)",
+                desc: "Summary totals, category breakdowns, streaks, and tags. Omits detailed per-task rows for maximum brevity.",
               },
             ].map((opt) => {
               const selected = pdfScope === opt.id;
@@ -1048,6 +1088,8 @@ function TimeOfDayChart({
                       : "var(--panel2)",
                   boxShadow: isPeak ? "0 0 10px -2px var(--accent)" : undefined,
                   opacity: v > 0 ? 1 : 0.45,
+                  WebkitPrintColorAdjust: "exact",
+                  printColorAdjust: "exact",
                 }}
               />
             </div>

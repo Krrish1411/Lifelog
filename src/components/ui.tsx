@@ -626,10 +626,22 @@ export function BarRow({
         <span className="flex min-w-0 items-center gap-1.5 truncate font-bold">{label}</span>
         <span className="tnum shrink-0 font-semibold" style={{ color: "var(--mut)" }}>{right}</span>
       </div>
-      <div className="h-[7px] overflow-hidden rounded-full" style={{ background: "var(--bg)" }}>
+      <div
+        className="h-[7px] overflow-hidden rounded-full border border-[var(--line)] print:border-slate-300"
+        style={{
+          background: "var(--panel2)",
+          WebkitPrintColorAdjust: "exact",
+          printColorAdjust: "exact",
+        }}
+      >
         <div
           className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${pct}%`, background: color }}
+          style={{
+            width: `${pct}%`,
+            background: color,
+            WebkitPrintColorAdjust: "exact",
+            printColorAdjust: "exact",
+          }}
         />
       </div>
       {sub && <div className="mt-0.5 text-[11px]" style={{ color: "var(--mut)" }}>{sub}</div>}
