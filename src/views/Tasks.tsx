@@ -160,6 +160,76 @@ export function TasksView({
     });
   }, [state.tasks, state.settings.tagOrder]);
 
+  const isLifeLog = typeof sel === "object" && "project" in sel && sel.project === LIFE_LOG_PROJECT_ID;
+  const [routineCat, setRoutineCat] = useState<string>("sleep");
+  const [routineTitle, setRoutineTitle] = useState<string>("");
+  const [routineDuration, setRoutineDuration] = useState<string>("450");
+  const [routineDateChoice, setRoutineDateChoice] = useState<"today" | "yesterday" | "custom">("today");
+  const [routineCustomDate, setRoutineCustomDate] = useState<string>(today);
+
+  const yesterday = useMemo(() => {
+    const d = new Date();
+    d.setDate(d.getDate() - 1);
+    return isoDate(d);
+  }, []);
+
+  const effectiveLogDate = routineDateChoice === "yesterday" ? yesterday : routineDateChoice === "custom" ? routineCustomDate : today;
+
+  const handleQuickLog = (asCompleted: boolean) => {
+    const cat = LIFE_LOG_CATEGORIES.find((c) => c.id === routineCat) || LIFE_LOG_CATEGORIES[0];
+    const durNum = Math.max(5, parseInt(routineDuration || "30", 10) || 30);
+    const finalTitle = routineTitle.trim() || (cat.id === "sleep" ? "Night Sleep" : cat.id === "routine" ? "Daily Routine" : `${cat.label}`);
+
+    const newTask: Task = {
+      id: uid(),
+      projectId: LIFE_LOG_PROJECT_ID,
+      title: finalTitle,
+      notes: "",
+      emoji: cat.emoji,
+      priority: "medium",
+      tags: [cat.tag],
+      estimateMin: durNum,
+      durationMin: durNum,
+      due: effectiveLogDate,
+      dueTime: null,
+      recurrence: null,
+      subtasks: [],
+      order: Date.now(),
+      done: asCompleted,
+      doneAt: asCompleted ? Date.now() : null,
+      createdAt: Date.now(),
+      completions: asCompleted ? [{ at: Date.now() }] : [],
+      snoozedUntil: null,
+      privateNote: null,
+    };
+
+    set((s) => ({ ...s, tasks: [newTask, ...s.tasks] }));
+    setRoutineTitle("");
+    toast(asCompleted ? `Logged ${fmtDur(durNum)} ${cat.label}` : `Planned ${finalTitle}`, "ok");
+  };
+
+  const lifeDayStats = useMemo(() => {
+    if (!isLifeLog) return null;
+    const targetDate = effectiveLogDate;
+    const dayTasks = state.tasks.filter(
+      (t) => t.projectId === LIFE_LOG_PROJECT_ID && (t.due === targetDate || (!t.due && isoDate(new Date(t.createdAt)) === targetDate))
+    );
+    const totalMin = dayTasks.reduce((sum, t) => sum + (t.durationMin || t.estimateMin || 0), 0);
+    const sleepMin = dayTasks
+      .filter((t) => t.tags.includes("sleep"))
+      .reduce((sum, t) => sum + (t.durationMin || t.estimateMin || 0), 0);
+    const otherMin = Math.max(0, totalMin - sleepMin);
+    const dayPct = Math.min(100, Math.round((totalMin / 1440) * 100)); // 1440 min = 24h
+    return {
+      totalMin,
+      sleepMin,
+      otherMin,
+      dayPct,
+      count: dayTasks.length,
+      targetDate,
+    };
+  }, [isLifeLog, state.tasks, effectiveLogDate]);
+
   const openTasks = useMemo(() => state.tasks.filter((t) => !t.done), [state.tasks]);
   const inboxCount = openTasks.filter((t) => !t.due).length;
   const todayCount = openTasks.filter(
@@ -168,6 +238,23 @@ export function TasksView({
   const allCount = openTasks.length;
 
   const list = useMemo(() => {
+    if (isLifeLog) {
+      let base = state.tasks.filter((t) => t.projectId === LIFE_LOG_PROJECT_ID);
+      const q = query.trim().toLowerCase();
+      if (q) {
+        base = base.filter((t) =>
+          `${t.title} ${t.notes} ${t.tags.join(" ")}`.toLowerCase().includes(q)
+        );
+      }
+      return [...base].sort((a, b) => {
+        if (a.done !== b.done) return a.done ? 1 : -1;
+        const dateA = a.due || isoDate(new Date(a.createdAt));
+        const dateB = b.due || isoDate(new Date(b.createdAt));
+        if (dateA !== dateB) return dateB.localeCompare(dateA);
+        return (b.doneAt || b.createdAt) - (a.doneAt || a.createdAt);
+      });
+    }
+
     let base = openTasks;
     if (sel === "inbox") base = base.filter((t) => !t.due);
     else if (sel === "today")
@@ -188,7 +275,6 @@ export function TasksView({
       );
 
     if (sortMode === "manual") {
-      // Respect manual ordering (index in state.tasks)
       return [...base];
     } else if (sortMode === "due") {
       return [...base].sort((a, b) => {
@@ -201,9 +287,10 @@ export function TasksView({
       const pw = { urgent: 0, high: 1, medium: 2, low: 3 };
       return [...base].sort((a, b) => pw[a.priority] - pw[b.priority]);
     }
-  }, [openTasks, sel, query, today, sortMode]);
+  }, [openTasks, state.tasks, isLifeLog, sel, query, today, sortMode]);
 
   const completed = useMemo(() => {
+    if (isLifeLog) return [];
     let base = state.tasks.filter((t) => t.done);
     if (typeof sel === "object" && "project" in sel)
       base = base.filter((t) => t.projectId === sel.project);
@@ -212,14 +299,16 @@ export function TasksView({
     else if (typeof sel === "object" && "priority" in sel)
       base = base.filter((t) => t.priority === sel.priority);
     return base.sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
-  }, [state.tasks, sel]);
+  }, [state.tasks, isLifeLog, sel]);
 
   const selTitle = useMemo(() => {
     if (sel === "inbox") return "Inbox";
     if (sel === "today") return "Today";
     if (sel === "all") return "All tasks";
-    if ("project" in sel)
+    if ("project" in sel) {
+      if (sel.project === LIFE_LOG_PROJECT_ID) return "🌊 Life Log · Whole Day & Routine Tracker";
       return state.projects.find((p) => p.id === sel.project)?.name ?? "Project";
+    }
     if ("tag" in sel) return sel.tag;
     return PRIORITY_META[sel.priority].label;
   }, [sel, state.projects]);
@@ -839,6 +928,280 @@ export function TasksView({
           </div>
         </div>
 
+        {/* Life Log Whole Day Tracker & Quick Routine Logger */}
+        {isLifeLog && (
+          <div className="flex flex-col gap-3 mt-4">
+            {/* 1. Day Overview & Balance Summary Card */}
+            {lifeDayStats && (
+              <div
+                className="p-4 rounded-2xl border glass-regular shadow-xs flex flex-col gap-3"
+                style={{ borderColor: "color-mix(in srgb, var(--accent) 30%, var(--line))" }}
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="text-2xl">🌊</span>
+                    <div>
+                      <div className="font-display text-sm font-bold flex items-center gap-2">
+                        <span>
+                          {effectiveLogDate === today ? "Today’s Routine Log" : effectiveLogDate === yesterday ? "Yesterday’s Routine Log" : `Log for ${effectiveLogDate}`}
+                        </span>
+                        <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-bold">
+                          {fmtDur(lifeDayStats.totalMin)} tracked
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-[var(--mut)]">
+                        {lifeDayStats.sleepMin > 0
+                          ? `😴 ${fmtDur(lifeDayStats.sleepMin)} Sleep · ${fmtDur(lifeDayStats.otherMin)} Routines & Activities`
+                          : "No sleep logged for this day yet · Log anytime below"}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Date Quick Switcher */}
+                  <div className="flex items-center gap-1 bg-[var(--panel2)] p-1 rounded-xl border border-[var(--line)] text-xs">
+                    <button
+                      type="button"
+                      onClick={() => setRoutineDateChoice("today")}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                        routineDateChoice === "today"
+                          ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
+                          : "text-[var(--mut)] hover:text-[var(--text)]"
+                      )}
+                    >
+                      Today
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRoutineDateChoice("yesterday")}
+                      className={cn(
+                        "px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                        routineDateChoice === "yesterday"
+                          ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
+                          : "text-[var(--mut)] hover:text-[var(--text)]"
+                      )}
+                    >
+                      Yesterday
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRoutineDateChoice("custom")}
+                      className={cn(
+                        "px-2 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                        routineDateChoice === "custom"
+                          ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
+                          : "text-[var(--mut)] hover:text-[var(--text)]"
+                      )}
+                    >
+                      Custom
+                    </button>
+                  </div>
+                </div>
+
+                {routineDateChoice === "custom" && (
+                  <div className="flex items-center gap-2 pt-1 border-t border-[var(--line)]/50">
+                    <span className="text-xs font-semibold text-[var(--mut)]">Target Date:</span>
+                    <input
+                      type="date"
+                      value={routineCustomDate}
+                      onChange={(e) => setRoutineCustomDate(e.target.value)}
+                      className="inp !py-1 !px-2 text-xs w-[160px]"
+                    />
+                  </div>
+                )}
+
+                {/* 24-hour day coverage bar */}
+                <div>
+                  <div className="flex items-center justify-between text-[11px] mb-1 font-semibold text-[var(--mut)]">
+                    <span>24h Day Coverage ({lifeDayStats.dayPct}%)</span>
+                    <span>{fmtDur(Math.max(0, 1440 - lifeDayStats.totalMin))} unlogged</span>
+                  </div>
+                  <div className="h-2 rounded-full overflow-hidden flex bg-[var(--panel2)] border border-[var(--line)]">
+                    {lifeDayStats.sleepMin > 0 && (
+                      <div
+                        className="h-full bg-indigo-500 transition-all duration-300"
+                        style={{ width: `${Math.min(100, (lifeDayStats.sleepMin / 1440) * 100)}%` }}
+                        title={`Sleep: ${fmtDur(lifeDayStats.sleepMin)}`}
+                      />
+                    )}
+                    {lifeDayStats.otherMin > 0 && (
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-300"
+                        style={{ width: `${Math.min(100, (lifeDayStats.otherMin / 1440) * 100)}%` }}
+                        title={`Routines & Activities: ${fmtDur(lifeDayStats.otherMin)}`}
+                      />
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 2. Quick Routine & Sleep Logger Card */}
+            <div
+              className="p-4 rounded-2xl border glass-regular shadow-xs flex flex-col gap-3.5"
+              style={{ borderColor: "var(--line)" }}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
+                  <span>✨</span> Quick Log Routine or Activity
+                </div>
+                <div className="text-[11px] text-[var(--mut)]">
+                  Log anytime · Night or Day
+                </div>
+              </div>
+
+              {/* Category chips */}
+              <div className="flex flex-wrap gap-1.5">
+                {LIFE_LOG_CATEGORIES.map((cat) => {
+                  const active = routineCat === cat.id;
+                  return (
+                    <button
+                      key={cat.id}
+                      type="button"
+                      onClick={() => {
+                        setRoutineCat(cat.id);
+                        if (cat.id === "sleep" && (!routineDuration || Number(routineDuration) <= 60)) {
+                          setRoutineDuration("450");
+                        } else if (cat.id !== "sleep" && Number(routineDuration) > 180) {
+                          setRoutineDuration("45");
+                        }
+                      }}
+                      className={cn(
+                        "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                        active
+                          ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-xs scale-105"
+                          : "bg-[var(--panel2)] border-[var(--line)] text-[var(--text)] hover:border-[var(--accent)]/60"
+                      )}
+                    >
+                      <span>{cat.emoji}</span>
+                      <span>{cat.label}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Duration selection */}
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-bold text-[var(--mut)] shrink-0">Duration:</span>
+                <div className="flex flex-wrap items-center gap-1">
+                  {routineCat === "sleep"
+                    ? [
+                        { m: 360, l: "6h" },
+                        { m: 420, l: "7h" },
+                        { m: 450, l: "7.5h" },
+                        { m: 480, l: "8h" },
+                        { m: 510, l: "8.5h" },
+                        { m: 540, l: "9h" },
+                      ].map((item) => (
+                        <button
+                          key={item.m}
+                          type="button"
+                          onClick={() => setRoutineDuration(String(item.m))}
+                          className={cn(
+                            "chip !py-1 !px-2.5 text-xs font-bold cursor-pointer transition-all",
+                            routineDuration === String(item.m)
+                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)]"
+                              : "hover:border-[var(--accent)]"
+                          )}
+                        >
+                          {item.l}
+                        </button>
+                      ))
+                    : [
+                        { m: 15, l: "15m" },
+                        { m: 30, l: "30m" },
+                        { m: 45, l: "45m" },
+                        { m: 60, l: "1h" },
+                        { m: 90, l: "1.5h" },
+                        { m: 120, l: "2h" },
+                      ].map((item) => (
+                        <button
+                          key={item.m}
+                          type="button"
+                          onClick={() => setRoutineDuration(String(item.m))}
+                          className={cn(
+                            "chip !py-1 !px-2.5 text-xs font-bold cursor-pointer transition-all",
+                            routineDuration === String(item.m)
+                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)]"
+                              : "hover:border-[var(--accent)]"
+                          )}
+                        >
+                          {item.l}
+                        </button>
+                      ))}
+                </div>
+
+                <div className="flex items-center gap-1.5 ml-auto">
+                  <input
+                    type="number"
+                    min={5}
+                    step={5}
+                    value={routineDuration}
+                    onChange={(e) => setRoutineDuration(e.target.value)}
+                    placeholder="Duration"
+                    className="inp !py-1 !px-2 text-xs w-[76px] text-right font-mono"
+                  />
+                  <span className="text-xs text-[var(--mut)] font-mono">min</span>
+                  {routineDuration && Number(routineDuration) >= 60 && (
+                    <span className="text-[11px] font-mono text-[var(--accent)] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-soft)]">
+                      ({fmtDur(Number(routineDuration))})
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Title Input & Action buttons */}
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 pt-1">
+                <input
+                  type="text"
+                  value={routineTitle}
+                  onChange={(e) => setRoutineTitle(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleQuickLog(true);
+                    }
+                  }}
+                  placeholder={
+                    routineCat === "sleep"
+                      ? "Night sleep (e.g. 11pm - 6:30am)"
+                      : routineCat === "routine"
+                      ? "Morning / Evening routine, skincare, meditation..."
+                      : routineCat === "watch"
+                      ? "Watched documentary / podcast / movie..."
+                      : routineCat === "build"
+                      ? "Personal project / vibe coding / side app..."
+                      : routineCat === "move"
+                      ? "Gym workout / outdoor walk / running..."
+                      : `Log ${LIFE_LOG_CATEGORIES.find((c) => c.id === routineCat)?.label || "activity"} details...`
+                  }
+                  className="inp flex-1 text-xs"
+                />
+
+                <div className="flex items-center gap-2 shrink-0">
+                  <Btn
+                    variant="primary"
+                    size="sm"
+                    onClick={() => handleQuickLog(true)}
+                    className="whitespace-nowrap flex-1 sm:flex-initial"
+                  >
+                    <Check size={13} /> <span>Log Routine Entry</span>
+                  </Btn>
+                  <Btn
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleQuickLog(false)}
+                    title="Plan as an active to-do item for later"
+                    className="whitespace-nowrap flex-1 sm:flex-initial"
+                  >
+                    <Plus size={13} /> <span>Plan To-Do</span>
+                  </Btn>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="stagger mt-4 flex flex-col gap-2">
           {/* Top Drop Target for dropping to the very top in manual mode */}
           {sortMode === "manual" && list.length > 0 && (
@@ -868,17 +1231,19 @@ export function TasksView({
             <div className="card">
               <EmptyState
                 icon={sel === "inbox" ? Inbox : ListChecks}
-                title={sel === "inbox" ? "Inbox zero" : `Nothing in “${selTitle}”`}
+                title={sel === "inbox" ? "Inbox zero" : isLifeLog ? "No routines logged yet" : `Nothing in “${selTitle}”`}
                 body={
                   query
                     ? "No tasks match your search."
+                    : isLifeLog
+                    ? "Track your daily sleep, morning & night routines, or hobbies using the quick logger above!"
                     : sel === "inbox"
                     ? "Tasks without a date land here. Give them a day or schedule them on the calendar."
                     : "Add a task and it will show up here."
                 }
               >
-                <Btn variant="primary" onClick={() => openTaskDialog()}>
-                  <Plus size={13} /> New task
+                <Btn variant="primary" onClick={() => isLifeLog ? handleQuickLog(true) : openTaskDialog()}>
+                  <Plus size={13} /> {isLifeLog ? "Log First Routine" : "New task"}
                 </Btn>
               </EmptyState>
             </div>
@@ -1320,7 +1685,7 @@ function TaskCard({
               {(t.durationMin || t.estimateMin) ? (
                 <span className="chip !py-0.5 text-[10px] font-mono text-[var(--mut)]">
                   <Clock size={10} className="text-sky-500" />
-                  <span>{t.durationMin || t.estimateMin}m logged</span>
+                  <span>{fmtDur(t.durationMin || t.estimateMin)} {t.done ? "logged" : "planned"}</span>
                 </span>
               ) : null}
 

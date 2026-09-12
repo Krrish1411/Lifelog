@@ -203,22 +203,6 @@ export function Shell() {
     return syncEngine.onStatusChange((s) => setSyncStatus(s));
   }, []);
 
-  // Desktop keyboard shortcuts: Ctrl+K / Cmd+K (Palette), Ctrl+N / Cmd+N (Task)
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      const isMac = typeof navigator !== "undefined" && /mac/i.test(navigator.platform);
-      const mod = isMac ? e.metaKey : e.ctrlKey;
-      if (mod && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        setPaletteOpen((o) => !o);
-      } else if (mod && e.key.toLowerCase() === "n") {
-        e.preventDefault();
-        openTaskDialog();
-      }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [openTaskDialog]);
 
   // Desktop Global Shortcut (Ctrl+Shift+Space / Cmd+Shift+Space) Quick Add
   useEffect(() => {
@@ -659,7 +643,7 @@ export function Shell() {
         {mobileBar}
         {mobileDrawer}
         <aside
-          className="fixed inset-y-0 left-0 z-40 hidden w-[74px] flex-col items-center gap-1.5 border-r py-5 md:flex md:w-[84px] select-none glass-regular"
+          className="fixed inset-y-0 left-0 z-40 hidden w-[74px] flex-col items-center gap-1.5 border-r py-5 md:flex md:w-[84px] select-none glass-regular overflow-y-auto overflow-x-hidden scrollbar-none"
           style={{ borderColor: "var(--line)" }}
         >
           <Logo small />
@@ -691,7 +675,7 @@ export function Shell() {
             </button>
             <button
               onClick={() => setPaletteOpen(true)}
-              title="Command Palette (Ctrl+K)"
+              title="Command Palette (Ctrl+K / K)"
               className="flex h-9 w-9 items-center justify-center rounded-xl border transition-all hover:scale-105 cursor-pointer"
               style={{ borderColor: "var(--line)", color: "var(--mut)", background: "var(--panel2)" }}
             >
@@ -721,7 +705,7 @@ export function Shell() {
           </div>
         </aside>
 
-        <main className="zoomable ml-0 w-full px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:ml-[84px] md:w-[calc(100%-84px)] md:px-6 md:py-6">
+        <main className="zoomable relative z-10 ml-0 w-full px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:ml-[84px] md:w-[calc(100%-84px)] md:px-6 md:py-6">
           <div className="w-full">{activeViewContent}</div>
         </main>
 
@@ -744,8 +728,8 @@ export function Shell() {
         {mobileBar}
         {mobileDrawer}
         <header
-          className="sticky top-0 z-40 hidden h-[56px] items-center gap-3 border-b px-5 md:flex select-none"
-          style={{ background: "var(--panel)", borderColor: "var(--line)" }}
+          className="fixed top-0 inset-x-0 z-40 hidden h-[56px] items-center gap-3 border-b px-5 md:flex select-none glass-regular"
+          style={{ borderColor: "var(--line)" }}
         >
           <Logo small />
           <nav className="flex flex-1 items-center gap-1 overflow-x-auto">
@@ -785,7 +769,7 @@ export function Shell() {
               onClick={() => setPaletteOpen(true)}
               className="flex h-8 w-8 items-center justify-center rounded-lg border transition-all cursor-pointer"
               style={{ borderColor: "var(--line)", color: "var(--mut)", background: "var(--panel2)" }}
-              title="Search (Ctrl+K)"
+              title="Search (Ctrl+K / K)"
             >
               <Search size={14} />
             </button>
@@ -798,7 +782,7 @@ export function Shell() {
           </div>
         </header>
 
-        <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-6 md:py-6 md:pb-20">
+        <main className="zoomable relative z-10 min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:pt-[72px] md:px-6 md:pb-20">
           <div className="w-full">{activeViewContent}</div>
         </main>
 
@@ -824,11 +808,11 @@ export function Shell() {
   /* ============================ 3. DESK ENGINE (Workspace Sidebar + Status Bar) ============================ */
   if (layout === "desk") {
     return (
-      <div className="relative flex min-h-screen flex-col md:flex-row">
+      <div className="relative min-h-screen">
         {mobileBar}
         {mobileDrawer}
         <aside
-          className="sticky top-0 z-40 hidden h-screen w-[236px] shrink-0 flex-col border-r p-4 md:flex select-none glass-regular"
+          className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r p-4 md:flex select-none glass-regular overflow-y-auto overflow-x-hidden scrollbar-none"
           style={{ borderColor: "var(--line)" }}
         >
           <div className="flex items-center justify-between">
@@ -863,7 +847,7 @@ export function Shell() {
               onClick={() => setPaletteOpen(true)}
               className="flex h-8 w-8 items-center justify-center rounded-lg border transition-all cursor-pointer"
               style={{ borderColor: "var(--line)", color: "var(--mut)", background: "var(--panel2)" }}
-              title="Search (Ctrl+K)"
+              title="Search (Ctrl+K / K)"
             >
               <Search size={14} />
             </button>
@@ -891,17 +875,15 @@ export function Shell() {
           </div>
         </aside>
 
-        <div className="flex min-h-screen w-full flex-1 min-w-0 flex-col">
-          <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-8 md:pt-6 md:pb-20">
-            <div className="w-full">{activeViewContent}</div>
-          </main>
-          <StatusBarDesk
-            dueToday={dueToday}
-            todayMin={tracked.get(today) ?? 0}
-            bestStreak={bestStreak}
-            goFocus={() => setView("focus")}
-          />
-        </div>
+        <main className="zoomable relative z-10 ml-0 w-full px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:ml-[236px] md:w-[calc(100%-236px)] md:px-8 md:pt-6 md:pb-20">
+          <div className="w-full">{activeViewContent}</div>
+        </main>
+        <StatusBarDesk
+          dueToday={dueToday}
+          todayMin={tracked.get(today) ?? 0}
+          bestStreak={bestStreak}
+          goFocus={() => setView("focus")}
+        />
 
         <Overlays
           greeting={greeting}
@@ -918,14 +900,14 @@ export function Shell() {
   /* ============================ 4. ZEN ENGINE (Full-screen Cockpit) ============================ */
   if (layout === "zen") {
     return (
-      <div className="relative flex min-h-screen flex-col md:flex-row">
+      <div className="relative min-h-screen">
         {mobileBar}
         {mobileDrawer}
         <div className="ambient" style={{ opacity: 0.5 }}>
           <div className="grid-lines" />
         </div>
         <aside
-          className="sticky top-0 z-40 hidden h-screen w-[68px] flex-col items-center gap-1.5 border-r py-4 backdrop-blur-md md:flex select-none"
+          className="fixed inset-y-0 left-0 z-40 hidden w-[68px] flex-col items-center gap-1.5 border-r py-4 backdrop-blur-md md:flex select-none overflow-y-auto overflow-x-hidden scrollbar-none"
           style={{ background: "color-mix(in srgb, var(--bg) 80%, transparent)", borderColor: "var(--line)" }}
         >
           <Logo small />
@@ -978,7 +960,7 @@ export function Shell() {
           </div>
         </aside>
 
-        <div className="relative z-10 flex min-h-screen w-full flex-col md:w-[calc(100%-68px)]">
+        <div className="relative z-10 ml-0 w-full min-h-screen md:ml-[68px] md:w-[calc(100%-68px)]">
           {view === "dashboard" && zenConfig && (
             <div
               className="pop mx-4 mt-4 flex flex-wrap items-center gap-4 rounded-2xl border px-4 py-2.5 md:mx-6 shadow-xl"
@@ -1009,7 +991,7 @@ export function Shell() {
               </button>
             </div>
           )}
-          <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-7 md:py-6">
+          <main className="zoomable relative z-10 min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-7 md:py-6">
             <div className="w-full">{activeViewContent}</div>
           </main>
         </div>
@@ -1796,6 +1778,11 @@ function Overlays({
         setPaletteOpen((prev) => !prev);
         return;
       }
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "n") {
+        e.preventDefault();
+        openTaskDialog();
+        return;
+      }
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
       if (e.metaKey || e.ctrlKey || e.altKey) return;
@@ -1806,7 +1793,7 @@ function Overlays({
       e.preventDefault();
       switch (action) {
         case "commandPalette":
-          setPaletteOpen(true);
+          setPaletteOpen((prev) => !prev);
           break;
         case "newTask":
           openTaskDialog();
@@ -2038,9 +2025,12 @@ function Overlays({
         }}
         onNewTask={() => openTaskDialog()}
         onSelectTask={(t) => openTaskDialog({ taskId: t.id })}
-        onSelectNote={() => {
+        onSelectNote={(note) => {
           setView("notes");
           window.location.hash = "notes";
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent("lifelog:open-note", { detail: { noteId: note.id } }));
+          }, 60);
         }}
         onToggleTheme={onToggleTheme}
       />

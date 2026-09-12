@@ -440,6 +440,14 @@ export function TaskDialog() {
                       const withoutCats = tags.filter((t) => !LIFE_LOG_CATEGORIES.some((c) => c.tag === t));
                       setTags([...withoutCats, cat.tag]);
                       setEmoji(cat.emoji);
+                      if (!title.trim()) {
+                        if (cat.id === "sleep") setTitle("Night Sleep");
+                        else if (cat.id === "routine") setTitle("Morning Routine");
+                      }
+                      if (cat.id === "sleep" && (!duration || Number(duration) <= 60)) {
+                        setDuration("450");
+                        setEstimate("450");
+                      }
                     }}
                     className={cn(
                       "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer",
@@ -456,33 +464,74 @@ export function TaskDialog() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <Labeled label="Time Spent / Duration" hint="minutes">
-                <div className="flex items-center gap-1.5">
-                  <TextInput
-                    type="number"
-                    min={5}
-                    step={5}
-                    value={duration}
-                    onChange={(e) => {
-                      setDuration(e.target.value);
-                      setEstimate(e.target.value);
-                    }}
-                    placeholder="30"
-                  />
-                  <div className="flex items-center gap-1 shrink-0">
-                    {[15, 30, 45, 60].map((m) => (
-                      <button
-                        key={m}
-                        type="button"
-                        onClick={() => {
-                          setDuration(String(m));
-                          setEstimate(String(m));
-                        }}
-                        className="chip !py-1 !px-2 text-[10.5px] font-bold cursor-pointer"
-                      >
-                        {m}m
-                      </button>
-                    ))}
+              <Labeled label="Time Spent / Duration" hint={tags.includes("sleep") ? "hours / minutes" : "minutes"}>
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <TextInput
+                      type="number"
+                      min={5}
+                      step={5}
+                      value={duration}
+                      onChange={(e) => {
+                        setDuration(e.target.value);
+                        setEstimate(e.target.value);
+                      }}
+                      placeholder={tags.includes("sleep") ? "450 (7.5h)" : "30"}
+                    />
+                    {duration && Number(duration) >= 60 && (
+                      <span className="text-[11px] font-mono text-[var(--accent)] shrink-0 font-bold px-1.5 py-0.5 rounded bg-[var(--accent-soft)]">
+                        {Math.floor(Number(duration) / 60)}h{Number(duration) % 60 ? ` ${Number(duration) % 60}m` : ""}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1">
+                    {tags.includes("sleep")
+                      ? [
+                          { m: 360, l: "6h" },
+                          { m: 420, l: "7h" },
+                          { m: 450, l: "7.5h" },
+                          { m: 480, l: "8h" },
+                          { m: 510, l: "8.5h" },
+                          { m: 540, l: "9h" },
+                        ].map((item) => (
+                          <button
+                            key={item.m}
+                            type="button"
+                            onClick={() => {
+                              setDuration(String(item.m));
+                              setEstimate(String(item.m));
+                            }}
+                            className={cn(
+                              "chip !py-1 !px-2 text-[10.5px] font-bold cursor-pointer transition-all",
+                              duration === String(item.m) && "!bg-[var(--accent)] !text-[var(--on-accent)]"
+                            )}
+                          >
+                            {item.l}
+                          </button>
+                        ))
+                      : [
+                          { m: 15, l: "15m" },
+                          { m: 30, l: "30m" },
+                          { m: 45, l: "45m" },
+                          { m: 60, l: "1h" },
+                          { m: 90, l: "1.5h" },
+                          { m: 120, l: "2h" },
+                        ].map((item) => (
+                          <button
+                            key={item.m}
+                            type="button"
+                            onClick={() => {
+                              setDuration(String(item.m));
+                              setEstimate(String(item.m));
+                            }}
+                            className={cn(
+                              "chip !py-1 !px-2 text-[10.5px] font-bold cursor-pointer transition-all",
+                              duration === String(item.m) && "!bg-[var(--accent)] !text-[var(--on-accent)]"
+                            )}
+                          >
+                            {item.l}
+                          </button>
+                        ))}
                   </div>
                 </div>
               </Labeled>

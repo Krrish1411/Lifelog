@@ -13,6 +13,7 @@ import {
   Plus,
 } from "lucide-react";
 import { announce } from "./LiveAnnouncer";
+import { useBodyScrollLock } from "../utils/scrollLock";
 
 interface CommandPaletteProps {
   open: boolean;
@@ -50,6 +51,8 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
   const [selectedIndex, setSelectedIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useBodyScrollLock(open);
 
   useEffect(() => {
     if (open) {
@@ -153,18 +156,19 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
     // 3. Search Active Tasks
     if (q) {
-      const matchedTasks = state.tasks
+      const activeTasks = state.tasks ?? [];
+      const matchedTasks = activeTasks
         .filter((t) => !t.done)
         .filter(
           (t) =>
-            t.title.toLowerCase().includes(q) ||
-            t.tags.some((tg) => tg.toLowerCase().includes(q)) ||
+            (t.title || "").toLowerCase().includes(q) ||
+            (t.tags ?? []).some((tg) => tg.toLowerCase().includes(q)) ||
             (t.notes && t.notes.toLowerCase().includes(q))
         )
         .slice(0, 8);
 
       matchedTasks.forEach((t) => {
-        const proj = state.projects.find((p) => p.id === t.projectId);
+        const proj = (state.projects ?? []).find((p) => p.id === t.projectId);
         result.push({
           id: `task-${t.id}`,
           group: "tasks",
@@ -183,8 +187,9 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       });
 
       // 4. Search Notes
-      const matchedNotes = state.notes
-        .filter((n) => n.title.toLowerCase().includes(q))
+      const allNotes = state.notes ?? [];
+      const matchedNotes = allNotes
+        .filter((n) => (n.title || "").toLowerCase().includes(q))
         .slice(0, 5);
 
       matchedNotes.forEach((n) => {
@@ -246,19 +251,30 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-[100] flex items-start justify-center pt-[12vh] px-4 bg-black/50 backdrop-blur-md transition-all"
-      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Universal Command Palette"
+      className="fixed inset-0 z-[100] flex items-start justify-center pt-[10vh] sm:pt-[12vh] px-3 sm:px-4"
+      style={{
+        background: "rgba(0, 0, 0, 0.62)",
+        backdropFilter: "blur(28px) saturate(180%)",
+        WebkitBackdropFilter: "blur(28px) saturate(180%)",
+      }}
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="w-full max-w-2xl bg-[var(--panel)] border border-[var(--line)] rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[72vh]"
+        className="w-full max-w-2xl rounded-3xl border glass-elevated shadow-2xl overflow-hidden flex flex-col max-h-[74vh] pop"
+        style={{
+          borderColor: "color-mix(in srgb, var(--line) 85%, transparent)",
+        }}
         onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Command Palette"
       >
         {/* Search header */}
-        <div className="flex items-center px-4 py-3.5 border-b border-[var(--line)] gap-3 bg-[var(--panel)]">
-          <Search className="w-5 h-5 text-[var(--color-mut)] shrink-0" />
+        <div
+          className="flex items-center px-4 py-3.5 border-b gap-3"
+          style={{ borderColor: "color-mix(in srgb, var(--line) 80%, transparent)" }}
+        >
+          <Search className="w-5 h-5 text-[var(--mut)] shrink-0" />
           <input
             ref={inputRef}
             type="text"
@@ -269,9 +285,12 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
             }}
             onKeyDown={handleKeyDown}
             placeholder="Type a command, task title, note, or view name..."
-            className="w-full bg-transparent border-none text-[var(--color-text)] placeholder-[var(--color-mut)] text-base focus:outline-none"
+            className="w-full bg-transparent border-none text-[var(--text)] placeholder-[var(--mut)] text-base focus:outline-none"
           />
-          <kbd className="hidden sm:inline-block px-2 py-0.5 text-xs font-mono text-[var(--color-mut)] bg-[var(--panel2)] rounded border border-[var(--line)]">
+          <kbd
+            className="hidden sm:inline-block px-2 py-0.5 text-xs font-mono text-[var(--mut)] rounded border"
+            style={{ background: "var(--panel2)", borderColor: "var(--line)" }}
+          >
             ESC
           </kbd>
         </div>
@@ -350,25 +369,37 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
         </div>
 
         {/* Footer shortcuts */}
-        <div className="px-4 py-2.5 bg-[var(--panel2)] border-t border-[var(--line)] text-xs text-[var(--color-mut)] flex items-center justify-between">
+        <div
+          className="px-4 py-2.5 border-t text-xs flex items-center justify-between"
+          style={{ borderColor: "color-mix(in srgb, var(--line) 80%, transparent)", color: "var(--mut)" }}
+        >
           <div className="flex items-center gap-3">
             <span>
-              <kbd className="font-mono bg-[var(--panel)] px-1.5 py-0.5 rounded border border-[var(--line)] text-[11px]">
+              <kbd
+                className="font-mono px-1.5 py-0.5 rounded border text-[11px]"
+                style={{ background: "var(--panel2)", borderColor: "var(--line)" }}
+              >
                 ↑
               </kbd>{" "}
-              <kbd className="font-mono bg-[var(--panel)] px-1.5 py-0.5 rounded border border-[var(--line)] text-[11px]">
+              <kbd
+                className="font-mono px-1.5 py-0.5 rounded border text-[11px]"
+                style={{ background: "var(--panel2)", borderColor: "var(--line)" }}
+              >
                 ↓
               </kbd>{" "}
               to navigate
             </span>
             <span>
-              <kbd className="font-mono bg-[var(--panel)] px-1.5 py-0.5 rounded border border-[var(--line)] text-[11px]">
+              <kbd
+                className="font-mono px-1.5 py-0.5 rounded border text-[11px]"
+                style={{ background: "var(--panel2)", borderColor: "var(--line)" }}
+              >
                 ↵
               </kbd>{" "}
               to select
             </span>
           </div>
-          <span className="text-[11px] font-medium">LifeLog Quick Palette</span>
+          <span className="text-[11px] font-semibold tracking-wide">LifeLog Quick Palette</span>
         </div>
       </div>
     </div>

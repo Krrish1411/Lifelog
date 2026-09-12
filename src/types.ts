@@ -203,13 +203,15 @@ export interface LifeLogCategory {
 }
 
 export const LIFE_LOG_CATEGORIES: LifeLogCategory[] = [
+  { id: "sleep", emoji: "😴", label: "Sleep / Rest", tag: "sleep", type: "health" },
+  { id: "routine", emoji: "🧘", label: "Morning / Night Routine", tag: "routine", type: "routine" },
   { id: "watch", emoji: "📺", label: "Watch / YouTube", tag: "watch", type: "entertainment" },
   { id: "read", emoji: "📖", label: "Read / Research", tag: "read", type: "learning" },
   { id: "build", emoji: "🛠", label: "Build / Vibe Coding", tag: "build", type: "creation" },
   { id: "think", emoji: "💭", label: "Journal / Think", tag: "think", type: "routine" },
-  { id: "move", emoji: "🏃", label: "Walk / Exercise", tag: "move", type: "health" },
+  { id: "move", emoji: "🏃", label: "Workout / Exercise", tag: "move", type: "health" },
   { id: "rest", emoji: "😌", label: "Rest / Leisure", tag: "rest", type: "routine" },
-  { id: "social", emoji: "👥", label: "Social / Family", tag: "social", type: "routine" },
+  { id: "social", emoji: "👥", label: "Social / Hangout", tag: "social", type: "routine" },
 ];
 
 export const SHORTCUT_ACTIONS: { action: string; label: string }[] = [

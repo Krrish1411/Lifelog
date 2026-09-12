@@ -91,6 +91,18 @@ export function NotesView() {
     return () => window.removeEventListener("lifelog:open-notes-drawer", handler);
   }, []);
 
+  useEffect(() => {
+    const handler = (e: any) => {
+      const noteId = e.detail?.noteId;
+      if (noteId) {
+        setFolderSel("all");
+        setSelId(noteId);
+      }
+    };
+    window.addEventListener("lifelog:open-note", handler);
+    return () => window.removeEventListener("lifelog:open-note", handler);
+  }, []);
+
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const selIdRef = useRef(selId);
