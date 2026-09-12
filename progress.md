@@ -88,8 +88,38 @@ This document provides a concise yet comprehensive summary of the recent enhance
 
 ---
 
-## 3. Build & Test Verification
+## 4. Electron Desktop Multi-Platform CI Builds & Encrypted Attachment Architecture
+
+### A. GitHub Actions Multi-Platform Workflow (`build-electron.yml`)
+- **Problem**:
+  - Desktop builds failed across all 3 platforms (Ubuntu Linux, Windows, macOS).
+  - **Root Cause 1**: `.gitignore` ignored `build/`, preventing application icons (`.png`, `.ico`, `.icns`) from being pushed to the repository. Runners failed during packaging due to missing icon files.
+  - **Root Cause 2**: In CI (`CI=true`), `electron-builder` defaulted to publishing releases, failing immediately due to a missing GitHub Personal Access Token.
+  - **Root Cause 3**: macOS runner attempted to invoke `codesign` with an Apple Developer identity that did not exist on the runner.
+  - **Root Cause 4**: Ubuntu runner lacked FUSE and archive utilities required for AppImage creation.
+- **Solution**:
+  - Un-ignored `build/` in `.gitignore` and committed explicit multi-size icons: `build/icon.ico` (multi-size 16-256px), `build/icon.icns` (Apple ICNS), and `build/icon.png` (512x512) alongside `electron/icons/`.
+  - Added `"publish": null` to `package.json` and passed `--publish never` across all platform jobs.
+  - Configured `CSC_IDENTITY_AUTO_DISCOVERY: false` and `identity: null` to permit clean, unsigned CI builds.
+  - Added `sudo apt-get install -y libarchive-tools libfuse2` on the Linux runner.
+
+### B. Database Architecture: Web Browser vs. Desktop vs. Android
+- **Web Browser (IndexedDB + Web Crypto AES-256-GCM)**:
+  - Stays on **IndexedDB**. Web browsers cannot execute native SQLite without heavy WASM layers that consume excessive RAM and are subject to browser storage quotas. IndexedDB is zero-dependency, ultra-fast, and supported in 100% of modern browsers.
+- **Desktop Electron (Encrypted Attachments Folder + Local Vault)**:
+  - When users have 1,000+ tasks, long notes, and 1–2 GB of attachments, packing attachments into a single database or JSON crashes V8 engine heap memory (>1.4 GB limit).
+  - Implemented a dedicated native encrypted directory: `<userData>/attachments/`.
+  - Every attachment is encrypted with **AES-256-GCM** and saved as an isolated `<attachmentId>.enc` binary file on disk.
+  - Added Electron IPC handlers (`save-attachment`, `load-attachment`, `delete-attachment`, `get-storage-info`).
+  - Vault metadata stays featherweight and fast, loading attachments on demand.
+- **Android Native APK**:
+  - Uses the private, sandboxed app directory (`Directory.Data/attachments/`) with client-side AES-256-GCM encryption.
+
+---
+
+## 5. Build & Test Verification
 
 - **TypeScript Compilation**: `npm run typecheck` &rarr; `tsc --noEmit` passed with 0 errors.
 - **Vite Production Build**: `npm run build` &rarr; built production bundle in `< 3.0s`.
-- **Git State**: Clean working tree on `main`, synchronized with remote repository `origin/main`.
+- **Git Remote Synchronization**: Pushed to `origin/main` (commit `3a6a5905`).
+
