@@ -187,28 +187,64 @@ export interface Settings {
   reduceMotion: boolean;
   reduceTransparency: boolean;
   highContrast: boolean;
+  /* Linux platform override */
+  disableGlassOnLinux?: boolean;
 }
 
+/** Standard project ID dedicated to general life tracking / vibe coding / entertainment / learning */
+export const LIFE_LOG_PROJECT_ID = "life-log-stream";
+
+export interface LifeLogCategory {
+  id: string;
+  emoji: string;
+  label: string;
+  tag: string;
+  type: "routine" | "learning" | "entertainment" | "creation" | "health";
+}
+
+export const LIFE_LOG_CATEGORIES: LifeLogCategory[] = [
+  { id: "watch", emoji: "📺", label: "Watch / YouTube", tag: "watch", type: "entertainment" },
+  { id: "read", emoji: "📖", label: "Read / Research", tag: "read", type: "learning" },
+  { id: "build", emoji: "🛠", label: "Build / Vibe Coding", tag: "build", type: "creation" },
+  { id: "think", emoji: "💭", label: "Journal / Think", tag: "think", type: "routine" },
+  { id: "move", emoji: "🏃", label: "Walk / Exercise", tag: "move", type: "health" },
+  { id: "rest", emoji: "😌", label: "Rest / Leisure", tag: "rest", type: "routine" },
+  { id: "social", emoji: "👥", label: "Social / Family", tag: "social", type: "routine" },
+];
+
 export const SHORTCUT_ACTIONS: { action: string; label: string }[] = [
-  { action: "newTask", label: "New task" },
-  { action: "commandPalette", label: "Command Palette / Quick search" },
-  { action: "togglePause", label: "Pause / resume running timer" },
+  { action: "openDashboard", label: "Go to Dashboard" },
+  { action: "openTasks", label: "Go to Tasks" },
   { action: "openFocus", label: "Go to Focus" },
   { action: "openCalendar", label: "Go to Calendar" },
+  { action: "openHabits", label: "Go to Habits" },
   { action: "openNotes", label: "Go to Notes" },
   { action: "openDayLog", label: "Go to Day Log" },
   { action: "openReports", label: "Go to Reports" },
+  { action: "openReview", label: "Go to Review" },
+  { action: "openSettings", label: "Go to Settings" },
+  { action: "newTask", label: "New task / Log entry" },
+  { action: "newNote", label: "New note" },
+  { action: "commandPalette", label: "Command Palette / Quick search" },
+  { action: "togglePause", label: "Pause / resume running timer" },
   { action: "help", label: "Show shortcut help" },
 ];
+
 export const DEFAULT_SHORTCUTS: Record<string, string> = {
-  newTask: "n",
-  commandPalette: "k",
+  openDashboard: "H",
+  openTasks: "T",
+  openFocus: "F",
+  openCalendar: "C",
+  openHabits: "B",
+  openNotes: "E",
+  openDayLog: "D",
+  openReports: "R",
+  openReview: "V",
+  openSettings: "S",
+  newTask: "N",
+  newNote: "M",
+  commandPalette: "K",
   togglePause: "space",
-  openFocus: "f",
-  openCalendar: "c",
-  openNotes: "e",
-  openDayLog: "d",
-  openReports: "r",
   help: "?",
 };
 

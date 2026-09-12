@@ -28,9 +28,11 @@ import {
 import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey } from "../types";
 import {
   DEFAULT_SETTINGS,
+  DEFAULT_SHORTCUTS,
   FONT_PAIRS,
   QUOTES,
   REPORT_WIDGETS,
+  SHORTCUT_ACTIONS,
   STATE_VERSION,
 } from "../types";
 import { ERASED_KEY, useApp } from "../store";
@@ -73,6 +75,8 @@ import {
 } from "../utils/audio";
 import {
   checkNativeNotificationPermission,
+  isLinux,
+  isLinuxDesktop,
   isNative,
   isNativeMobile,
   isTauri,
@@ -973,6 +977,28 @@ export function SettingsView() {
                       </button>
                     );
                   })}
+                  {(isLinux || isLinuxDesktop) && (
+                    <div className="col-span-full rounded-2xl border p-3.5 glass-clear space-y-2 border-l-4 mt-2" style={{ borderLeftColor: "var(--accent)" }}>
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text)] flex items-center gap-1.5">
+                          <span>🐧</span> Linux Desktop Rendering
+                        </span>
+                        <span className="text-[10.5px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                          Recommended: Desk Suite
+                        </span>
+                      </div>
+                      <p className="text-[12px] leading-relaxed text-[var(--mut)]">
+                        WebKitGTK on Linux runs smoothest with <strong>Desk Suite</strong>. Liquid Glass is automatically redirected to Desk on Linux to prevent GPU compositor blank screens, but you can override this if desired.
+                      </p>
+                      <div className="pt-1">
+                        <Toggle
+                          checked={s.disableGlassOnLinux === false}
+                          onChange={(checked) => patch({ disableGlassOnLinux: !checked })}
+                          label="Force Liquid Glass on Linux (requires hardware accelerated compositor)"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               ),
               true,
@@ -1557,6 +1583,77 @@ export function SettingsView() {
                       />
                     </div>
                   ))}
+                </div>
+              ),
+              true
+            )}
+
+            {/* Keyboard Shortcuts Customization */}
+            {section(
+              "Keyboard Shortcuts & Remapping",
+              "Quick single-key navigation across the app. Press any key in the box to remap. Automatically pauses when typing in text fields.",
+              (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between p-3 rounded-2xl glass-clear border" style={{ borderColor: "var(--line)" }}>
+                    <div className="flex items-center gap-2.5">
+                      <span className="font-mono text-xs font-bold bg-[var(--panel2)] px-2 py-0.5 rounded-lg border border-[var(--line)]">Ctrl + K</span>
+                      <span className="text-[12.5px] font-bold">Universal Command Palette</span>
+                    </div>
+                    <span className="text-[11px] font-medium text-[var(--mut)]">Always active</span>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {SHORTCUT_ACTIONS.map((sa) => {
+                      const currentKey = s.shortcuts?.[sa.action] ?? DEFAULT_SHORTCUTS[sa.action] ?? "";
+                      return (
+                        <div
+                          key={sa.action}
+                          className="flex items-center justify-between rounded-xl border px-3 py-2 glass-regular"
+                          style={{ borderColor: "var(--line)" }}
+                        >
+                          <span className="text-[12.5px] font-bold truncate pr-2">{sa.label}</span>
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <input
+                              type="text"
+                              maxLength={10}
+                              value={currentKey === "space" ? "space" : currentKey.toUpperCase()}
+                              onKeyDown={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                const pressed = e.key === " " ? "space" : e.key.length === 1 ? e.key.toUpperCase() : e.key;
+                                patch({
+                                  shortcuts: {
+                                    ...s.shortcuts,
+                                    [sa.action]: pressed,
+                                  },
+                                });
+                                toast(`Remapped ${sa.label} to "${pressed}"`, "ok");
+                              }}
+                              onChange={() => {}}
+                              title="Click and press any key to remap"
+                              className="w-16 text-center font-mono text-[12px] font-bold py-1 px-1.5 rounded-lg border border-[var(--line)] bg-[var(--panel2)] text-[var(--accent)] cursor-pointer focus:ring-2 focus:ring-[var(--accent)]"
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
+                      Click on any shortcut box and tap a new key on your keyboard to assign.
+                    </span>
+                    <Btn
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        patch({ shortcuts: { ...DEFAULT_SHORTCUTS } });
+                        toast("Reset all shortcuts to default", "ok");
+                      }}
+                    >
+                      Reset to defaults
+                    </Btn>
+                  </div>
                 </div>
               ),
               true

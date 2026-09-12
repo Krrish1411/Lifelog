@@ -26,6 +26,7 @@ import {
   Filter,
 } from "lucide-react";
 import type { Priority, Project, Subtask, Task } from "../types";
+import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
 import {
   describeRecurrence,
@@ -620,7 +621,11 @@ export function TasksView({
                       : "text-[var(--text)] hover:bg-[var(--panel2)]"
                   )}
                 >
-                  <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: p.color || "#4fa3a5" }} />
+                  {p.id === LIFE_LOG_PROJECT_ID ? (
+                    <span className="text-xs shrink-0">🌊</span>
+                  ) : (
+                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: p.color || "#4fa3a5" }} />
+                  )}
                   <span className="flex-1 truncate">{p.name}</span>
                   {pCount > 0 && (
                     <span className="text-[10.5px] text-[var(--mut)] tnum">{pCount}</span>
@@ -1298,41 +1303,74 @@ function TaskCard({
 
         {/* Row 2: Metadata Badges (Project, Due Date, Priority, Tags, Subtasks, Time) */}
         <div className="flex flex-wrap items-center gap-1.5 text-[10.5px] font-medium pt-0.5">
-          {/* Due date chip with smart Todoist coloring */}
-          {t.due && (
-            <span
-              className={cn(
-                "chip !py-0.5 text-[10.5px] flex items-center gap-1",
-                overdue
-                  ? "!border-red-500/40 !bg-red-500/10 text-red-600 dark:text-red-400 font-bold"
-                  : t.due === today
-                    ? "!border-amber-500/40 !bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
-                    : "text-[var(--mut)]"
-              )}
-            >
-              <Calendar size={10} className="shrink-0" />
-              <span>
-                {overdue ? "Overdue: " : t.due === today ? "Today" : fmtDayShort(t.due)}
-                {t.dueTime ? ` · ${t.dueTime}` : ""}
-              </span>
-            </span>
-          )}
+          {t.projectId === LIFE_LOG_PROJECT_ID ? (
+            <>
+              {/* Category chip */}
+              {(() => {
+                const cat = LIFE_LOG_CATEGORIES.find((c) => t.tags.includes(c.tag));
+                return cat ? (
+                  <span className="chip !py-0.5 text-[10px] font-bold text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-soft)]">
+                    <span>{cat.emoji}</span>
+                    <span>{cat.label}</span>
+                  </span>
+                ) : null;
+              })()}
 
-          {/* Priority chip */}
-          {t.priority === "urgent" ? (
-            <span
-              className="chip !py-0.5 text-[10px]"
-              style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
-            >
-              <Zap size={9} /> urgent
-            </span>
+              {/* Time logged */}
+              {(t.durationMin || t.estimateMin) ? (
+                <span className="chip !py-0.5 text-[10px] font-mono text-[var(--mut)]">
+                  <Clock size={10} className="text-sky-500" />
+                  <span>{t.durationMin || t.estimateMin}m logged</span>
+                </span>
+              ) : null}
+
+              {/* Date */}
+              {t.due && (
+                <span className="chip !py-0.5 text-[10px] text-[var(--mut)]">
+                  <Calendar size={10} />
+                  <span>{t.due === today ? "Today" : fmtDayShort(t.due)}</span>
+                </span>
+              )}
+            </>
           ) : (
-            <span
-              className="chip !py-0.5 text-[10px]"
-              style={{ color: PRIORITY_META[t.priority].color }}
-            >
-              {PRIORITY_META[t.priority].icon} {PRIORITY_META[t.priority].label}
-            </span>
+            <>
+              {/* Due date chip with smart Todoist coloring */}
+              {t.due && (
+                <span
+                  className={cn(
+                    "chip !py-0.5 text-[10.5px] flex items-center gap-1",
+                    overdue
+                      ? "!border-red-500/40 !bg-red-500/10 text-red-600 dark:text-red-400 font-bold"
+                      : t.due === today
+                        ? "!border-amber-500/40 !bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold"
+                        : "text-[var(--mut)]"
+                  )}
+                >
+                  <Calendar size={10} className="shrink-0" />
+                  <span>
+                    {overdue ? "Overdue: " : t.due === today ? "Today" : fmtDayShort(t.due)}
+                    {t.dueTime ? ` · ${t.dueTime}` : ""}
+                  </span>
+                </span>
+              )}
+
+              {/* Priority chip */}
+              {t.priority === "urgent" ? (
+                <span
+                  className="chip !py-0.5 text-[10px]"
+                  style={{ color: "var(--danger)", borderColor: "var(--danger)" }}
+                >
+                  <Zap size={9} /> urgent
+                </span>
+              ) : (
+                <span
+                  className="chip !py-0.5 text-[10px]"
+                  style={{ color: PRIORITY_META[t.priority].color }}
+                >
+                  {PRIORITY_META[t.priority].icon} {PRIORITY_META[t.priority].label}
+                </span>
+              )}
+            </>
           )}
 
           {/* Project chip */}

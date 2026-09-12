@@ -251,7 +251,13 @@ export function NotesView() {
   };
 
   const deleteNote = async (n: Note) => {
-    const ok = await confirm({ title: "Delete note", body: `“${n.title}” and its ${n.attachments?.length ?? 0} attachment(s) will be permanently removed from local storage.`, confirmLabel: "Delete note", danger: true });
+    const ok = await confirm({
+      title: "Delete note",
+      body: `“${n.title || "Untitled note"}” and its ${n.attachments?.length ?? 0} attachment(s) will be permanently deleted.`,
+      confirmLabel: "Delete note",
+      danger: true,
+      compact: true,
+    });
     if (!ok) return;
     set((s) => ({ ...s, notes: s.notes.filter((x) => x.id !== n.id) }));
     if (selId === n.id) {
@@ -305,6 +311,7 @@ export function NotesView() {
       body,
       confirmLabel: "Delete folder",
       danger: true,
+      compact: true,
     });
     if (!ok) return;
     set((s) => ({
@@ -387,60 +394,102 @@ export function NotesView() {
 
   /* ---------------- editor actions ---------------- */
   const mdBtn = (title: string, icon: React.ReactNode, fn: () => void) => (
-    <button key={title} title={title} onClick={fn} disabled={preview === "preview" || !selNote}
-      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:scale-105 disabled:opacity-35"
-      style={{ color: "var(--mut)", cursor: "pointer", background: "var(--bg)", border: "1px solid var(--line)" }}>
+    <button
+      key={title}
+      title={title}
+      onClick={fn}
+      disabled={preview === "preview" || !selNote}
+      className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg transition-all hover:bg-[var(--accent-soft)] hover:text-[var(--accent)] hover:scale-105 active:scale-95 disabled:opacity-30 cursor-pointer text-[var(--mut)]"
+    >
       {icon}
     </button>
   );
   const wrap = (b: string, a: string) => { if (taRef.current) applyWrap(taRef.current, b, a, (v) => { setDraft((d) => ({ ...d, text: v })); dirty.current = true; }); };
   const prefix = (p: string) => { if (taRef.current) applyLinePrefix(taRef.current, p, (v) => { setDraft((d) => ({ ...d, text: v })); dirty.current = true; }); };
 
-  const toolbar = (
-    <div className="flex items-center gap-1 overflow-x-auto scrollbar-none py-0.5 flex-nowrap w-full min-w-0">
-      {mdBtn("Heading 1", <Heading1 size={13} />, () => prefix("# "))}
-      {mdBtn("Heading 2", <Heading2 size={13} />, () => prefix("## "))}
-      {mdBtn("Bold", <Bold size={13} />, () => wrap("**", "**"))}
-      {mdBtn("Italic", <Italic size={13} />, () => wrap("*", "*"))}
-      {mdBtn("Underline", <Underline size={13} />, () => wrap("++", "++"))}
-      {mdBtn("Strikethrough", <Strikethrough size={13} />, () => wrap("~~", "~~"))}
-      {mdBtn("Highlight", <Highlighter size={13} />, () => wrap("==", "=="))}
-      {mdBtn("Inline code", <span className="font-mono text-[11px] font-bold">{"</>"}</span>, () => wrap("`", "`"))}
-      {mdBtn("Quote", <Quote size={13} />, () => prefix("> "))}
-      {mdBtn("Bullet list", <List size={13} />, () => prefix("- "))}
-      {mdBtn("Numbered list", <ListOrdered size={13} />, () => prefix("1. "))}
-      {mdBtn("Checklist", <ListTodo size={13} />, () => prefix("- [ ] "))}
-      {mdBtn("Link", <Link2 size={13} />, () => wrap("[", "](https://)"))}
-      {mdBtn("Divider", <Minus size={13} />, () => { setDraft((d) => ({ ...d, text: `${d.text}\n---\n` })); dirty.current = true; })}
-    </div>
-  );
+  const formattingToolbar = (
+    <div className="flex items-center gap-1.5 w-full min-w-0 overflow-x-auto scrollbar-none py-1 px-1 select-none">
+      {/* Group 1: Typography */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        {mdBtn("Heading 1", <Heading1 size={13} />, () => prefix("# "))}
+        {mdBtn("Heading 2", <Heading2 size={13} />, () => prefix("## "))}
+      </div>
 
-  const attachmentsBar = (
-    <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5 flex-nowrap w-full min-w-0">
-      <label className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
-        style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--mut)" }}>
-        <ImageIcon size={12} /> Photo
-        <input type="file" accept="image/*" className="hidden" onChange={(e) => { onMediaFile(e.target.files?.[0], "image"); e.target.value = ""; }} />
-      </label>
-      <label className="flex h-7 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
-        style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--mut)" }}>
-        <Film size={12} /> Video
-        <input type="file" accept="video/*" className="hidden" onChange={(e) => { onMediaFile(e.target.files?.[0], "video"); e.target.value = ""; }} />
-      </label>
-      {recSec === null ? (
-        <button onClick={startRecording} className="flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-[1.03]"
-          style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--mut)", cursor: "pointer" }}>
-          <Mic size={12} /> Record audio
-        </button>
-      ) : (
-        <button onClick={() => stopRecording(true)} className="ring-pulse flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2.5 text-[11px] font-bold"
-          style={{ borderColor: "var(--danger)", background: "color-mix(in srgb, var(--danger) 15%, transparent)", color: "var(--danger)", cursor: "pointer" }}>
-          <Square size={11} /> Stop · {recSec}s
-        </button>
-      )}
-      <span className="text-[10px] font-medium shrink-0 ml-auto" style={{ color: "var(--mut)" }}>
-        AES-256 encrypted
-      </span>
+      <div className="w-px h-4 shrink-0 bg-[var(--line)] mx-0.5" />
+
+      {/* Group 2: Inline Styles */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        {mdBtn("Bold", <Bold size={13} />, () => wrap("**", "**"))}
+        {mdBtn("Italic", <Italic size={13} />, () => wrap("*", "*"))}
+        {mdBtn("Underline", <Underline size={13} />, () => wrap("++", "++"))}
+        {mdBtn("Strikethrough", <Strikethrough size={13} />, () => wrap("~~", "~~"))}
+        {mdBtn("Highlight", <Highlighter size={13} />, () => wrap("==", "=="))}
+        {mdBtn("Inline code", <span className="font-mono text-[11px] font-bold">{"</>"}</span>, () => wrap("`", "`"))}
+        {mdBtn("Quote", <Quote size={13} />, () => prefix("> "))}
+      </div>
+
+      <div className="w-px h-4 shrink-0 bg-[var(--line)] mx-0.5" />
+
+      {/* Group 3: Structure */}
+      <div className="flex items-center gap-0.5 shrink-0">
+        {mdBtn("Bullet list", <List size={13} />, () => prefix("- "))}
+        {mdBtn("Numbered list", <ListOrdered size={13} />, () => prefix("1. "))}
+        {mdBtn("Checklist", <ListTodo size={13} />, () => prefix("- [ ] "))}
+        {mdBtn("Link", <Link2 size={13} />, () => wrap("[", "](https://)"))}
+        {mdBtn("Divider", <Minus size={13} />, () => { setDraft((d) => ({ ...d, text: `${d.text}\n---\n` })); dirty.current = true; })}
+      </div>
+
+      <div className="w-px h-4 shrink-0 bg-[var(--line)] mx-0.5" />
+
+      {/* Group 4: Media Attachments */}
+      <div className="flex items-center gap-1.5 shrink-0">
+        <label
+          className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-105 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          style={{ borderColor: "var(--line)", background: "var(--panel2)", color: "var(--mut)" }}
+          title="Attach photo"
+        >
+          <ImageIcon size={12} />
+          <span className="hidden sm:inline">Photo</span>
+          <input type="file" accept="image/*" className="hidden" onChange={(e) => { onMediaFile(e.target.files?.[0], "image"); e.target.value = ""; }} />
+        </label>
+        <label
+          className="flex h-7 shrink-0 cursor-pointer items-center gap-1 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-105 hover:border-[var(--accent)] hover:text-[var(--accent)]"
+          style={{ borderColor: "var(--line)", background: "var(--panel2)", color: "var(--mut)" }}
+          title="Attach video"
+        >
+          <Film size={12} />
+          <span className="hidden sm:inline">Video</span>
+          <input type="file" accept="video/*" className="hidden" onChange={(e) => { onMediaFile(e.target.files?.[0], "video"); e.target.value = ""; }} />
+        </label>
+        {recSec === null ? (
+          <button
+            onClick={startRecording}
+            className="flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[11px] font-bold transition-all hover:scale-105 hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer"
+            style={{ borderColor: "var(--line)", background: "var(--panel2)", color: "var(--mut)" }}
+            title="Record audio snippet"
+          >
+            <Mic size={12} />
+            <span className="hidden sm:inline">Record</span>
+          </button>
+        ) : (
+          <button
+            onClick={() => stopRecording(true)}
+            className="ring-pulse flex h-7 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-bold cursor-pointer"
+            style={{ borderColor: "var(--danger)", background: "color-mix(in srgb, var(--danger) 15%, transparent)", color: "var(--danger)" }}
+          >
+            <Square size={10} /> {recSec}s
+          </button>
+        )}
+      </div>
+
+      {/* Group 5: Security Indicator */}
+      <div
+        className="flex items-center gap-1 text-[10.5px] font-semibold text-emerald-500 shrink-0 ml-auto pl-2"
+        title="Notes & attachments are client-side encrypted with AES-256 GCM before saving."
+      >
+        <Lock size={12} />
+        <span className="hidden md:inline">AES-256</span>
+      </div>
     </div>
   );
 
@@ -992,9 +1041,8 @@ export function NotesView() {
             </div>
 
             {/* Formatting & Media Toolbar */}
-            <div className="pt-2 border-t border-[var(--line)] flex flex-col gap-1.5 w-full min-w-0 shrink-0 bg-[var(--panel)]">
-              {toolbar}
-              {attachmentsBar}
+            <div className="border-t border-[var(--line)] w-full min-w-0 shrink-0 glass-regular rounded-b-2xl">
+              {formattingToolbar}
             </div>
           </>
         )}

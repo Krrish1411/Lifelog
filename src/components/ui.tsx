@@ -80,6 +80,7 @@ export function Modal({
   width = 560,
   footer,
   zIndex = 70,
+  compact = false,
 }: {
   open: boolean;
   onClose: () => void;
@@ -88,6 +89,7 @@ export function Modal({
   width?: number;
   footer?: ReactNode;
   zIndex?: number;
+  compact?: boolean;
 }) {
   useEffect(() => {
     if (!open) return;
@@ -99,34 +101,41 @@ export function Modal({
   useBodyScrollLock(open);
 
   if (!open) return null;
+  const targetWidth = compact ? Math.min(380, typeof width === "number" ? width : 380) : width;
+
   return (
     <div
       role="dialog"
       aria-modal="true"
-      className="fadein fixed inset-0 flex items-start justify-center overflow-y-auto p-3 sm:p-5 overscroll-contain"
+      className={cn(
+        "fadein fixed inset-0 flex justify-center overflow-y-auto p-3 sm:p-5 overscroll-contain",
+        compact ? "items-center" : "items-start"
+      )}
       style={{
-        background: "rgba(0, 0, 0, 0.62)",
-        backdropFilter: "blur(24px) saturate(160%)",
-        WebkitBackdropFilter: "blur(24px) saturate(160%)",
+        background: "rgba(0, 0, 0, 0.65)",
+        backdropFilter: "blur(28px) saturate(180%)",
+        WebkitBackdropFilter: "blur(28px) saturate(180%)",
         zIndex,
-        paddingTop: "max(calc(var(--safe-top, 0px) + 12px), 3vh)",
-        paddingBottom: "max(calc(var(--safe-bottom, 0px) + 16px), 24px)",
+        paddingTop: compact ? "16px" : "max(calc(var(--safe-top, 0px) + 12px), 3vh)",
+        paddingBottom: compact ? "16px" : "max(calc(var(--safe-bottom, 0px) + 16px), 24px)",
       }}
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="pop w-full max-w-[calc(100vw-24px)] rounded-3xl border shadow-2xl flex flex-col max-h-[90vh] overflow-hidden"
+        className={cn(
+          "pop w-full rounded-3xl border glass-elevated flex flex-col overflow-hidden",
+          compact ? "max-h-[85vh] my-auto" : "max-h-[90vh]"
+        )}
         style={{
-          maxWidth: `min(${typeof width === "number" ? `${width}px` : width}, calc(100vw - 24px))`,
-          background: "color-mix(in srgb, var(--panel) 82%, transparent)",
+          maxWidth: `min(${typeof targetWidth === "number" ? `${targetWidth}px` : targetWidth}, calc(100vw - 24px))`,
           borderColor: "color-mix(in srgb, var(--line) 85%, transparent)",
-          backdropFilter: "blur(36px) saturate(200%)",
-          WebkitBackdropFilter: "blur(36px) saturate(200%)",
-          boxShadow: "0 32px 80px -20px rgba(0,0,0,0.85), inset 0 1.25px 0.5px 0 rgba(255,255,255,0.22)",
         }}
       >
         <div
-          className="flex items-center justify-between border-b px-5 py-4 shrink-0"
+          className={cn(
+            "flex items-center justify-between border-b shrink-0",
+            compact ? "px-4 py-3" : "px-5 py-4"
+          )}
           style={{ borderColor: "color-mix(in srgb, var(--line) 80%, transparent)" }}
         >
           <div className="font-display text-[16px] font-bold tracking-tight">{title}</div>
@@ -139,10 +148,13 @@ export function Modal({
             <X size={16} />
           </button>
         </div>
-        <div className="flex-1 overflow-y-auto px-4 py-3 sm:px-5 sm:py-4 overscroll-contain">{children}</div>
+        <div className={cn("flex-1 overflow-y-auto overscroll-contain", compact ? "px-4 py-3" : "px-4 py-3 sm:px-5 sm:py-4")}>{children}</div>
         {footer && (
           <div
-            className="flex items-center justify-end gap-2 border-t px-4 py-3 sm:px-5 sm:py-3.5 shrink-0 bg-[var(--panel)]"
+            className={cn(
+              "flex items-center justify-end gap-2 border-t shrink-0 glass-regular",
+              compact ? "px-4 py-2.5" : "px-4 py-3 sm:px-5 sm:py-3.5"
+            )}
             style={{ borderColor: "var(--line)" }}
           >
             {footer}

@@ -16,6 +16,7 @@ import {
   Search,
 } from "lucide-react";
 import type { Priority, Recurrence, Subtask, Task, TaskTimeBlock } from "../types";
+import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
 import {
@@ -137,13 +138,23 @@ export function TaskDialog() {
     return null;
   }, [title, editing]);
 
+  const unlinkedNotes = useMemo(() => {
+    return state.notes.filter((n) => !linkedNoteIds.includes(n.id));
+  }, [state.notes, linkedNoteIds]);
+
+  const recentNotes = useMemo(() => {
+    return [...unlinkedNotes]
+      .sort((a, b) => (b.updatedAt || b.createdAt) - (a.updatedAt || a.createdAt))
+      .slice(0, 5);
+  }, [unlinkedNotes]);
+
   const filteredNotes = useMemo(() => {
-    if (!noteSearch.trim()) return state.notes;
+    if (!noteSearch.trim()) return recentNotes;
     const q = noteSearch.toLowerCase();
-    return state.notes.filter(
+    return unlinkedNotes.filter(
       (n) => n.title && n.title.toLowerCase().includes(q)
-    );
-  }, [state.notes, noteSearch]);
+    ).slice(0, 15);
+  }, [unlinkedNotes, recentNotes, noteSearch]);
 
   const applyNlp = () => {
     if (!nlpPreview) return;
@@ -260,15 +271,19 @@ export function TaskDialog() {
     if (!pid || pid === "__new") pid = projects[0]?.id ?? uid();
     const key = await getDeviceKey();
     const encNote = privateNote.trim() ? await encryptText(key, privateNote) : null;
-    const dueVal = due || null;
+    const dueVal = due || (pid === LIFE_LOG_PROJECT_ID ? todayIso() : null);
+    const effectiveTags = pid === LIFE_LOG_PROJECT_ID && !tags.some(t => LIFE_LOG_CATEGORIES.some(c => c.tag === t))
+      ? [...tags, "watch"]
+      : tags;
+    const effectiveEmoji = emoji || (pid === LIFE_LOG_PROJECT_ID ? "🌊" : null);
     const parsedSnooze = snooze ? new Date(snooze).getTime() : null;
     const snoozeTs = parsedSnooze && !isNaN(parsedSnooze) ? parsedSnooze : null;
     const base = {
       title: title.trim(),
       projectId: pid,
-      emoji: emoji || null,
+      emoji: effectiveEmoji,
       priority,
-      tags,
+      tags: effectiveTags,
       estimateMin: Math.max(0, parseInt(estimate || "0", 10) || 0),
       due: dueVal,
       dueTime: dueVal && dueTime ? dueTime : null,
@@ -405,42 +420,121 @@ export function TaskDialog() {
           </Labeled>
         </div>
 
-        <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3 sm:gap-4">
-          <Labeled label="Priority">
-            <Seg
-              options={[
-                { value: "low", label: "Low" },
-                { value: "medium", label: "Med" },
-                { value: "high", label: "High" },
-                { value: "urgent", label: "Urgent" },
-              ]}
-              value={priority}
-              onChange={setPriority}
-            />
-          </Labeled>
-          <Labeled label="Estimate (minutes)" hint="feeds calibration">
-            <TextInput type="number" min={0} step={5} value={estimate} onChange={(e) => setEstimate(e.target.value)} />
-          </Labeled>
-        </div>
+        {projectId === LIFE_LOG_PROJECT_ID ? (
+          <div className="rounded-2xl border p-3.5 sm:p-4 space-y-3.5 glass-regular" style={{ borderColor: "var(--line)" }}>
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
+                <span>🌊</span> Life Stream Activity Category
+              </span>
+              <span className="text-[11px] text-[var(--mut)]">Auto-tracked in Life Balance report</span>
+            </div>
 
-        <Labeled label="Tags" hint="casing preserved, no # prefix">
-          <TagInput tags={tags} onChange={setTags} />
-        </Labeled>
+            <div className="flex flex-wrap gap-1.5">
+              {LIFE_LOG_CATEGORIES.map((cat) => {
+                const active = tags.includes(cat.tag);
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => {
+                      const withoutCats = tags.filter((t) => !LIFE_LOG_CATEGORIES.some((c) => c.tag === t));
+                      setTags([...withoutCats, cat.tag]);
+                      setEmoji(cat.emoji);
+                    }}
+                    className={cn(
+                      "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                      active
+                        ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-xs font-extrabold"
+                        : "bg-[var(--panel2)] border-[var(--line)] text-[var(--text)] hover:border-[var(--accent)]"
+                    )}
+                  >
+                    <span>{cat.emoji}</span>
+                    <span>{cat.label}</span>
+                  </button>
+                );
+              })}
+            </div>
 
-        {/* Standard Due Date & Time */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Labeled label="Due date">
-            <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
-          </Labeled>
-          <div className="grid grid-cols-2 gap-2 sm:contents">
-            <Labeled label="Time block" hint="start">
-              <TextInput type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} disabled={!due} />
-            </Labeled>
-            <Labeled label="Block length" hint="min">
-              <TextInput type="number" min={15} step={15} value={duration} onChange={(e) => setDuration(e.target.value)} disabled={!dueTime} />
-            </Labeled>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <Labeled label="Time Spent / Duration" hint="minutes">
+                <div className="flex items-center gap-1.5">
+                  <TextInput
+                    type="number"
+                    min={5}
+                    step={5}
+                    value={duration}
+                    onChange={(e) => {
+                      setDuration(e.target.value);
+                      setEstimate(e.target.value);
+                    }}
+                    placeholder="30"
+                  />
+                  <div className="flex items-center gap-1 shrink-0">
+                    {[15, 30, 45, 60].map((m) => (
+                      <button
+                        key={m}
+                        type="button"
+                        onClick={() => {
+                          setDuration(String(m));
+                          setEstimate(String(m));
+                        }}
+                        className="chip !py-1 !px-2 text-[10.5px] font-bold cursor-pointer"
+                      >
+                        {m}m
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </Labeled>
+              <Labeled label="Log Date" hint="defaults to today">
+                <TextInput
+                  type="date"
+                  value={due || todayIso()}
+                  onChange={(e) => setDue(e.target.value)}
+                />
+              </Labeled>
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className="flex flex-col sm:grid sm:grid-cols-2 gap-3 sm:gap-4">
+              <Labeled label="Priority">
+                <Seg
+                  options={[
+                    { value: "low", label: "Low" },
+                    { value: "medium", label: "Med" },
+                    { value: "high", label: "High" },
+                    { value: "urgent", label: "Urgent" },
+                  ]}
+                  value={priority}
+                  onChange={setPriority}
+                />
+              </Labeled>
+              <Labeled label="Estimate (minutes)" hint="feeds calibration">
+                <TextInput type="number" min={0} step={5} value={estimate} onChange={(e) => setEstimate(e.target.value)} />
+              </Labeled>
+            </div>
+
+            <Labeled label="Tags" hint="casing preserved, no # prefix">
+              <TagInput tags={tags} onChange={setTags} />
+            </Labeled>
+
+            {/* Standard Due Date & Time */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <Labeled label="Due date">
+                <TextInput type="date" value={due} onChange={(e) => setDue(e.target.value)} />
+              </Labeled>
+              <div className="grid grid-cols-2 gap-2 sm:contents">
+                <Labeled label="Time block" hint="start">
+                  <TextInput type="time" value={dueTime} onChange={(e) => setDueTime(e.target.value)} disabled={!due} />
+                </Labeled>
+                <Labeled label="Block length" hint="min">
+                  <TextInput type="number" min={15} step={15} value={duration} onChange={(e) => setDuration(e.target.value)} disabled={!dueTime} />
+                </Labeled>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Multi-Block Calendar Scheduling */}
         <div className="rounded-xl border p-3 sm:p-3.5 space-y-3" style={{ borderColor: "var(--line)", background: "var(--panel2)" }}>
@@ -631,7 +725,7 @@ export function TaskDialog() {
           )}
 
           {/* Available Notes Chips */}
-          <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
             {filteredNotes.map((n) => {
               const selected = linkedNoteIds.includes(n.id);
               return (
@@ -655,6 +749,11 @@ export function TaskDialog() {
                 </button>
               );
             })}
+            {!noteSearch && unlinkedNotes.length > 5 && (
+              <span className="text-[10.5px] text-[var(--mut)] py-0.5 px-1 font-medium">
+                +{unlinkedNotes.length - 5} more notes (use Search above)
+              </span>
+            )}
             {state.notes.length > 0 && filteredNotes.length === 0 && (
               <span className="text-xs text-[var(--mut)] py-1">
                 No notes match "{noteSearch}".

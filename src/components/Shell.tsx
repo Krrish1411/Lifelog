@@ -25,6 +25,7 @@ import {
   Square,
   Sun,
   Timer,
+  Trash2,
   X,
 } from "lucide-react";
 import type { Priority, TokenKey, ViewId } from "../types";
@@ -823,11 +824,11 @@ export function Shell() {
   /* ============================ 3. DESK ENGINE (Workspace Sidebar + Status Bar) ============================ */
   if (layout === "desk") {
     return (
-      <div className="relative min-h-screen">
+      <div className="relative flex min-h-screen flex-col md:flex-row">
         {mobileBar}
         {mobileDrawer}
         <aside
-          className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r p-4 md:flex select-none glass-regular"
+          className="sticky top-0 z-40 hidden h-screen w-[236px] shrink-0 flex-col border-r p-4 md:flex select-none glass-regular"
           style={{ borderColor: "var(--line)" }}
         >
           <div className="flex items-center justify-between">
@@ -890,8 +891,8 @@ export function Shell() {
           </div>
         </aside>
 
-        <div className="ml-0 flex min-h-screen w-full flex-col md:ml-[236px] md:w-[calc(100%-236px)]">
-          <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-7 md:py-6 md:pb-20">
+        <div className="flex min-h-screen w-full flex-1 min-w-0 flex-col">
+          <main className="zoomable min-h-0 w-full flex-1 px-3.5 pt-[calc(68px+var(--safe-top,0px))] pb-28 md:px-8 md:pt-6 md:pb-20">
             <div className="w-full">{activeViewContent}</div>
           </main>
           <StatusBarDesk
@@ -1800,7 +1801,7 @@ function Overlays({
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const sc = state.settings.shortcuts ?? {};
       const k = e.key === " " ? "space" : e.key.length === 1 ? e.key.toLowerCase() : e.key;
-      const action = Object.entries(sc).find(([, key]) => key === k)?.[0];
+      const action = Object.entries(sc).find(([, key]) => (key || "").toLowerCase() === k.toLowerCase())?.[0];
       if (!action) return;
       e.preventDefault();
       switch (action) {
@@ -1810,20 +1811,50 @@ function Overlays({
         case "newTask":
           openTaskDialog();
           break;
+        case "newNote":
+          setView("notes");
+          window.location.hash = "notes";
+          setTimeout(() => window.dispatchEvent(new CustomEvent("lifelog:new-note")), 60);
+          break;
+        case "openDashboard":
+          setView("dashboard");
+          window.location.hash = "dashboard";
+          break;
+        case "openTasks":
+          setView("tasks");
+          window.location.hash = "tasks";
+          break;
         case "openFocus":
           setView("focus");
+          window.location.hash = "focus";
           break;
         case "openCalendar":
           setView("calendar");
+          window.location.hash = "calendar";
+          break;
+        case "openHabits":
+          setView("habits");
+          window.location.hash = "habits";
           break;
         case "openNotes":
           setView("notes");
+          window.location.hash = "notes";
           break;
         case "openDayLog":
           setView("daylog");
+          window.location.hash = "daylog";
           break;
         case "openReports":
           setView("reports");
+          window.location.hash = "reports";
+          break;
+        case "openReview":
+          setView("review");
+          window.location.hash = "review";
+          break;
+        case "openSettings":
+          setView("settings");
+          window.location.hash = "settings";
           break;
         case "help":
           setHelp(true);
@@ -1866,7 +1897,9 @@ function Overlays({
     <>
       {/* Daily Launch Greeting */}
       <Modal open={greeting} onClose={closeGreeting} title="LifeLog" width={520}>
-        <div className="flex flex-col items-start gap-4">
+        <div className="relative flex flex-col items-start gap-4">
+          <div className="h-1 -mt-4 -mx-4 sm:-mx-5 w-[calc(100%+32px)] sm:w-[calc(100%+40px)] rounded-t-3xl shrink-0"
+               style={{ background: "linear-gradient(90deg, var(--accent), color-mix(in srgb, var(--accent) 30%, transparent), transparent)" }} />
           <div>
             <div className="font-display text-[27px] font-bold leading-tight tracking-tight">
               {greetingFor(hour)}
@@ -1876,20 +1909,20 @@ function Overlays({
               {fmtDateLong(new Date())}
             </div>
           </div>
-          <div className="w-full rounded-2xl border p-4" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+          <div className="w-full rounded-2xl border p-4 glass-clear border-l-4 shadow-sm" style={{ borderLeftColor: "var(--accent)" }}>
             <div className="flex items-start gap-3">
               <Quote size={20} className="mt-0.5 shrink-0" style={{ color: "var(--accent)" }} />
-              <p className="font-display text-[16px] font-semibold leading-relaxed" style={{ color: "var(--text)" }}>
+              <p className="font-display text-[15.5px] font-semibold leading-relaxed" style={{ color: "var(--text)" }}>
                 {quote}
               </p>
             </div>
           </div>
-          <div className="flex w-full justify-end gap-2">
+          <div className="flex w-full items-center justify-between gap-2 pt-1">
             <Btn variant="ghost" onClick={closeGreeting}>
               Skip
             </Btn>
-            <Btn variant="primary" onClick={closeGreeting}>
-              Let’s log the day
+            <Btn variant="primary" onClick={closeGreeting} className="flex-1 sm:flex-initial sm:min-w-[170px]">
+              Let’s log the day →
             </Btn>
           </div>
         </div>
@@ -1941,17 +1974,28 @@ function Overlays({
       <Modal
         open={!!confirmReq?.open}
         onClose={() => resolveConfirm(false)}
-        title={confirmReq?.title ?? ""}
-        width={440}
+        title={
+          confirmReq?.danger ? (
+            <span className="flex items-center gap-2" style={{ color: "var(--danger)" }}>
+              <Trash2 size={16} />
+              {confirmReq?.title ?? "Confirm"}
+            </span>
+          ) : (
+            confirmReq?.title ?? ""
+          )
+        }
+        width={confirmReq?.compact ? 360 : 440}
+        compact={confirmReq?.compact}
         zIndex={95}
         footer={
           <>
-            <Btn variant="ghost" onClick={() => resolveConfirm(false)}>
+            <Btn variant="ghost" onClick={() => resolveConfirm(false)} size={confirmReq?.compact ? "sm" : "md"}>
               Cancel
             </Btn>
             <Btn
               variant={confirmReq?.danger ? "danger" : "primary"}
               disabled={blocked}
+              size={confirmReq?.compact ? "sm" : "md"}
               onClick={() => resolveConfirm(true)}
               style={
                 confirmReq?.danger
@@ -2002,27 +2046,99 @@ function Overlays({
       />
 
       {/* Keyboard Shortcuts Modal */}
-      <Modal open={help} onClose={() => setHelp(false)} title="Keyboard shortcuts" width={420}>
-        <div className="flex flex-col gap-1.5">
-          {SHORTCUT_ACTIONS.map((a) => (
-            <div
-              key={a.action}
-              className="flex items-center justify-between rounded-xl border px-3 py-2"
-              style={{ borderColor: "var(--line)", background: "var(--bg)" }}
-            >
-              <span className="text-[12.5px] font-bold">{a.label}</span>
-              <kbd
-                className="rounded-lg border px-2 py-0.5 font-mono text-[11.5px] font-bold"
-                style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
-              >
-                {(state.settings.shortcuts[a.action] ?? "") === "space"
-                  ? "␣ space"
-                  : state.settings.shortcuts[a.action] ?? "—"}
+      <Modal open={help} onClose={() => setHelp(false)} title="Keyboard Shortcuts Cheat Sheet" width={480}>
+        <div className="flex flex-col gap-3.5 select-none">
+          {/* Hero Banner: Command Palette */}
+          <div
+            className="flex items-center justify-between rounded-2xl p-3.5 glass-clear border"
+            style={{ borderColor: "color-mix(in srgb, var(--accent) 35%, var(--line))" }}
+          >
+            <div className="flex items-center gap-2.5">
+              <Search size={16} style={{ color: "var(--accent)" }} />
+              <div>
+                <div className="text-[13px] font-bold">Universal Command Palette</div>
+                <div className="text-[10.5px]" style={{ color: "var(--mut)" }}>
+                  Search tasks, switch views, trigger actions instantly
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <kbd className="rounded-lg border px-2 py-0.5 font-mono text-[11px] font-bold bg-[var(--panel2)] border-[var(--line)]">
+                Ctrl
+              </kbd>
+              <span className="text-[11px] font-bold opacity-60">+</span>
+              <kbd className="rounded-lg border px-2 py-0.5 font-mono text-[11px] font-bold bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)]">
+                K
               </kbd>
             </div>
-          ))}
-          <div className="mt-1 text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
-            Remap any key in Settings → Keyboard shortcuts. Shortcuts pause while you type in a field.
+          </div>
+
+          {/* Group 1: Navigation */}
+          <div className="flex flex-col gap-1">
+            <div className="px-1 text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
+              Navigation
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { action: "openDashboard", label: "Dashboard" },
+                { action: "openTasks", label: "Tasks" },
+                { action: "openFocus", label: "Focus & Timer" },
+                { action: "openCalendar", label: "Calendar" },
+                { action: "openHabits", label: "Habits" },
+                { action: "openNotes", label: "Notes" },
+                { action: "openDayLog", label: "Day Log" },
+                { action: "openReports", label: "Reports" },
+                { action: "openReview", label: "Review" },
+                { action: "openSettings", label: "Settings" },
+              ].map((item) => {
+                const keyVal = state.settings.shortcuts[item.action] ?? "";
+                return (
+                  <div
+                    key={item.action}
+                    className="flex items-center justify-between rounded-xl border px-2.5 py-1.5 glass-regular"
+                    style={{ borderColor: "var(--line)" }}
+                  >
+                    <span className="text-[12px] font-bold truncate pr-1">{item.label}</span>
+                    <kbd className="rounded-md border px-1.5 py-0.2 font-mono text-[10.5px] font-bold shrink-0 bg-[var(--panel2)] border-[var(--line)]">
+                      {keyVal ? keyVal.toUpperCase() : "—"}
+                    </kbd>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Group 2: Creation & Action */}
+          <div className="flex flex-col gap-1">
+            <div className="px-1 text-[10.5px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
+              Actions & Creation
+            </div>
+            <div className="grid grid-cols-2 gap-1.5">
+              {[
+                { action: "newTask", label: "New task / Log entry" },
+                { action: "newNote", label: "New note" },
+                { action: "togglePause", label: "Pause / Resume timer" },
+                { action: "help", label: "Shortcut cheat sheet" },
+              ].map((item) => {
+                const keyVal = state.settings.shortcuts[item.action] ?? "";
+                return (
+                  <div
+                    key={item.action}
+                    className="flex items-center justify-between rounded-xl border px-2.5 py-1.5 glass-regular"
+                    style={{ borderColor: "var(--line)" }}
+                  >
+                    <span className="text-[12px] font-bold truncate pr-1">{item.label}</span>
+                    <kbd className="rounded-md border px-1.5 py-0.2 font-mono text-[10.5px] font-bold shrink-0 bg-[var(--panel2)] border-[var(--line)]">
+                      {keyVal === "space" ? "␣ space" : keyVal ? keyVal.toUpperCase() : "—"}
+                    </kbd>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="mt-1 text-[11px] font-medium text-center" style={{ color: "var(--mut)" }}>
+            Remap any key anytime in <span className="font-bold text-[var(--text)]">Settings → Shortcuts</span>. Disabled inside text inputs.
           </div>
         </div>
       </Modal>

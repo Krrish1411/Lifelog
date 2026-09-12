@@ -5,6 +5,7 @@ import {
   MONTHS, WEEKDAYS_SHORT, addDaysIso, fmtDayShort, fmtDur, isoDate, listDates, parseIso,
   sessionMinutes, streakStats, todayIso, weekStartIso,
 } from "../utils/core";
+import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { BarRow, Btn, EmptyState, Seg, cn } from "../components/ui";
 
 type Preset = "week" | "last7" | "month" | "last30" | "all" | "custom";
@@ -101,6 +102,38 @@ export function ReportsView() {
     }
     return { planned, actual };
   }, [state.tasks, state.sessions, from, to]);
+
+  /* ---- Life Log vs Work breakdown ---- */
+  const lifeTasks = useMemo(() => {
+    return state.tasks.filter((t) => {
+      if (t.projectId !== LIFE_LOG_PROJECT_ID) return false;
+      const d = t.due || isoDate(new Date(t.createdAt));
+      return d >= from && d <= to;
+    });
+  }, [state.tasks, from, to]);
+
+  const lifeMin = useMemo(() => {
+    return lifeTasks.reduce((acc, t) => acc + (t.durationMin || t.estimateMin || 30), 0);
+  }, [lifeTasks]);
+
+  const totalAllMin = totalMin + lifeMin;
+  const workPct = totalAllMin > 0 ? Math.round((totalMin / totalAllMin) * 100) : 50;
+  const lifePct = 100 - workPct;
+
+  const lifeCategoryBreakdown = useMemo(() => {
+    const map = new Map<string, { label: string; emoji: string; min: number }>();
+    for (const cat of LIFE_LOG_CATEGORIES) {
+      map.set(cat.tag, { label: cat.label, emoji: cat.emoji, min: 0 });
+    }
+    for (const t of lifeTasks) {
+      const match = LIFE_LOG_CATEGORIES.find((c) => t.tags.includes(c.tag)) || LIFE_LOG_CATEGORIES[0];
+      const cur = map.get(match.tag);
+      if (cur) {
+        cur.min += t.durationMin || t.estimateMin || 30;
+      }
+    }
+    return [...map.values()].filter((x) => x.min > 0).sort((a, b) => b.min - a.min);
+  }, [lifeTasks]);
 
   /* ---- estimate calibration (task / project / tag) ---- */
   const [calibDim, setCalibDim] = useState<"task" | "project" | "tag">("task");
@@ -322,6 +355,82 @@ export function ReportsView() {
             <span>{quality?.pauses ?? 0} pause{(quality?.pauses ?? 0) === 1 ? "" : "s"} logged</span>
           </div>
         </div>
+      </div>
+
+      {/* Life Balance: Work vs Routine & Life Log */}
+      <div className="card card-hover engine-panel p-4.5 w-full min-w-0 glass-regular border" style={{ borderColor: "var(--line)" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3" style={{ borderColor: "var(--line)" }}>
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🌊</span>
+            <div>
+              <div className="font-display text-[15.5px] font-bold tracking-tight">
+                Life Balance · Work vs Routine Life
+              </div>
+              <div className="text-xs font-semibold text-[var(--mut)]">
+                Comparing deep work sessions vs lifestyle streams (YouTube, research, vibe coding, habits)
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="chip text-xs font-bold text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-soft)]">
+              Work: {fmtDur(totalMin)} ({workPct}%)
+            </span>
+            <span className="chip text-xs font-bold text-sky-500 border-sky-500/40 bg-sky-500/10">
+              Life Log: {fmtDur(lifeMin)} ({lifePct}%)
+            </span>
+          </div>
+        </div>
+
+        {/* Visual proportion bar */}
+        <div className="mt-3.5 space-y-1.5">
+          <div className="h-3 w-full rounded-full overflow-hidden flex bg-[var(--panel2)] border border-[var(--line)]">
+            <div
+              className="h-full transition-all"
+              style={{ width: `${workPct}%`, background: "var(--accent)" }}
+              title={`Work & Projects: ${workPct}% (${fmtDur(totalMin)})`}
+            />
+            <div
+              className="h-full transition-all bg-sky-500"
+              style={{ width: `${lifePct}%` }}
+              title={`Routine & Life Streams: ${lifePct}% (${fmtDur(lifeMin)})`}
+            />
+          </div>
+          <div className="flex justify-between text-[11px] font-bold text-[var(--mut)]">
+            <span className="flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-[var(--accent)] inline-block" />
+              Work & Focus Sessions ({workPct}%)
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-2 w-2 rounded-full bg-sky-500 inline-block" />
+              Routine, Learning & Lifestyle ({lifePct}%)
+            </span>
+          </div>
+        </div>
+
+        {/* Life stream activity chips */}
+        {lifeCategoryBreakdown.length > 0 ? (
+          <div className="mt-4 pt-3 border-t grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2" style={{ borderColor: "var(--line)" }}>
+            {lifeCategoryBreakdown.map((item) => (
+              <div
+                key={item.label}
+                className="flex items-center justify-between p-2.5 rounded-xl border bg-[var(--bg)]"
+                style={{ borderColor: "var(--line)" }}
+              >
+                <div className="flex items-center gap-1.5 truncate">
+                  <span>{item.emoji}</span>
+                  <span className="text-xs font-bold truncate">{item.label}</span>
+                </div>
+                <span className="font-mono text-xs font-extrabold text-[var(--text)] shrink-0 pl-1">
+                  {fmtDur(item.min)}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-3 pt-2 text-[11px] text-[var(--mut)] font-medium">
+            💡 Log your YouTube watching, vibe coding, reading or leisure under the <strong>🌊 Life Log</strong> project in Tasks to see your breakdown here.
+          </div>
+        )}
       </div>
 
       {/* summary strip */}

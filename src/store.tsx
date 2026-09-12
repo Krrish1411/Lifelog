@@ -9,7 +9,7 @@ import {
 } from "react";
 import type { ReactNode } from "react";
 import type { State, Task, ViewId } from "./types";
-import { DEFAULT_SETTINGS, STATE_VERSION } from "./types";
+import { DEFAULT_SETTINGS, DEFAULT_SHORTCUTS, LIFE_LOG_PROJECT_ID, STATE_VERSION } from "./types";
 import {
   decryptEnvelope,
   encryptEnvelope,
@@ -28,6 +28,7 @@ import {
 } from "./utils/idb";
 import {
   cancelTaskDueNotification,
+  isLinuxDesktop,
   isNative,
   scheduleTaskDueNotification,
   triggerHaptic,
@@ -76,6 +77,7 @@ export interface ConfirmOpts {
   body: string;
   confirmLabel?: string;
   danger?: boolean;
+  compact?: boolean;
   requireText?: string;
 }
 export interface TaskDialogState {
@@ -119,9 +121,24 @@ export function useApp(): AppCtx {
 /* ---------------- state loading / merging ---------------- */
 function mergeState(raw: Partial<State>): State {
   const base = raw as State;
+  const rawProjects = base.projects ? [...base.projects] : [];
+  if (!rawProjects.some((p) => p.id === LIFE_LOG_PROJECT_ID)) {
+    rawProjects.push({
+      id: LIFE_LOG_PROJECT_ID,
+      name: "Life Log",
+      emoji: "🌊",
+      color: "#38bdf8",
+      createdAt: Date.now(),
+      order: 9999,
+    });
+  }
+
+  const initialLayout = base.settings?.layout ?? DEFAULT_SETTINGS.layout;
+  const isLinuxAutoDesk = isLinuxDesktop && initialLayout === "glass" && base.settings?.disableGlassOnLinux !== false;
+
   return {
     version: STATE_VERSION,
-    projects: base.projects ?? [],
+    projects: rawProjects,
     tasks: base.tasks ?? [],
     habits: base.habits ?? [],
     folders: base.folders ?? [],
@@ -132,6 +149,7 @@ function mergeState(raw: Partial<State>): State {
     settings: {
       ...DEFAULT_SETTINGS,
       ...(base.settings ?? {}),
+      layout: isLinuxAutoDesk ? "desk" : initialLayout,
       accent:
         !base.settings?.accent || base.settings.accent.toLowerCase() === "#d97706"
           ? DEFAULT_SETTINGS.accent
@@ -141,7 +159,7 @@ function mergeState(raw: Partial<State>): State {
         ...(base.settings?.reportWidgets ?? {}),
       },
       shortcuts: {
-        ...DEFAULT_SETTINGS.shortcuts,
+        ...DEFAULT_SHORTCUTS,
         ...(base.settings?.shortcuts ?? {}),
       },
       tokens: base.settings?.tokens ?? {},

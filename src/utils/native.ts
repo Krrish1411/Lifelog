@@ -12,6 +12,9 @@ export const isNativeMobile = Capacitor.isNativePlatform();
 export const isTauri = typeof window !== "undefined" && checkIsTauri();
 export const isNative = isNativeMobile || isTauri;
 export const platformType = isTauri ? "desktop" : isNativeMobile ? "android" : "web";
+const ua = typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() : "";
+export const isLinux = typeof window !== "undefined" && ua.includes("linux") && !ua.includes("android");
+export const isLinuxDesktop = isTauri && isLinux;
 
 /**
  * Send native desktop notification via Tauri.
