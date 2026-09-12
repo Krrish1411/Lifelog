@@ -155,6 +155,130 @@ export function fmtTimeRange(startTime: string, durationMin: number, format: "12
   const endTime = calcEndTimeFromDuration(startTime, durationMin);
   return `${fmtTimeStr(startTime, format)} – ${fmtTimeStr(endTime, format)} (${fmtDur(durationMin)})`;
 }
+
+/**
+ * Accurately calculates how many minutes of a task fall on targetDateIso.
+ * Properly attributes overnight tasks (such as sleep from 23:00 to 07:00).
+ * If logged on targetDate (morning wake-up):
+ *   - Evening date (targetDate - 1) gets the evening portion (e.g. 23:00-24:00 = 60m).
+ *   - Morning date (targetDate) gets the morning portion (e.g. 00:00-07:00 = 420m).
+ */
+export function getTaskMinutesForDay(
+  task: {
+    due: string | null;
+    dueTime: string | null;
+    durationMin: number;
+    estimateMin?: number;
+    tags?: string[];
+  },
+  targetDateIso: string
+): number {
+  const dur = task.durationMin > 0 ? task.durationMin : (task.estimateMin || 0);
+  if (dur <= 0) return 0;
+  if (!task.due) return 0;
+
+  // If task has no dueTime, it simply belongs to task.due
+  if (!task.dueTime) {
+    return task.due === targetDateIso ? dur : 0;
+  }
+
+  const startMin = parseTimeMinutes(task.dueTime);
+  const endMin = startMin + dur;
+
+  // Does this task cross midnight?
+  const isOvernight = endMin > 1440;
+
+  if (!isOvernight) {
+    return task.due === targetDateIso ? dur : 0;
+  }
+
+  // Crosses midnight!
+  const isSleep = task.tags?.includes("sleep");
+  let eveningDate = task.due;
+  let morningDate = addDaysIso(task.due, 1);
+
+  if (isSleep && startMin >= 1080) {
+    // Sleep logged on morning date (wake-up day) with evening start:
+    morningDate = task.due;
+    eveningDate = addDaysIso(task.due, -1);
+  }
+
+  if (targetDateIso === eveningDate) {
+    return 1440 - startMin;
+  }
+  if (targetDateIso === morningDate) {
+    return endMin - 1440;
+  }
+
+  return 0;
+}
+
+export interface TimeClashResult {
+  hasConflict: boolean;
+  conflictTitle?: string;
+  conflictTimeRange?: string;
+}
+
+/**
+ * Checks if a proposed time block on targetDate clashes with existing sessions or scheduled tasks.
+ */
+export function checkTimeClash(
+  targetDate: string,
+  startTime: string,
+  durationMin: number,
+  tasks: Array<{ id: string; due: string | null; dueTime: string | null; durationMin: number; estimateMin?: number; title: string }>,
+  sessions: Session[],
+  currentId?: string | null,
+  timeFormat: "12h" | "24h" = "12h"
+): TimeClashResult {
+  if (!targetDate || !startTime || durationMin <= 0) {
+    return { hasConflict: false };
+  }
+
+  const proposedStart = parseTimeMinutes(startTime);
+  const proposedEnd = proposedStart + durationMin;
+
+  // 1. Check existing Focus Sessions on targetDate
+  for (const s of sessions) {
+    const sDate = isoDate(new Date(s.startedAt));
+    if (sDate !== targetDate) continue;
+    const sStart = new Date(s.startedAt);
+    const sStartMin = sStart.getHours() * 60 + sStart.getMinutes();
+    const sDur = Math.max(1, Math.round(sessionMinutes(s)));
+    const sEndMin = sStartMin + sDur;
+
+    // Overlap condition: proposedStart < sEndMin && proposedEnd > sStartMin
+    if (proposedStart < sEndMin && proposedEnd > sStartMin) {
+      const timeRange = fmtTimeRange(minutesToTimeStr(sStartMin), sDur, timeFormat);
+      return {
+        hasConflict: true,
+        conflictTitle: `Focus Session (${s.mode})`,
+        conflictTimeRange: timeRange,
+      };
+    }
+  }
+
+  // 2. Check existing tasks/routines with dueTime on targetDate
+  for (const t of tasks) {
+    if (currentId && t.id === currentId) continue;
+    if (t.due !== targetDate || !t.dueTime) continue;
+    const tStartMin = parseTimeMinutes(t.dueTime);
+    const tDur = Math.max(1, t.durationMin || t.estimateMin || 30);
+    const tEndMin = tStartMin + tDur;
+
+    if (proposedStart < tEndMin && proposedEnd > tStartMin) {
+      const timeRange = fmtTimeRange(t.dueTime, tDur, timeFormat);
+      return {
+        hasConflict: true,
+        conflictTitle: t.title,
+        conflictTimeRange: timeRange,
+      };
+    }
+  }
+
+  return { hasConflict: false };
+}
+
 export function fmtDayShort(iso: string): string {
   const d = parseIso(iso);
   const wd = (d.getDay() + 6) % 7;

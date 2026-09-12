@@ -43,6 +43,8 @@ import {
   calcStartTimeFromDuration,
   fmtTimeStr,
   fmtTimeRange,
+  getTaskMinutesForDay,
+  checkTimeClash,
 } from "../utils/core";
 import {
   Btn,
@@ -256,10 +258,32 @@ export function TasksView({
     }
   };
 
-  const handleQuickLog = (asCompleted: boolean) => {
+  const handleQuickLog = async (asCompleted: boolean) => {
     const cat = allCategories.find((c) => c.id === routineCat) || allCategories[0] || LIFE_LOG_CATEGORIES[0];
     const durNum = Math.max(5, parseInt(routineDuration || "30", 10) || 30);
     const finalTitle = routineTitle.trim() || (cat.id === "sleep" ? "Night Sleep" : cat.id === "routine" ? "Daily Routine" : `${cat.label}`);
+
+    if (routineStartTime && durNum > 0) {
+      const clash = checkTimeClash(
+        effectiveLogDate,
+        routineStartTime,
+        durNum,
+        state.tasks,
+        state.sessions,
+        null,
+        state.settings.timeFormat || "12h"
+      );
+      if (clash.hasConflict) {
+        const ok = await confirm({
+          title: "Time Clash Detected",
+          body: `This scheduled time (${fmtTimeRange(routineStartTime, durNum, state.settings.timeFormat || "12h")}) overlaps with "${clash.conflictTitle}" (${clash.conflictTimeRange}). Log anyway?`,
+          confirmLabel: "Log Anyway",
+          cancelLabel: "Adjust Time",
+          danger: false,
+        });
+        if (!ok) return;
+      }
+    }
 
     const newTask: Task = {
       id: uid(),
@@ -294,50 +318,30 @@ export function TasksView({
     if (!isLifeLog) return null;
     const targetDate = effectiveLogDate;
     const daySessions = state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === targetDate);
-    const daySessionTaskIds = new Set(daySessions.map((s) => s.taskId).filter(Boolean));
 
-    const dayTasks = state.tasks.filter((t) => {
-      if (t.projectId === LIFE_LOG_PROJECT_ID) {
-        return (
-          t.due === targetDate ||
-          (!t.due && isoDate(new Date(t.createdAt)) === targetDate) ||
-          (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate)
-        );
-      }
-      // Other projects: include tasks completed, due, or focused on targetDate!
-      const wasDoneOnDate = t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate;
-      const wasDueOnDate = t.due === targetDate;
-      const hadSessionOnDate = daySessionTaskIds.has(t.id);
-      return wasDoneOnDate || wasDueOnDate || hadSessionOnDate;
-    });
-
-    // Dynamic duration helper: if duration not logged, dynamically use focus tracked minutes!
-    const getTaskDuration = (t: Task) => {
-      const tracked = trackedByTask.get(t.id) || 0;
-      return (t.durationMin > 0 ? t.durationMin : tracked) || t.estimateMin || 0;
-    };
-
-    const sleepMin = dayTasks
+    // Dynamic split calculations for cross-midnight overnight items:
+    const sleepMin = state.tasks
       .filter((t) => t.tags.includes("sleep"))
-      .reduce((sum, t) => sum + getTaskDuration(t), 0);
+      .reduce((sum, t) => sum + getTaskMinutesForDay(t, targetDate), 0);
 
-    const routineMin = dayTasks
+    const routineMin = state.tasks
       .filter((t) => t.projectId === LIFE_LOG_PROJECT_ID && !t.tags.includes("sleep"))
-      .reduce((sum, t) => sum + getTaskDuration(t), 0);
+      .reduce((sum, t) => sum + getTaskMinutesForDay(t, targetDate), 0);
 
-    // Deep work & focus sessions for this date (from state.sessions and normal project tasks):
-    const totalDayFocusMin = daySessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
-    const focusOnLifeLogMin = daySessions
-      .filter((s) => s.taskId && dayTasks.some((t) => t.id === s.taskId && t.projectId === LIFE_LOG_PROJECT_ID))
+    // Deep work & focus sessions for this date (from actual sessions):
+    const totalDayFocusMin = daySessions
+      .filter((s) => s.mode !== "break")
       .reduce((sum, s) => sum + sessionMinutes(s), 0);
-    const otherTasksDuration = dayTasks
-      .filter((t) => t.projectId !== LIFE_LOG_PROJECT_ID)
-      .reduce((sum, t) => sum + getTaskDuration(t), 0);
-    const dedicatedWorkMin = Math.max(totalDayFocusMin - focusOnLifeLogMin, otherTasksDuration);
+    const dedicatedWorkMin = totalDayFocusMin;
 
     const totalMin = sleepMin + routineMin + dedicatedWorkMin;
     const dayPct = Math.min(100, Math.round((totalMin / 1440) * 100)); // 1440 min = 24h
     const unloggedMin = Math.max(0, 1440 - totalMin);
+
+    const lifeTasksForDay = state.tasks.filter((t) => {
+      if (t.projectId !== LIFE_LOG_PROJECT_ID) return false;
+      return getTaskMinutesForDay(t, targetDate) > 0 || t.due === targetDate;
+    });
 
     return {
       totalMin,
@@ -346,12 +350,16 @@ export function TasksView({
       workMin: dedicatedWorkMin,
       unloggedMin,
       dayPct,
-      count: dayTasks.length,
+      count: lifeTasksForDay.length,
       targetDate,
     };
-  }, [isLifeLog, state.tasks, state.sessions, effectiveLogDate, trackedByTask]);
+  }, [isLifeLog, state.tasks, state.sessions, effectiveLogDate]);
 
-  const openTasks = useMemo(() => state.tasks.filter((t) => !t.done), [state.tasks]);
+  // Normal task views strictly exclude LifeLog routine entries
+  const openTasks = useMemo(
+    () => state.tasks.filter((t) => !t.done && t.projectId !== LIFE_LOG_PROJECT_ID),
+    [state.tasks]
+  );
   const inboxCount = openTasks.filter((t) => !t.due).length;
   const todayCount = openTasks.filter(
     (t) => t.due && t.due <= today && (!t.snoozedUntil || t.snoozedUntil <= Date.now())
@@ -361,25 +369,18 @@ export function TasksView({
   const list = useMemo(() => {
     if (isLifeLog) {
       const targetDate = effectiveLogDate;
-      const daySessions = state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === targetDate);
-      const daySessionTaskIds = new Set(daySessions.map((s) => s.taskId).filter(Boolean));
 
+      // LifeLog view displays ONLY LifeLog stream items, supporting cross-midnight sleep attribution
       let base = state.tasks.filter((t) => {
-        if (routineDateChoice === "all") {
-          return true;
-        }
-        if (t.projectId === LIFE_LOG_PROJECT_ID) {
-          return (
-            t.due === targetDate ||
-            (!t.due && isoDate(new Date(t.createdAt)) === targetDate) ||
-            (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate)
-          );
-        }
-        // Include normal tasks from other projects active, completed, or focused on targetDate!
-        const wasDoneOnDate = t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate;
-        const wasDueOnDate = t.due === targetDate;
-        const hadSessionOnDate = daySessionTaskIds.has(t.id);
-        return wasDoneOnDate || wasDueOnDate || hadSessionOnDate;
+        if (t.projectId !== LIFE_LOG_PROJECT_ID) return false;
+        if (routineDateChoice === "all") return true;
+        const minutesOnDay = getTaskMinutesForDay(t, targetDate);
+        if (minutesOnDay > 0) return true;
+        return (
+          t.due === targetDate ||
+          (!t.due && isoDate(new Date(t.createdAt)) === targetDate) ||
+          (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate)
+        );
       });
 
       const q = query.trim().toLowerCase();

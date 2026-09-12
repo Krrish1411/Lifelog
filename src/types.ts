@@ -273,6 +273,12 @@ export interface State {
   tagColors: Record<string, string>; // tag name (exact casing) → hex colour
   settings: Settings;
   meta: Meta;
+  deleted?: {
+    notes?: Record<string, number>; // id -> deletedAt epoch ms
+    tasks?: Record<string, number>;
+    projects?: Record<string, number>;
+    habits?: Record<string, number>;
+  };
 }
 
 export const REPORT_WIDGETS: { key: string; label: string; desc: string }[] = [

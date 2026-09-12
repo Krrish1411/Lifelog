@@ -15,7 +15,7 @@ import {
 import type { Priority, Project, ViewId } from "../types";
 import { useApp } from "../store";
 import { triggerHaptic } from "../utils/native";
-import { normalizeHex } from "../utils/core";
+import { normalizeHex, uid } from "../utils/core";
 import { scrollToPageTop, useBodyScrollLock } from "../utils/scrollLock";
 import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, TextInput, cn } from "./ui";
 
@@ -43,8 +43,9 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
   const [tagsExpanded, setTagsExpanded] = useState(true);
   const [prioritiesExpanded, setPrioritiesExpanded] = useState(false);
 
-  // Editing state for projects
+  // Editing / Creating state for projects
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [projName, setProjName] = useState("");
   const [projEmoji, setProjEmoji] = useState("📁");
   const [projColor, setProjColor] = useState("#4fa3a5");
@@ -157,17 +158,36 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
 
   const saveEditProject = () => {
     if (!projName.trim()) return toast("Project needs a name", "err");
-    if (!editingProject) return;
-    set((s) => ({
-      ...s,
-      projects: s.projects.map((p) =>
-        p.id === editingProject.id
-          ? { ...p, name: projName.trim(), emoji: projEmoji, color: projColor }
-          : p
-      ),
-    }));
-    toast("Project updated", "ok");
-    setEditingProject(null);
+    if (editingProject) {
+      set((s) => ({
+        ...s,
+        projects: s.projects.map((p) =>
+          p.id === editingProject.id
+            ? { ...p, name: projName.trim(), emoji: projEmoji, color: projColor }
+            : p
+        ),
+      }));
+      toast("Project updated", "ok");
+      setEditingProject(null);
+    } else {
+      const newId = uid();
+      set((s) => ({
+        ...s,
+        projects: [
+          ...s.projects,
+          {
+            id: newId,
+            name: projName.trim(),
+            emoji: projEmoji,
+            color: projColor,
+            createdAt: Date.now(),
+          },
+        ],
+      }));
+      toast(`Created project "${projName.trim()}"`, "ok");
+      setIsCreatingProject(false);
+      handleProjectClick(newId);
+    }
   };
 
   const openEditTag = (e: React.MouseEvent, t: string) => {
@@ -320,8 +340,16 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
                 type="button"
                 onClick={() => {
                   triggerHaptic("medium");
-                  onNewProject?.();
-                  onClose();
+                  if (onNewProject) {
+                    onNewProject();
+                    onClose();
+                  } else {
+                    setEditingProject(null);
+                    setProjName("");
+                    setProjEmoji("📁");
+                    setProjColor("#4fa3a5");
+                    setIsCreatingProject(true);
+                  }
                 }}
                 className="rounded-md p-1 text-[var(--mut)] hover:bg-[var(--panel2)] hover:text-[var(--text)] active:scale-95 cursor-pointer"
                 title="Create Project"
@@ -533,45 +561,56 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
         </div>
       </aside>
 
-      {/* ================= project edit modal ================= */}
+      {/* ================= project create / edit modal ================= */}
       <Modal
-        open={!!editingProject}
-        onClose={() => setEditingProject(null)}
-        title="Edit project"
+        open={!!editingProject || isCreatingProject}
+        onClose={() => {
+          setEditingProject(null);
+          setIsCreatingProject(false);
+        }}
+        title={editingProject ? "Edit project" : "Create Project"}
         width={480}
         footer={
           <>
+            {editingProject && (
+              <Btn
+                variant="danger"
+                className="mr-auto"
+                onClick={async () => {
+                  if (!editingProject) return;
+                  const p = editingProject;
+                  setEditingProject(null);
+                  const count = state.tasks.filter((t) => t.projectId === p.id).length;
+                  const ok = await confirm({
+                    title: `Delete project "${p.name}"?`,
+                    body: `This project and its ${count} task(s) will be permanently deleted. Tracked time history remains in reports.`,
+                    confirmLabel: "Delete project",
+                    danger: true,
+                    requireText: p.name,
+                  });
+                  if (!ok) return;
+                  set((s) => ({
+                    ...s,
+                    projects: s.projects.filter((x) => x.id !== p.id),
+                    tasks: s.tasks.filter((t) => t.projectId !== p.id),
+                  }));
+                  toast(`Deleted project "${p.name}"`, "warn");
+                }}
+              >
+                <Trash2 size={13} /> Delete project
+              </Btn>
+            )}
             <Btn
-              variant="danger"
-              className="mr-auto"
-              onClick={async () => {
-                if (!editingProject) return;
-                const p = editingProject;
+              variant="ghost"
+              onClick={() => {
                 setEditingProject(null);
-                const count = state.tasks.filter((t) => t.projectId === p.id).length;
-                const ok = await confirm({
-                  title: `Delete project "${p.name}"?`,
-                  body: `This project and its ${count} task(s) will be permanently deleted. Tracked time history remains in reports.`,
-                  confirmLabel: "Delete project",
-                  danger: true,
-                  requireText: p.name,
-                });
-                if (!ok) return;
-                set((s) => ({
-                  ...s,
-                  projects: s.projects.filter((x) => x.id !== p.id),
-                  tasks: s.tasks.filter((t) => t.projectId !== p.id),
-                }));
-                toast(`Deleted project "${p.name}"`, "warn");
+                setIsCreatingProject(false);
               }}
             >
-              <Trash2 size={13} /> Delete project
-            </Btn>
-            <Btn variant="ghost" onClick={() => setEditingProject(null)}>
               Cancel
             </Btn>
             <Btn variant="primary" onClick={saveEditProject}>
-              Save
+              {editingProject ? "Save" : "Create Project"}
             </Btn>
           </>
         }

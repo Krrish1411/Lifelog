@@ -39,11 +39,20 @@ export function useApplyTheme(s: Settings) {
       if (o && normalizeHex(o)) derived[k] = normalizeHex(o)!;
     });
 
-    derived.text = ensureContrast(derived.text, bg, 7);
-    derived.mut = ensureContrast(derived.mut, bg, 4.6);
-    derived.ok = ensureContrast(derived.ok, bg, 3);
-    derived.warn = ensureContrast(derived.warn, bg, 3);
-    derived.danger = ensureContrast(derived.danger, bg, 3);
+    if (s.highContrast) {
+      derived.text = dark ? "#ffffff" : "#000000";
+      derived.mut = dark ? "#e2e8f0" : "#1e293b";
+      derived.line = dark ? "#ffffff" : "#000000";
+      derived.ok = dark ? "#4ade80" : "#15803d";
+      derived.warn = dark ? "#facc15" : "#b45309";
+      derived.danger = dark ? "#f87171" : "#b91c1c";
+    } else {
+      derived.text = ensureContrast(derived.text, bg, 7);
+      derived.mut = ensureContrast(derived.mut, bg, 4.6);
+      derived.ok = ensureContrast(derived.ok, bg, 3);
+      derived.warn = ensureContrast(derived.warn, bg, 3);
+      derived.danger = ensureContrast(derived.danger, bg, 3);
+    }
 
     const accentInput =
       !s.accent || s.accent.toLowerCase() === "#d97706"

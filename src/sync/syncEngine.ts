@@ -627,7 +627,10 @@ class WebRTCSyncEngine {
       // Note: Do NOT auto-broadcast or auto-merge! Await user direction choice in SyncDialog!
     } else if (msg.type === "FORCE_REPLACE_STATE") {
       this.setStatus("syncing");
-      this.dispatchStateMerge(() => msg.state);
+      this.dispatchStateMerge((local) => ({
+        ...msg.state,
+        settings: local.settings,
+      }));
       this.setStatus("connected");
     } else if (msg.type === "FULL_STATE") {
       this.setStatus("syncing");
@@ -699,14 +702,54 @@ export function getSessionLatestTs(s: Session): number {
 }
 
 /**
- * Merge two full states using Last-Write-Wins (LWW) per entity ID.
+ * Merge two full states using Last-Write-Wins (LWW) per entity ID,
+ * enforcing deletion tombstones and preserving local device settings.
  */
 export function mergeFullState(local: State, remote: State): State {
-  const mergedTasks = mergeList(local.tasks, remote.tasks, (t) => t.doneAt ?? t.createdAt);
-  const mergedNotes = mergeList(local.notes, remote.notes, (n) => n.updatedAt ?? n.createdAt);
-  const mergedProjects = mergeList(local.projects, remote.projects, (p) => p.createdAt);
-  const mergedHabits = mergeList(local.habits, remote.habits, (h) => h.createdAt);
-  const mergedSessions = mergeList(local.sessions, remote.sessions, getSessionLatestTs);
+  // 1. Merge tombstones from local and remote
+  const mergedDeleted = {
+    notes: { ...(local.deleted?.notes ?? {}), ...(remote.deleted?.notes ?? {}) },
+    tasks: { ...(local.deleted?.tasks ?? {}), ...(remote.deleted?.tasks ?? {}) },
+    projects: { ...(local.deleted?.projects ?? {}), ...(remote.deleted?.projects ?? {}) },
+    habits: { ...(local.deleted?.habits ?? {}), ...(remote.deleted?.habits ?? {}) },
+  };
+
+  // 2. Merge entity lists with LWW
+  let mergedTasks = mergeList(local.tasks, remote.tasks, (t) => t.doneAt ?? t.createdAt);
+  let mergedNotes = mergeList(local.notes, remote.notes, (n) => n.updatedAt ?? n.createdAt);
+  let mergedProjects = mergeList(local.projects, remote.projects, (p) => p.createdAt);
+  let mergedHabits = mergeList(local.habits, remote.habits, (h) => h.createdAt);
+  let mergedSessions = mergeList(local.sessions, remote.sessions, getSessionLatestTs);
+
+  // 3. Apply tombstones: purge any deleted items so they never resurrect
+  if (mergedDeleted.notes) {
+    mergedNotes = mergedNotes.filter((n) => {
+      const delAt = mergedDeleted.notes[n.id];
+      if (!delAt) return true;
+      return (n.updatedAt ?? n.createdAt) > delAt;
+    });
+  }
+  if (mergedDeleted.tasks) {
+    mergedTasks = mergedTasks.filter((t) => {
+      const delAt = mergedDeleted.tasks[t.id];
+      if (!delAt) return true;
+      return t.createdAt > delAt;
+    });
+  }
+  if (mergedDeleted.projects) {
+    mergedProjects = mergedProjects.filter((p) => {
+      const delAt = mergedDeleted.projects[p.id];
+      if (!delAt) return true;
+      return p.createdAt > delAt;
+    });
+  }
+  if (mergedDeleted.habits) {
+    mergedHabits = mergedHabits.filter((h) => {
+      const delAt = mergedDeleted.habits[h.id];
+      if (!delAt) return true;
+      return h.createdAt > delAt;
+    });
+  }
 
   const mergedDayLogs = { ...local.dayLogs };
   for (const [day, rLog] of Object.entries(remote.dayLogs ?? {})) {
@@ -716,6 +759,7 @@ export function mergeFullState(local: State, remote: State): State {
     }
   }
 
+  // Preserve local device settings (Theme, Layout, Sound, Shortcuts, Mobile Engine)
   return {
     ...local,
     tasks: mergedTasks,
@@ -725,6 +769,8 @@ export function mergeFullState(local: State, remote: State): State {
     sessions: mergedSessions,
     dayLogs: mergedDayLogs,
     folders: mergeList(local.folders, remote.folders, () => 0),
+    deleted: mergedDeleted,
+    settings: local.settings,
   };
 }
 

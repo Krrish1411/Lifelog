@@ -156,6 +156,7 @@ export function NotesView() {
 
   /* load + decrypt selected note (only when switching notes!) */
   const prevSelId = useRef<string | null>(null);
+  const lastLoadedUpdatedAt = useRef<number>(0);
   useEffect(() => {
     if (prevSelId.current && prevSelId.current !== selId && dirty.current) {
       flushSave();
@@ -168,7 +169,10 @@ export function NotesView() {
       taRef.current.scrollTop = 0;
     }
 
-    if (isSwitching || loadedFor.current !== selId) {
+    const note = selId && !selId.startsWith("draft-daily-") ? state.notes.find((n) => n.id === selId) : null;
+    const isRemoteUpdate = !dirty.current && note && note.updatedAt > (lastLoadedUpdatedAt.current || 0);
+
+    if (isSwitching || loadedFor.current !== selId || isRemoteUpdate) {
       if (selId.startsWith("draft-daily-")) {
         const dayIso = selId.replace("draft-daily-", "") || today;
         loadedFor.current = selId;
@@ -176,16 +180,16 @@ export function NotesView() {
         setDraft({ title: fmtNoteName(dayIso), text: "" });
         return;
       }
-      const note = state.notes.find((n) => n.id === selId);
       if (!note) return;
       loadedFor.current = selId;
+      lastLoadedUpdatedAt.current = note.updatedAt;
       dirty.current = false;
       setDraft({ title: note.title, text: "" });
       getDeviceKey().then((k) => decryptText(k, note.blob)).then((text) => {
         setDraft((d) => (loadedFor.current === selId ? { ...d, text } : d));
       });
     }
-  }, [selId]);
+  }, [selId, state.notes]);
 
   /* autosave (debounced, re-encrypts) */
   useEffect(() => {

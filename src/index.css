@@ -304,14 +304,42 @@ input[type="range"].energy::-moz-range-thumb {
 
 /* ---------- High contrast mode ---------- */
 [data-high-contrast="true"] {
-  --line: color-mix(in srgb, var(--text) 40%, transparent);
+  --line: color-mix(in srgb, var(--text) 65%, transparent) !important;
+  --line-hi: var(--text) !important;
+  --mut: color-mix(in srgb, var(--text) 88%, transparent) !important;
+}
+
+[data-high-contrast="true"] .ambient,
+[data-high-contrast="true"] .liquid-field {
+  display: none !important;
 }
 
 [data-high-contrast="true"] .card,
-[data-high-contrast="true"] .inp,
-[data-high-contrast="true"] .chip {
-  border-width: 2px;
+[data-high-contrast="true"] .engine-panel,
+[data-high-contrast="true"] .panel {
+  background: var(--panel) !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border: 2px solid var(--line) !important;
 }
+
+[data-high-contrast="true"] .inp,
+[data-high-contrast="true"] input,
+[data-high-contrast="true"] textarea,
+[data-high-contrast="true"] select {
+  border: 2px solid var(--line) !important;
+  background: var(--panel) !important;
+}
+
+[data-high-contrast="true"] .chip,
+[data-high-contrast="true"] button {
+  border-width: 1.5px !important;
+}
+
+[data-high-contrast="true"] * {
+  text-shadow: none !important;
+}
+
 
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }

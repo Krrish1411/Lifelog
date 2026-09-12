@@ -1977,7 +1977,7 @@ function Overlays({
         footer={
           <>
             <Btn variant="ghost" onClick={() => resolveConfirm(false)} size={confirmReq?.compact ? "sm" : "md"}>
-              Cancel
+              {confirmReq?.cancelLabel ?? "Cancel"}
             </Btn>
             <Btn
               variant="primary"

@@ -15,6 +15,7 @@ import {
   Activity,
 } from "lucide-react";
 import type { Session, TimerMode, TaskTimeBlock } from "../types";
+import { LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
 import { fmtClock, fmtDur, isoDate, sessionMinutes, todayIso, uid } from "../utils/core";
 import {
@@ -362,6 +363,9 @@ export function FocusView() {
         .filter(
           (t) =>
             !t.done &&
+            t.projectId !== LIFE_LOG_PROJECT_ID &&
+            !t.tags.includes("sleep") &&
+            !t.tags.includes("routine") &&
             (!query.trim() || t.title.toLowerCase().includes(query.trim().toLowerCase()))
         )
         .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")),

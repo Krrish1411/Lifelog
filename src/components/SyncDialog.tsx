@@ -229,10 +229,16 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     }
   };
 
+  const MASTER_KEY = "lifelog.sync.masterEstablished";
+  const [masterEstablished, setMasterEstablished] = useState<boolean>(() => {
+    if (typeof localStorage === "undefined") return false;
+    return !!localStorage.getItem(MASTER_KEY);
+  });
   const [syncDirection, setSyncDirection] = useState<"clone_to_peer" | "two_way">("clone_to_peer");
   const [isApplyingSync, setIsApplyingSync] = useState(false);
 
   const demoTasksCount = state?.tasks ? state.tasks.filter(isSeedTask).length : 0;
+  const isConnectedOrSyncing = status === "connected" || status === "syncing";
 
   const handleExecuteSync = async () => {
     if (!state) return;
@@ -242,12 +248,16 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
       if (syncDirection === "clone_to_peer") {
         await syncEngine.forceCloneToPeer(state);
         triggerHaptic("success");
-        toast(`Cloned this device's records to ${peer?.deviceName || "peer"}!`, "ok");
+        toast(`Master sync complete! Cloned this device's records to ${peer?.deviceName || "peer"}!`, "ok");
       } else {
         await syncEngine.broadcastFullState(state, true);
         triggerHaptic("success");
         toast("Two-way sync complete (sample demo items filtered)!", "ok");
       }
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem(MASTER_KEY, "true");
+      }
+      setMasterEstablished(true);
     } catch (err: any) {
       toast("Sync failed: " + (err?.message || "network error"), "err");
     } finally {
@@ -284,6 +294,10 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     triggerHaptic("warning");
     handleStopPinHost();
     syncEngine.disconnect();
+    if (typeof localStorage !== "undefined") {
+      localStorage.removeItem(MASTER_KEY);
+    }
+    setMasterEstablished(false);
     setOfferTicket("");
     setAnswerTicket("");
     setAnswerInput("");
@@ -305,13 +319,13 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     <Modal
       open={open}
       onClose={() => {
-        if (syncEngine.getStatus() !== "connected") {
+        if (!isConnectedOrSyncing) {
           handleStopPinHost();
         }
         onClose();
       }}
       title="Peer-to-Peer Device Sync"
-      width={520}
+      width={620}
       footer={
         <div className="flex items-center justify-between w-full">
           <div className="flex items-center gap-1.5 text-xs text-[var(--mut)]">
@@ -352,7 +366,7 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
         )}
 
         {/* 1. Connected State View */}
-        {status === "connected" && (
+        {isConnectedOrSyncing && (
           <div className="p-4 rounded-2xl border border-emerald-500/30 bg-emerald-500/5 space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
@@ -381,76 +395,117 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
               </Btn>
             </div>
 
-            {/* Sync Direction & Device Role Selector */}
-            <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--panel)] space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="font-display font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
-                  <ArrowLeftRight size={13} className="text-[var(--accent)]" /> Sync Mode & Direction
-                </span>
-                <span className="text-[10.5px] font-mono text-[var(--mut)]">
-                  {peer?.stats?.isFreshSeed ? "⚠️ Peer has fresh demo data" : "Ready"}
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSyncDirection("clone_to_peer")}
-                  className={cn(
-                    "flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer",
-                    syncDirection === "clone_to_peer"
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
-                      : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
-                  )}
-                >
-                  <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
-                    {syncDirection === "clone_to_peer" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+            {/* Sync Direction & Device Role Selector (1st Connection Setup or Active Status) */}
+            {!masterEstablished ? (
+              <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--panel)] space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="font-display font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
+                    <ArrowLeftRight size={14} className="text-[var(--accent)]" /> 1st Connection: Device In Control Setup
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-xs text-[var(--text)] flex items-center gap-1">
-                      <span>Mirror This Device → {peer?.deviceName || "Peer"}</span>
-                      <span className="chip !py-0 !px-1.5 text-[9px] font-bold text-emerald-500 border-emerald-500/30">Recommended</span>
-                    </div>
-                    <p className="text-[11px] text-[var(--mut)] mt-0.5 leading-snug">
-                      Host is Primary. Completely overwrites peer with your records. Zero demo tasks or contamination touch this device.
-                    </p>
-                  </div>
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => setSyncDirection("two_way")}
-                  className={cn(
-                    "flex items-start gap-2.5 p-2.5 rounded-xl border text-left transition-all cursor-pointer",
-                    syncDirection === "two_way"
-                      ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
-                      : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
-                  )}
-                >
-                  <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
-                    {syncDirection === "two_way" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                  <span className="text-[10px] font-mono text-[var(--accent)] px-2 py-0.5 rounded-md bg-[var(--accent-soft)]">
+                    Action Required
                   </span>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-bold text-xs text-[var(--text)]">
-                      Two-Way Smart Merge (Filter Demo Items)
-                    </div>
-                    <p className="text-[11px] text-[var(--mut)] mt-0.5 leading-snug">
-                      Exchanges new items bidirectionally while automatically filtering out sample demo tasks.
-                    </p>
-                  </div>
-                </button>
-              </div>
+                </div>
+                <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                  To guarantee zero sync errors or leftover sample demo entries, select which device is in control for this initial connection. 
+                  Choosing <b>This Device as Master</b> will wipe data on the peer and mirror your local data starting from 0.
+                </p>
 
-              <Btn
-                variant="primary"
-                className="w-full justify-center gap-1.5"
-                onClick={handleExecuteSync}
-                disabled={isApplyingSync}
-              >
-                {isApplyingSync ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                <span>{isApplyingSync ? "Synchronizing..." : syncDirection === "clone_to_peer" ? `Overwrite ${peer?.deviceName || "Peer"} with Local Records` : "Execute Two-Way Merge"}</span>
-              </Btn>
-            </div>
+                <div className="grid grid-cols-1 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setSyncDirection("clone_to_peer")}
+                    className={cn(
+                      "flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer",
+                      syncDirection === "clone_to_peer"
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
+                        : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
+                    )}
+                  >
+                    <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
+                      {syncDirection === "clone_to_peer" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
+                        <span>👑 Make THIS Device Primary (Wipe Peer &amp; Start from 0)</span>
+                        <span className="chip !py-0 !px-1.5 text-[9px] font-bold text-emerald-500 border-emerald-500/30">Recommended</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--mut)] mt-1 leading-snug">
+                        This device is in control. Peer device data is completely cleared to 0 and replaced with your local tasks, notes, and habits. Guaranteed zero sync conflicts.
+                      </p>
+                    </div>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setSyncDirection("two_way")}
+                    className={cn(
+                      "flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer",
+                      syncDirection === "two_way"
+                        ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
+                        : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
+                    )}
+                  >
+                    <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
+                      {syncDirection === "two_way" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="font-bold text-xs text-[var(--text)]">
+                        🔄 Smart Two-Way Merge (Keep Both Devices)
+                      </div>
+                      <p className="text-[11px] text-[var(--mut)] mt-1 leading-snug">
+                        Retains data on both devices and exchanges new entries bidirectionally while automatically filtering out fresh demo tasks.
+                      </p>
+                    </div>
+                  </button>
+                </div>
+
+                <Btn
+                  variant="primary"
+                  className="w-full justify-center gap-1.5 py-2.5 text-xs font-bold"
+                  onClick={handleExecuteSync}
+                  disabled={isApplyingSync}
+                >
+                  {isApplyingSync ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                  <span>{isApplyingSync ? "Setting Up Initial Sync..." : syncDirection === "clone_to_peer" ? `Establish Master: Wipe ${peer?.deviceName || "Peer"} & Mirror from 0` : "Establish Two-Way Synchronized Link"}</span>
+                </Btn>
+              </div>
+            ) : (
+              <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
+                    <span className="font-bold text-xs text-emerald-400">
+                      {syncDirection === "clone_to_peer" ? "Master Control Active (Single Source of Truth)" : "Continuous Two-Way Sync Active"}
+                    </span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setMasterEstablished(false)}
+                    className="text-[11px] text-[var(--accent)] hover:underline font-semibold cursor-pointer"
+                  >
+                    Change Control Mode
+                  </button>
+                </div>
+                <p className="text-[11.5px] text-[var(--mut)] leading-snug">
+                  {syncDirection === "clone_to_peer"
+                    ? `This device is authoritative. Changes replicate continuously to ${peer?.deviceName || "peer"}. Settings remain isolated on each device.`
+                    : `Bidirectional synchronization is active with deletion tracking and demo item filtration. Settings remain isolated on each device.`}
+                </p>
+                <div className="pt-1">
+                  <Btn
+                    variant="outline"
+                    size="sm"
+                    className="w-full justify-center gap-1.5 text-xs"
+                    onClick={handleExecuteSync}
+                    disabled={isApplyingSync}
+                  >
+                    {isApplyingSync ? <RefreshCw size={13} className="animate-spin" /> : <RefreshCw size={13} />}
+                    <span>{isApplyingSync ? "Syncing..." : "Force Sync Now"}</span>
+                  </Btn>
+                </div>
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[var(--line)]">
               <div className="p-2 rounded-xl bg-[var(--panel2)]">
@@ -468,7 +523,7 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
         )}
 
         {/* 2. Pairing Configuration View (when not connected) */}
-        {status !== "connected" && (
+        {!isConnectedOrSyncing && (
           <div className="space-y-4">
             {/* Device Name input */}
             <div>

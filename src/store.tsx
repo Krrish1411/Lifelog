@@ -76,6 +76,7 @@ export interface ConfirmOpts {
   title: string;
   body: string;
   confirmLabel?: string;
+  cancelLabel?: string;
   danger?: boolean;
   compact?: boolean;
   requireText?: string;
@@ -319,7 +320,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
     broadcastWindowState(state);
   }, [state]);
 
-  const set = useCallback((fn: (s: State) => State) => setState((s) => (s ? fn(s) : s)), []);
+  const set = useCallback((fn: (s: State) => State) => {
+    setState((s) => {
+      if (!s) return s;
+      const next = fn(s);
+      let deleted = next.deleted ? { ...next.deleted } : undefined;
+      const now = Date.now();
+
+      if (s.notes && next.notes && next.notes.length < s.notes.length) {
+        const nextIds = new Set(next.notes.map((n) => n.id));
+        for (const oldN of s.notes) {
+          if (!nextIds.has(oldN.id)) {
+            if (!deleted) deleted = {};
+            if (!deleted.notes) deleted.notes = {};
+            deleted.notes[oldN.id] = now;
+          }
+        }
+      }
+      if (s.tasks && next.tasks && next.tasks.length < s.tasks.length) {
+        const nextIds = new Set(next.tasks.map((t) => t.id));
+        for (const oldT of s.tasks) {
+          if (!nextIds.has(oldT.id)) {
+            if (!deleted) deleted = {};
+            if (!deleted.tasks) deleted.tasks = {};
+            deleted.tasks[oldT.id] = now;
+          }
+        }
+      }
+      if (s.projects && next.projects && next.projects.length < s.projects.length) {
+        const nextIds = new Set(next.projects.map((p) => p.id));
+        for (const oldP of s.projects) {
+          if (!nextIds.has(oldP.id)) {
+            if (!deleted) deleted = {};
+            if (!deleted.projects) deleted.projects = {};
+            deleted.projects[oldP.id] = now;
+          }
+        }
+      }
+      if (s.habits && next.habits && next.habits.length < s.habits.length) {
+        const nextIds = new Set(next.habits.map((h) => h.id));
+        for (const oldH of s.habits) {
+          if (!nextIds.has(oldH.id)) {
+            if (!deleted) deleted = {};
+            if (!deleted.habits) deleted.habits = {};
+            deleted.habits[oldH.id] = now;
+          }
+        }
+      }
+
+      return deleted ? { ...next, deleted } : next;
+    });
+  }, []);
 
   const pushToast = useCallback((msg: string, kind: ToastItem["kind"] = "ok") => {
     const id = toastSeq++;

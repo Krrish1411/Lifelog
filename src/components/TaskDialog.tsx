@@ -32,6 +32,7 @@ import {
   calcEndTimeFromDuration,
   fmtTimeStr,
   fmtTimeRange,
+  checkTimeClash,
 } from "../utils/core";
 import { parseNaturalLanguageTask } from "../utils/nlp";
 import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, Select, TagInput, TextInput, TextArea, Toggle, cn } from "./ui";
@@ -159,14 +160,14 @@ export function TaskDialog() {
       const isLifeLogDialog = (taskDialog.projectId ?? state.projects[0]?.id) === LIFE_LOG_PROJECT_ID;
       setTitle("");
       setProjectId(taskDialog.projectId ?? state.projects[0]?.id ?? "");
-      setEmoji(isLifeLogDialog ? "😴" : "");
+      setEmoji(isLifeLogDialog ? "🌊" : "");
       setPriority("medium");
-      setTags(isLifeLogDialog ? ["sleep"] : []);
-      setEstimate(isLifeLogDialog ? "510" : "30");
+      setTags([]);
+      setEstimate(isLifeLogDialog ? "30" : "");
       setDue(preset || (isLifeLogDialog ? todayIso() : ""));
-      setDueTime(isLifeLogDialog ? "23:00" : presetTime);
-      setEndTime(isLifeLogDialog ? "07:30" : "");
-      setDuration(isLifeLogDialog ? "510" : "60");
+      setDueTime(presetTime || "");
+      setEndTime("");
+      setDuration(isLifeLogDialog ? "30" : "");
       setNotes("");
       setPrivateNote("");
       setRepeats(false);
@@ -324,22 +325,50 @@ export function TaskDialog() {
     const key = await getDeviceKey();
     const encNote = privateNote.trim() ? await encryptText(key, privateNote) : null;
     const dueVal = due || (pid === LIFE_LOG_PROJECT_ID ? todayIso() : null);
-    const effectiveTags = pid === LIFE_LOG_PROJECT_ID && !tags.some(t => allCategories.some(c => c.tag === t))
-      ? [...tags, "watch"]
-      : tags;
+    const effectiveTags = tags;
     const effectiveEmoji = emoji || (pid === LIFE_LOG_PROJECT_ID ? "🌊" : null);
     const parsedSnooze = snooze ? new Date(snooze).getTime() : null;
     const snoozeTs = parsedSnooze && !isNaN(parsedSnooze) ? parsedSnooze : null;
+    const estVal = Math.max(0, parseInt(estimate || "0", 10) || 0);
+    const durVal = dueTime
+      ? Math.max(1, parseInt(duration || String(estVal || 30), 10) || estVal || 30)
+      : (duration ? Math.max(1, parseInt(duration, 10) || estVal) : estVal);
+
+    if (dueVal && dueTime && durVal > 0) {
+      const clash = checkTimeClash(
+        dueVal,
+        dueTime,
+        durVal,
+        state.tasks,
+        state.sessions,
+        editing?.id ?? null,
+        state.settings.timeFormat || "12h"
+      );
+      if (clash.hasConflict) {
+        const ok = await confirm({
+          title: "Time Clash Detected",
+          body: `This scheduled time (${fmtTimeRange(dueTime, durVal, state.settings.timeFormat || "12h")}) overlaps with "${clash.conflictTitle}" (${clash.conflictTimeRange}). Log it anyway?`,
+          confirmLabel: "Log Anyway",
+          cancelLabel: "Adjust Time",
+          danger: false,
+        });
+        if (!ok) {
+          setSaving(false);
+          return;
+        }
+      }
+    }
+
     const base = {
       title: title.trim(),
       projectId: pid,
       emoji: effectiveEmoji,
       priority,
       tags: effectiveTags,
-      estimateMin: Math.max(0, parseInt(estimate || "0", 10) || 0),
+      estimateMin: estVal,
       due: dueVal,
       dueTime: dueVal && dueTime ? dueTime : null,
-      durationMin: Math.max(15, parseInt(duration || "60", 10) || 60),
+      durationMin: durVal,
       notes,
       recurrence: repeats ? rec : null,
       subtasks,

@@ -8,7 +8,6 @@ import {
   Flame,
   Pause,
   Timer,
-  Code,
   Moon,
   Clock,
   Zap,
@@ -33,6 +32,7 @@ import {
   weekStartIso,
   fmtTimeRange,
   fmtTimeStr,
+  getTaskMinutesForDay,
 } from "../utils/core";
 import { requestDailyNote } from "../utils/nav";
 import { Btn, EmptyState, cn } from "../components/ui";
@@ -46,20 +46,21 @@ export function DayLogView() {
   const [notePreview, setNotePreview] = useState<string | null>(null);
 
   const week = useMemo(() => listDates(weekStart, addDaysIso(weekStart, 6)), [weekStart]);
+
+  // Tracked minutes map: date -> total focus minutes
   const tracked = useMemo(() => {
-    const m = new Map<string, number>();
+    const map = new Map<string, number>();
     for (const s of state.sessions) {
-      if (!s.taskId || s.mode === "break") continue;
-      const day = isoDate(new Date(s.startedAt));
-      m.set(day, (m.get(day) ?? 0) + sessionMinutes(s));
+      if (s.mode === "break" || !s.taskId) continue;
+      const key = isoDate(new Date(s.startedAt));
+      map.set(key, (map.get(key) ?? 0) + sessionMinutes(s));
     }
-    return m;
+    return map;
   }, [state.sessions]);
 
-  const daySessions = useMemo(
-    () => state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === sel).sort((a, b) => a.startedAt - b.startedAt),
-    [state.sessions, sel],
-  );
+  const daySessions = useMemo(() => {
+    return state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === sel);
+  }, [state.sessions, sel]);
 
   const dayDone = useMemo(
     () =>
@@ -85,10 +86,12 @@ export function DayLogView() {
     return [...LIFE_LOG_CATEGORIES, ...(state.settings.customLifeLogCategories ?? [])];
   }, [state.settings.customLifeLogCategories]);
 
-  // Tasks from LifeLog stream for the selected day:
+  // Tasks from LifeLog stream for the selected day (including cross-midnight sleep!):
   const dayLifeLogTasks = useMemo(() => {
     return state.tasks.filter((t) => {
       if (t.projectId !== LIFE_LOG_PROJECT_ID) return false;
+      const minOnDay = getTaskMinutesForDay(t, sel);
+      if (minOnDay > 0) return true;
       return (
         t.due === sel ||
         (!t.due && isoDate(new Date(t.createdAt)) === sel) ||
@@ -105,19 +108,18 @@ export function DayLogView() {
     return dayLifeLogTasks.filter((t) => !t.tags.includes("sleep"));
   }, [dayLifeLogTasks]);
 
+  // Cross-midnight sleep split: evening portion goes to start day, morning portion goes to wake-up day
   const sleepMin = useMemo(() => {
-    return sleepTasks.reduce((acc, t) => {
-      const trk = daySessions.filter((s) => s.taskId === t.id).reduce((sum, s) => sum + sessionMinutes(s), 0);
-      return acc + ((t.durationMin > 0 ? t.durationMin : trk) || t.estimateMin || 0);
-    }, 0);
-  }, [sleepTasks, daySessions]);
+    return state.tasks
+      .filter((t) => t.tags.includes("sleep"))
+      .reduce((acc, t) => acc + getTaskMinutesForDay(t, sel), 0);
+  }, [state.tasks, sel]);
 
   const routineMin = useMemo(() => {
-    return routineTasks.reduce((acc, t) => {
-      const trk = daySessions.filter((s) => s.taskId === t.id).reduce((sum, s) => sum + sessionMinutes(s), 0);
-      return acc + ((t.durationMin > 0 ? t.durationMin : trk) || t.estimateMin || 0);
-    }, 0);
-  }, [routineTasks, daySessions]);
+    return state.tasks
+      .filter((t) => t.projectId === LIFE_LOG_PROJECT_ID && !t.tags.includes("sleep"))
+      .reduce((acc, t) => acc + getTaskMinutesForDay(t, sel), 0);
+  }, [state.tasks, sel]);
 
   const log = state.dayLogs[sel];
   const totalMin = tracked.get(sel) ?? 0;
@@ -155,7 +157,7 @@ export function DayLogView() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
-            <h1 className="font-display text-[24px] font-bold tracking-tight">Day Log & Code Stream</h1>
+            <h1 className="font-display text-[24px] font-bold tracking-tight">Day Log & Focus Stream</h1>
             <span className="chip !py-0.5 text-[10px] font-mono font-bold bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30">
               {fmtDur(dayTotalLoggedMin)} tracked
             </span>
@@ -197,7 +199,7 @@ export function DayLogView() {
                 {parseIso(iso).getDate()}
               </span>
               <span className="flex h-[10px] items-center gap-1">
-                {hasWork && <span className="h-[6px] w-[6px] rounded-full shrink-0 bg-sky-500" title={`${fmtDur(tracked.get(iso) ?? 0)} code focused`} />}
+                {hasWork && <span className="h-[6px] w-[6px] rounded-full shrink-0 bg-sky-500" title={`${fmtDur(tracked.get(iso) ?? 0)} focused`} />}
                 {hasLife && <span className="h-[6px] w-[6px] rounded-full shrink-0 bg-indigo-500" title="LifeLog tracked" />}
                 {dayDoneCount > 0 && <span className="h-[6px] w-[6px] rounded-full shrink-0" style={{ background: "var(--accent)" }} title={`${dayDoneCount} done`} />}
               </span>
@@ -206,13 +208,13 @@ export function DayLogView() {
         })}
       </div>
 
-      {/* 24-Hour Whole Day Balance & Code Log Bar */}
+      {/* 24-Hour Whole Day Balance & Focus Log Bar */}
       <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden flex flex-col gap-2.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <span className="text-xl">🌊</span>
             <div>
-              <span className="font-display text-[15px] font-bold tracking-tight">24h Day Balance & Code Record</span>
+              <span className="font-display text-[15px] font-bold tracking-tight">24h Day Balance & Focus Record</span>
               <div className="text-[11px] font-semibold text-[var(--mut)]">
                 {fmtDur(dayTotalLoggedMin)} of 24h accounted for ({dayPct}%)
               </div>
@@ -220,7 +222,7 @@ export function DayLogView() {
           </div>
           <div className="flex flex-wrap items-center gap-3 text-xs font-mono font-bold">
             <span className="text-indigo-400 flex items-center gap-1">😴 {fmtDur(sleepMin)} Sleep</span>
-            <span className="text-sky-400 flex items-center gap-1">💻 {fmtDur(totalMin)} Code & Focus</span>
+            <span className="text-sky-400 flex items-center gap-1">⚡ {fmtDur(totalMin)} Deep Focus</span>
             <span className="text-emerald-400 flex items-center gap-1">🧘 {fmtDur(routineMin)} Routines</span>
             <span className="text-[var(--mut)] flex items-center gap-1">⏳ {fmtDur(unloggedMin)} Free</span>
           </div>
@@ -239,7 +241,7 @@ export function DayLogView() {
             <div
               className="h-full bg-sky-500 transition-all duration-300"
               style={{ width: `${Math.min(100, (totalMin / 1440) * 100)}%` }}
-              title={`Code & Focus: ${fmtDur(totalMin)}`}
+              title={`Deep Focus: ${fmtDur(totalMin)}`}
             />
           )}
           {routineMin > 0 && (
@@ -255,7 +257,7 @@ export function DayLogView() {
       {/* Stat Row */}
       <div className="stagger grid grid-cols-2 gap-2.5 lg:grid-cols-4 w-full min-w-0">
         {[
-          { icon: <Code size={16} />, k: "Code & Focus", v: fmtDur(totalMin), sub: `${focusSessions.length} session${focusSessions.length !== 1 ? "s" : ""}`, hot: totalMin > 0 },
+          { icon: <Zap size={16} />, k: "Deep Focus", v: fmtDur(totalMin), sub: `${focusSessions.length} session${focusSessions.length !== 1 ? "s" : ""}`, hot: totalMin > 0 },
           { icon: <Moon size={16} />, k: "Sleep Tracked", v: fmtDur(sleepMin), sub: sleepTasks[0]?.dueTime ? fmtTimeRange(sleepTasks[0].dueTime, sleepMin, timeFmt) : `${sleepTasks.length} log${sleepTasks.length !== 1 ? "s" : ""}`, hot: sleepMin > 0 },
           { icon: <Sparkles size={16} />, k: "Life & Routines", v: fmtDur(routineMin), sub: `${routineTasks.length} activit${routineTasks.length !== 1 ? "ies" : "y"}`, hot: routineMin > 0 },
           { icon: <CheckCircle2 size={16} />, k: "Tasks Done", v: String(dayDone.length), sub: `${dayLifeLogTasks.filter((t) => t.done).length} routines`, hot: dayDone.length > 0 },
@@ -273,14 +275,14 @@ export function DayLogView() {
         ))}
       </div>
 
-      {/* Section 1: Code & Focus Timeline */}
+      {/* Section 1: Focus Timeline */}
       <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr] w-full min-w-0">
-        {/* Focus by Project (Code Distribution) */}
+        {/* Focus by Project */}
         <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-display text-[15px] font-bold tracking-tight">Code & Focus by Project</div>
-              <div className="mt-0.5 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Share of the day’s focused engineering time</div>
+              <div className="font-display text-[15px] font-bold tracking-tight">Focus by Project</div>
+              <div className="mt-0.5 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Share of the day’s focused deep work time</div>
             </div>
             {totalMin > 0 && (
               <span className="font-mono text-xs font-bold text-[var(--accent)]">
@@ -289,7 +291,7 @@ export function DayLogView() {
             )}
           </div>
           {byProject.length === 0 ? (
-            <EmptyState icon={Code} title="No coding focus recorded" body="Start a session from the Focus tab or task card and it will appear here, grouped by project." />
+            <EmptyState icon={Zap} title="No focus recorded" body="Start a session from the Focus tab or task card and it will appear here, grouped by project." />
           ) : (
             <>
               {/* Proportional Block Bar */}
@@ -338,12 +340,12 @@ export function DayLogView() {
           )}
         </div>
 
-        {/* Timestamped Session Timeline (Code Log) */}
+        {/* Timestamped Session Timeline (Focus Log) */}
         <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
             <div>
-              <div className="font-display text-[15px] font-bold tracking-tight">Code Session Timeline</div>
-              <div className="mt-0.5 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Every code sprint, pause and completion — timestamped</div>
+              <div className="font-display text-[15px] font-bold tracking-tight">Focus Session Timeline</div>
+              <div className="mt-0.5 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Every focus sprint, pause and completion — timestamped</div>
             </div>
             <Btn size="sm" variant="soft" onClick={() => setView("focus")}>
               <Zap size={12} /> Focus
@@ -494,7 +496,7 @@ export function DayLogView() {
       {/* Section 3: Daily Note & Standup Log */}
       <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
         <div className="flex items-center justify-between">
-          <div className="font-display text-[15px] font-bold tracking-tight">Daily Note & Code Standup · {fmtNoteName(sel)}</div>
+          <div className="font-display text-[15px] font-bold tracking-tight">Daily Note & Review · {fmtNoteName(sel)}</div>
           <Btn size="sm" variant="soft" onClick={() => { requestDailyNote(sel); setView("notes"); }}>
             <FileText size={12} /> Open Note
           </Btn>
@@ -502,7 +504,7 @@ export function DayLogView() {
         {notePreview === null ? (
           <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>Decrypting note…</div>
         ) : notePreview === "" ? (
-          <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>No note written for this day yet — open it and capture standup thoughts or what happened.</div>
+          <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>No note written for this day yet — open it and capture thoughts, review or what happened.</div>
         ) : (
           <div className="note-page mt-2.5 max-h-[190px] overflow-y-auto whitespace-pre-wrap rounded-xl border p-3 text-[13px]" style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--text)" }}>
             {notePreview.slice(0, 700)}{notePreview.length > 700 ? "…" : ""}

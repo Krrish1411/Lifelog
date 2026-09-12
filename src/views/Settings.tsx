@@ -524,7 +524,7 @@ export function SettingsView() {
               "Dark Mode Themes",
               "Curated rich night palettes with high contrast. Selecting any theme automatically activates Dark Mode.",
               (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {DARK_THEMES.map((th) => {
                     const isCurrent = s.themeMode === "dark" && s.designerTheme === th.id;
                     return (
@@ -533,39 +533,31 @@ export function SettingsView() {
                         type="button"
                         onClick={() => applyDesignerTheme(th)}
                         className={cn(
-                          "flex items-start gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer relative",
+                          "flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all cursor-pointer relative",
                           isCurrent
                             ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)]"
                             : "border-[var(--line)] bg-[var(--bg)] hover:bg-[var(--panel2)]"
                         )}
                       >
                         <div
-                          className="h-8 w-8 rounded-lg shrink-0 flex items-center justify-center shadow-xs border border-white/10"
+                          className="h-7 w-7 rounded-lg shrink-0 flex items-center justify-center shadow-xs border border-white/10"
                           style={{ background: th.previewBg }}
                         >
-                          <span className="h-4 w-4 rounded-full" style={{ background: th.previewAccent }} />
+                          <span className="h-3.5 w-3.5 rounded-full" style={{ background: th.previewAccent }} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="font-display text-[13px] font-bold tracking-tight truncate">
+                            <span className="font-display text-[12px] font-bold tracking-tight truncate">
                               {th.name}
                             </span>
-                            {th.darkOnly && (
-                              <span className="chip !py-0 !px-1.5 text-[9px] font-mono text-[var(--warn)] border-[var(--warn)]/40 shrink-0">
-                                Dark Only
-                              </span>
-                            )}
                             {isCurrent && (
-                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-bold shrink-0">
-                                <Check size={10} />
+                              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
+                                <Check size={8} />
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] mt-0.5 truncate">
+                          <div className="text-[9.5px] font-semibold text-[var(--accent)] truncate">
                             {th.tag}
-                          </div>
-                          <div className="text-[11px] leading-snug text-[var(--mut)] line-clamp-2 mt-0.5">
-                            {th.desc}
                           </div>
                         </div>
                       </button>
@@ -581,7 +573,7 @@ export function SettingsView() {
               "Light Mode Themes",
               "Clean daylight palettes with crisp legibility. Selecting any theme automatically activates Light Mode.",
               (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {LIGHT_THEMES.map((th) => {
                     const isCurrent = s.themeMode === "light" && s.designerTheme === th.id;
                     return (
@@ -590,34 +582,31 @@ export function SettingsView() {
                         type="button"
                         onClick={() => applyDesignerTheme(th)}
                         className={cn(
-                          "flex items-start gap-3 rounded-xl border p-3 text-left transition-all cursor-pointer relative",
+                          "flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all cursor-pointer relative",
                           isCurrent
                             ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)]"
                             : "border-[var(--line)] bg-[var(--bg)] hover:bg-[var(--panel2)]"
                         )}
                       >
                         <div
-                          className="h-8 w-8 rounded-lg shrink-0 flex items-center justify-center shadow-xs border border-black/10"
+                          className="h-7 w-7 rounded-lg shrink-0 flex items-center justify-center shadow-xs border border-black/10"
                           style={{ background: th.previewBg }}
                         >
-                          <span className="h-4 w-4 rounded-full" style={{ background: th.previewAccent }} />
+                          <span className="h-3.5 w-3.5 rounded-full" style={{ background: th.previewAccent }} />
                         </div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-1">
-                            <span className="font-display text-[13px] font-bold tracking-tight truncate">
+                            <span className="font-display text-[12px] font-bold tracking-tight truncate">
                               {th.name}
                             </span>
                             {isCurrent && (
-                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-bold shrink-0">
-                                <Check size={10} />
+                              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
+                                <Check size={8} />
                               </span>
                             )}
                           </div>
-                          <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--accent)] mt-0.5 truncate">
+                          <div className="text-[9.5px] font-semibold text-[var(--accent)] truncate">
                             {th.tag}
-                          </div>
-                          <div className="text-[11px] leading-snug text-[var(--mut)] line-clamp-2 mt-0.5">
-                            {th.desc}
                           </div>
                         </div>
                       </button>
