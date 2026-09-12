@@ -230,12 +230,40 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
   };
 
   const MASTER_KEY = "lifelog.sync.masterEstablished";
+  const MASTER_ROLE_KEY = "lifelog.sync.masterRole";
+  const MASTER_DEVICE_KEY = "lifelog.sync.masterDeviceName";
+
   const [masterEstablished, setMasterEstablished] = useState<boolean>(() => {
     if (typeof localStorage === "undefined") return false;
     return !!localStorage.getItem(MASTER_KEY);
   });
+  const [masterRole, setMasterRole] = useState<string>(() => {
+    if (typeof localStorage === "undefined") return "master";
+    return localStorage.getItem(MASTER_ROLE_KEY) || "master";
+  });
+  const [masterDeviceName, setMasterDeviceName] = useState<string>(() => {
+    if (typeof localStorage === "undefined") return "";
+    return localStorage.getItem(MASTER_DEVICE_KEY) || "";
+  });
   const [syncDirection, setSyncDirection] = useState<"clone_to_peer" | "two_way">("clone_to_peer");
   const [isApplyingSync, setIsApplyingSync] = useState(false);
+
+  // Listen to remote peer establishing master setup
+  useEffect(() => {
+    const unsub = syncEngine.onMasterSetup((event) => {
+      setMasterEstablished(true);
+      const role = event.mode === "clone_to_peer" ? "secondary" : "two_way";
+      setMasterRole(role);
+      setMasterDeviceName(event.masterDeviceName);
+      toast(
+        event.mode === "clone_to_peer"
+          ? `Primary device (${event.masterDeviceName}) initialized sync! Data mirrored cleanly from 0.`
+          : `Two-way sync link established by ${event.masterDeviceName}!`,
+        "ok"
+      );
+    });
+    return unsub;
+  }, []);
 
   const demoTasksCount = state?.tasks ? state.tasks.filter(isSeedTask).length : 0;
   const isConnectedOrSyncing = status === "connected" || status === "syncing";
@@ -243,19 +271,30 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
   const handleExecuteSync = async () => {
     if (!state) return;
     setIsApplyingSync(true);
+    const myDevice = deviceName.trim() || "LifeLog Device";
     try {
       triggerHaptic("medium");
       if (syncDirection === "clone_to_peer") {
-        await syncEngine.forceCloneToPeer(state);
+        await syncEngine.forceCloneToPeer(state, myDevice);
         triggerHaptic("success");
         toast(`Master sync complete! Cloned this device's records to ${peer?.deviceName || "peer"}!`, "ok");
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(MASTER_KEY, "true");
+          localStorage.setItem(MASTER_ROLE_KEY, "master");
+          localStorage.setItem(MASTER_DEVICE_KEY, myDevice);
+        }
+        setMasterRole("master");
       } else {
         await syncEngine.broadcastFullState(state, true);
+        await syncEngine.sendMasterSetupEvent("two_way", myDevice);
         triggerHaptic("success");
         toast("Two-way sync complete (sample demo items filtered)!", "ok");
-      }
-      if (typeof localStorage !== "undefined") {
-        localStorage.setItem(MASTER_KEY, "true");
+        if (typeof localStorage !== "undefined") {
+          localStorage.setItem(MASTER_KEY, "true");
+          localStorage.setItem(MASTER_ROLE_KEY, "two_way");
+          localStorage.setItem(MASTER_DEVICE_KEY, myDevice);
+        }
+        setMasterRole("two_way");
       }
       setMasterEstablished(true);
     } catch (err: any) {
@@ -296,8 +335,12 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     syncEngine.disconnect();
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem(MASTER_KEY);
+      localStorage.removeItem(MASTER_ROLE_KEY);
+      localStorage.removeItem(MASTER_DEVICE_KEY);
     }
     setMasterEstablished(false);
+    setMasterRole("master");
+    setMasterDeviceName("");
     setOfferTicket("");
     setAnswerTicket("");
     setAnswerInput("");
@@ -476,21 +519,34 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
                   <div className="flex items-center gap-2">
                     <CheckCircle2 size={16} className="text-emerald-400 shrink-0" />
                     <span className="font-bold text-xs text-emerald-400">
-                      {syncDirection === "clone_to_peer" ? "Master Control Active (Single Source of Truth)" : "Continuous Two-Way Sync Active"}
+                      {masterRole === "secondary"
+                        ? `Secondary Replica · Master: ${masterDeviceName || peer?.deviceName || "Device 1"}`
+                        : masterRole === "two_way" || syncDirection === "two_way"
+                        ? "Continuous Two-Way Sync Active"
+                        : "Master Control Active (Single Source of Truth)"}
                     </span>
                   </div>
                   <button
                     type="button"
-                    onClick={() => setMasterEstablished(false)}
+                    onClick={() => {
+                      if (typeof localStorage !== "undefined") {
+                        localStorage.removeItem(MASTER_KEY);
+                        localStorage.removeItem(MASTER_ROLE_KEY);
+                        localStorage.removeItem(MASTER_DEVICE_KEY);
+                      }
+                      setMasterEstablished(false);
+                    }}
                     className="text-[11px] text-[var(--accent)] hover:underline font-semibold cursor-pointer"
                   >
                     Change Control Mode
                   </button>
                 </div>
                 <p className="text-[11.5px] text-[var(--mut)] leading-snug">
-                  {syncDirection === "clone_to_peer"
-                    ? `This device is authoritative. Changes replicate continuously to ${peer?.deviceName || "peer"}. Settings remain isolated on each device.`
-                    : `Bidirectional synchronization is active with deletion tracking and demo item filtration. Settings remain isolated on each device.`}
+                  {masterRole === "secondary"
+                    ? `This device is synced as a secondary replica of ${masterDeviceName || peer?.deviceName || "Device 1"}. Local records are mirrored from the primary device. Settings remain isolated on each device.`
+                    : masterRole === "two_way" || syncDirection === "two_way"
+                    ? `Bidirectional synchronization is active with deletion tracking and demo item filtration. Settings remain isolated on each device.`
+                    : `This device is authoritative. Changes replicate continuously to ${peer?.deviceName || "peer"}. Settings remain isolated on each device.`}
                 </p>
                 <div className="pt-1">
                   <Btn

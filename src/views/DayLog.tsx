@@ -33,6 +33,7 @@ import {
   fmtTimeRange,
   fmtTimeStr,
   getTaskMinutesForDay,
+  isSleepTask,
 } from "../utils/core";
 import { requestDailyNote } from "../utils/nav";
 import { Btn, EmptyState, cn } from "../components/ui";
@@ -101,23 +102,23 @@ export function DayLogView() {
   }, [state.tasks, sel]);
 
   const sleepTasks = useMemo(() => {
-    return dayLifeLogTasks.filter((t) => t.tags.includes("sleep"));
+    return dayLifeLogTasks.filter((t) => isSleepTask(t));
   }, [dayLifeLogTasks]);
 
   const routineTasks = useMemo(() => {
-    return dayLifeLogTasks.filter((t) => !t.tags.includes("sleep"));
+    return dayLifeLogTasks.filter((t) => !isSleepTask(t));
   }, [dayLifeLogTasks]);
 
   // Cross-midnight sleep split: evening portion goes to start day, morning portion goes to wake-up day
   const sleepMin = useMemo(() => {
     return state.tasks
-      .filter((t) => t.tags.includes("sleep"))
+      .filter((t) => isSleepTask(t))
       .reduce((acc, t) => acc + getTaskMinutesForDay(t, sel), 0);
   }, [state.tasks, sel]);
 
   const routineMin = useMemo(() => {
     return state.tasks
-      .filter((t) => t.projectId === LIFE_LOG_PROJECT_ID && !t.tags.includes("sleep"))
+      .filter((t) => t.projectId === LIFE_LOG_PROJECT_ID && !isSleepTask(t))
       .reduce((acc, t) => acc + getTaskMinutesForDay(t, sel), 0);
   }, [state.tasks, sel]);
 

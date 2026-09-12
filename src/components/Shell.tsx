@@ -869,8 +869,8 @@ export function Shell() {
             <Btn variant="primary" className="mt-2.5 w-full" size="sm" onClick={() => openTaskDialog()}>
               <Plus size={14} /> New task
             </Btn>
-            <div className="mt-2.5 text-center text-[10px] font-bold tracking-wider opacity-70" style={{ color: "var(--mut)" }}>
-              Crafted by Krish Patel
+            <div className="mt-2.5 text-center text-[10px] font-bold tracking-wider" style={{ color: "var(--mut)" }}>
+              Crafted by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span>
             </div>
           </div>
         </aside>
@@ -1101,8 +1101,8 @@ export function Shell() {
           <Btn variant="primary" onClick={() => openTaskDialog()}>
             <Plus size={14} /> New task
           </Btn>
-          <div className="text-center text-[10px] font-bold tracking-wider opacity-70" style={{ color: "var(--mut)" }}>
-            Crafted by Krish Patel
+          <div className="text-center text-[10px] font-bold tracking-wider" style={{ color: "var(--mut)" }}>
+            Crafted by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span>
           </div>
         </div>
       </aside>
@@ -1405,7 +1405,7 @@ function StatusBar({
         className={cn("ml-auto text-[10.5px] font-bold tracking-wider", running && "ml-0")}
         style={{ color: "var(--mut)" }}
       >
-        Crafted by Krish Patel · AES-256 Local Only
+        Crafted by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span> · AES-256 Local Only
       </span>
     </div>
   );
@@ -1465,7 +1465,7 @@ function StatusBarDesk({
         className={cn("ml-auto text-[10.5px] font-bold tracking-wider", running && "ml-0")}
         style={{ color: "var(--mut)" }}
       >
-        Crafted by Krish Patel · AES-256 Local Only
+        Crafted by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span> · AES-256 Local Only
       </span>
     </div>
   );

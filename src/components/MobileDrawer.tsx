@@ -234,7 +234,10 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
 
       {/* Drawer content panel */}
       <aside
-        className="relative z-10 flex h-full w-[290px] max-w-[85vw] flex-col border-r glass-regular shadow-2xl transition-transform animate-in slide-in-from-left duration-250 select-none overscroll-contain"
+        className={cn(
+          "relative z-10 flex h-full w-[290px] max-w-[85vw] flex-col border-r shadow-2xl transition-transform animate-in slide-in-from-left duration-250 select-none overscroll-contain",
+          state.settings.layout === "glass" ? "glass-regular" : "bg-[var(--panel)]"
+        )}
         style={{
           borderColor: "var(--line)",
           paddingTop: "max(calc(var(--safe-top) + 8px), 16px)",
@@ -555,8 +558,8 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
             <Plus size={15} strokeWidth={2.8} />
             <span>Create New Task</span>
           </button>
-          <div className="text-center text-[10.5px] font-semibold text-[var(--mut)] opacity-75 select-none">
-            LifeLog • Crafted by Krish Patel
+          <div className="text-center text-[10.5px] font-semibold text-[var(--mut)] select-none">
+            LifeLog • Crafted by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span>
           </div>
         </div>
       </aside>

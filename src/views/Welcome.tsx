@@ -242,6 +242,12 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
             );
           })}
         </div>
+
+        {/* Crafted by Krish Patel banner */}
+        <div className="mt-8 flex items-center justify-center gap-2 text-xs font-semibold text-[var(--mut)]">
+          <span>LifeLog · Crafted with precision by</span>
+          <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span>
+        </div>
       </section>
 
       {/* Feature Showcase Section */}
@@ -372,7 +378,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
       {/* Footer */}
       <footer className="border-t border-[var(--line)] py-8 text-center text-[12px] font-semibold text-[var(--mut)]">
-        <p>LifeLog · Crafted by <span className="text-[var(--accent)] font-bold">Krish Patel</span> · 100% Local-First Sanctuary</p>
+        <p>LifeLog · Crafted by <span className="text-[var(--accent)] font-extrabold tracking-tight">Krish Patel</span> · 100% Local-First Sanctuary</p>
       </footer>
     </div>
   );

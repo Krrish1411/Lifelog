@@ -25,7 +25,8 @@ export type SyncMessage =
   | { type: "HANDSHAKE"; peer: SyncPeerInfo; lastSyncTs: number; stats?: DeviceStats }
   | { type: "HANDSHAKE_ACK"; peer: SyncPeerInfo; lastSyncTs: number; stats?: DeviceStats }
   | { type: "FULL_STATE"; state: State; timestamp: number; filterSeed?: boolean }
-  | { type: "FORCE_REPLACE_STATE"; state: State; timestamp: number }
+  | { type: "FORCE_REPLACE_STATE"; state: State; timestamp: number; masterDeviceName?: string }
+  | { type: "MASTER_SETUP_EVENT"; mode: "clone_to_peer" | "two_way"; masterDeviceName: string; timestamp: number }
   | { type: "DELTA_STATE"; delta: PartialStateDelta; timestamp: number }
   | { type: "PING"; timestamp: number }
   | { type: "PONG"; timestamp: number }

@@ -53,6 +53,7 @@ class WebRTCSyncEngine {
   private transportType: SyncTransport = "relay";
   private statusListeners: Set<SyncStatusListener> = new Set();
   private stateApplyListeners: Set<StateApplyListener> = new Set();
+  private masterSetupListeners: Set<(event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void> = new Set();
 
   // Relay SSE / streaming state
   private eventSource: EventSource | null = null;
@@ -131,6 +132,21 @@ class WebRTCSyncEngine {
   public onStateApply(listener: StateApplyListener): () => void {
     this.stateApplyListeners.add(listener);
     return () => this.stateApplyListeners.delete(listener);
+  }
+
+  public onMasterSetup(listener: (event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void): () => void {
+    this.masterSetupListeners.add(listener);
+    return () => this.masterSetupListeners.delete(listener);
+  }
+
+  public async sendMasterSetupEvent(mode: "clone_to_peer" | "two_way", masterDeviceName: string): Promise<void> {
+    if (this.status !== "connected") return;
+    await this.sendMessage({
+      type: "MASTER_SETUP_EVENT",
+      mode,
+      masterDeviceName,
+      timestamp: Date.now(),
+    });
   }
 
   private setStatus(status: SyncStatus, peer?: SyncPeerInfo | null) {
@@ -536,7 +552,7 @@ class WebRTCSyncEngine {
     };
   }
 
-  public async forceCloneToPeer(state: State): Promise<void> {
+  public async forceCloneToPeer(state: State, masterDeviceName?: string): Promise<void> {
     if (this.status !== "connected") return;
     this.setStatus("syncing");
     try {
@@ -561,11 +577,14 @@ class WebRTCSyncEngine {
         } catch {}
       }
 
+      const devName = masterDeviceName || "Primary Device";
       await this.sendMessage({
         type: "FORCE_REPLACE_STATE",
         state: payloadState,
+        masterDeviceName: devName,
         timestamp: Date.now(),
       });
+      await this.sendMasterSetupEvent("clone_to_peer", devName);
     } finally {
       this.setStatus("connected");
     }
@@ -631,7 +650,26 @@ class WebRTCSyncEngine {
         ...msg.state,
         settings: local.settings,
       }));
+      const masterName = msg.masterDeviceName || this.connectedPeer?.deviceName || "Primary Device";
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("lifelog.sync.masterEstablished", "true");
+        localStorage.setItem("lifelog.sync.masterRole", "secondary");
+        localStorage.setItem("lifelog.sync.masterDeviceName", masterName);
+      }
+      for (const l of this.masterSetupListeners) {
+        l({ mode: "clone_to_peer", masterDeviceName: masterName });
+      }
       this.setStatus("connected");
+    } else if (msg.type === "MASTER_SETUP_EVENT") {
+      const masterName = msg.masterDeviceName || this.connectedPeer?.deviceName || "Primary Device";
+      if (typeof localStorage !== "undefined") {
+        localStorage.setItem("lifelog.sync.masterEstablished", "true");
+        localStorage.setItem("lifelog.sync.masterRole", msg.mode === "clone_to_peer" ? "secondary" : "two_way");
+        localStorage.setItem("lifelog.sync.masterDeviceName", masterName);
+      }
+      for (const l of this.masterSetupListeners) {
+        l({ mode: msg.mode, masterDeviceName: masterName });
+      }
     } else if (msg.type === "FULL_STATE") {
       this.setStatus("syncing");
       const remoteState = msg.filterSeed ? cleanSeedData(msg.state).cleanedState : msg.state;

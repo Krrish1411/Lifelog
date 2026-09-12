@@ -1682,7 +1682,7 @@ export function SettingsView() {
                     <div>
                       <div className="text-[14.5px] font-bold">LifeLog</div>
                       <div className="text-[12px] font-semibold mt-0.5" style={{ color: "var(--mut)" }}>
-                        Crafted with precision by <span className="font-bold text-accent">Krish Patel</span>
+                        Crafted with precision by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span>
                       </div>
                     </div>
                     <span className="chip text-[11px] font-mono">v{STATE_VERSION}.0</span>

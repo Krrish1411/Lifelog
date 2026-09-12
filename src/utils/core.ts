@@ -526,3 +526,16 @@ export function download(filename: string, content: string, mime = "application/
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 2000);
 }
+
+/**
+ * Detects whether a task represents a sleep or bedtime rest entry.
+ * Checks tags, emoji, and title keywords for robust classification.
+ */
+export function isSleepTask(t: { tags?: string[]; title?: string; emoji?: string | null }): boolean {
+  if (!t) return false;
+  if (t.tags && t.tags.some((tag) => tag.toLowerCase() === "sleep" || tag.toLowerCase() === "rest")) return true;
+  if (t.emoji === "😴" || t.emoji === "💤" || t.emoji === "🛏️") return true;
+  if (t.title && /sleep|bedtime|nap\b/i.test(t.title)) return true;
+  return false;
+}
+

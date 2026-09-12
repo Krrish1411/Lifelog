@@ -17,7 +17,7 @@ import {
 import type { Session, TimerMode, TaskTimeBlock } from "../types";
 import { LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
-import { fmtClock, fmtDur, isoDate, sessionMinutes, todayIso, uid } from "../utils/core";
+import { fmtClock, fmtDur, isoDate, sessionMinutes, todayIso, uid, isSleepTask } from "../utils/core";
 import {
   playTimerFinishSound,
   playTimerStartSound,
@@ -366,6 +366,7 @@ export function FocusView() {
             t.projectId !== LIFE_LOG_PROJECT_ID &&
             !t.tags.includes("sleep") &&
             !t.tags.includes("routine") &&
+            !isSleepTask(t) &&
             (!query.trim() || t.title.toLowerCase().includes(query.trim().toLowerCase()))
         )
         .sort((a, b) => (a.due ?? "9999").localeCompare(b.due ?? "9999")),

@@ -24,6 +24,7 @@ import {
   GripVertical,
   SlidersHorizontal,
   Filter,
+  Moon,
 } from "lucide-react";
 import type { Priority, Project, Subtask, Task, LifeLogCategory } from "../types";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
@@ -45,6 +46,7 @@ import {
   fmtTimeRange,
   getTaskMinutesForDay,
   checkTimeClash,
+  isSleepTask,
 } from "../utils/core";
 import {
   Btn,
@@ -321,11 +323,11 @@ export function TasksView({
 
     // Dynamic split calculations for cross-midnight overnight items:
     const sleepMin = state.tasks
-      .filter((t) => t.tags.includes("sleep"))
+      .filter((t) => isSleepTask(t))
       .reduce((sum, t) => sum + getTaskMinutesForDay(t, targetDate), 0);
 
     const routineMin = state.tasks
-      .filter((t) => t.projectId === LIFE_LOG_PROJECT_ID && !t.tags.includes("sleep"))
+      .filter((t) => t.projectId === LIFE_LOG_PROJECT_ID && !isSleepTask(t))
       .reduce((sum, t) => sum + getTaskMinutesForDay(t, targetDate), 0);
 
     // Deep work & focus sessions for this date (from actual sessions):
@@ -1806,6 +1808,8 @@ function TaskCard({
   const overdue = !done && !!t.due && t.due < today;
   const snoozed = !!t.snoozedUntil && t.snoozedUntil > Date.now();
   const subDone = t.subtasks.filter((s) => s.done).length;
+  const isSleep = isSleepTask(t);
+  const isLifeLogItem = t.projectId === LIFE_LOG_PROJECT_ID;
 
   const allCategories: LifeLogCategory[] = useMemo(() => {
     const custom = state.settings.customLifeLogCategories ?? [];
@@ -1948,39 +1952,48 @@ function TaskCard({
             </div>
           )}
 
-          {/* Todoist-Style Circular Priority Checkbox */}
-          <div className="flex items-center justify-center shrink-0 pt-0.5">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                triggerHaptic("medium");
-                onToggle();
-              }}
-              className={cn(
-                "group/check relative flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full border-[2px] transition-all active:scale-90 hover:scale-105"
-              )}
-              style={{
-                borderColor: done ? "var(--ok)" : PRIORITY_META[t.priority]?.color ?? "var(--accent)",
-                background: done ? "var(--ok)" : "transparent",
-                cursor: "pointer",
-                opacity: snoozed ? 0.5 : 1,
-              }}
-              title={done ? "Reopen task" : `Complete task (${PRIORITY_META[t.priority].label})`}
-              aria-label="Toggle done"
+          {/* Circular Priority Checkbox or Sleep Status Icon */}
+          {isSleep ? (
+            <div
+              className="flex h-[20px] w-[20px] shrink-0 items-center justify-center rounded-full bg-indigo-500/15 text-indigo-400 pt-0.5"
+              title="Logged Sleep Entry"
             >
-              {done ? (
-                <Check size={11} strokeWidth={3} style={{ color: "var(--on-accent)" }} />
-              ) : (
-                <Check
-                  size={10}
-                  strokeWidth={2.8}
-                  className="opacity-0 group-hover/check:opacity-80 transition-opacity"
-                  style={{ color: PRIORITY_META[t.priority]?.color ?? "var(--accent)" }}
-                />
-              )}
-            </button>
-          </div>
+              <Moon size={12} className="shrink-0" />
+            </div>
+          ) : (
+            <div className="flex items-center justify-center shrink-0 pt-0.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  triggerHaptic("medium");
+                  onToggle();
+                }}
+                className={cn(
+                  "group/check relative flex h-[19px] w-[19px] shrink-0 items-center justify-center rounded-full border-[2px] transition-all active:scale-90 hover:scale-105"
+                )}
+                style={{
+                  borderColor: done ? "var(--ok)" : PRIORITY_META[t.priority]?.color ?? "var(--accent)",
+                  background: done ? "var(--ok)" : "transparent",
+                  cursor: "pointer",
+                  opacity: snoozed ? 0.5 : 1,
+                }}
+                title={done ? "Reopen task" : `Complete task (${PRIORITY_META[t.priority].label})`}
+                aria-label="Toggle done"
+              >
+                {done ? (
+                  <Check size={11} strokeWidth={3} style={{ color: "var(--on-accent)" }} />
+                ) : (
+                  <Check
+                    size={10}
+                    strokeWidth={2.8}
+                    className="opacity-0 group-hover/check:opacity-80 transition-opacity"
+                    style={{ color: PRIORITY_META[t.priority]?.color ?? "var(--accent)" }}
+                  />
+                )}
+              </button>
+            </div>
+          )}
 
           {/* Full-width Title Area: multiline, clear typography */}
           <div className="min-w-0 flex-1 cursor-pointer" onClick={onEdit}>
@@ -2011,7 +2024,7 @@ function TaskCard({
             >
               <Pencil size={13} />
             </button>
-            {!done && (
+            {!done && !isSleep && !isLifeLogItem && (
               <button
                 type="button"
                 onClick={(e) => {
@@ -2121,30 +2134,32 @@ function TaskCard({
             </>
           )}
 
-          {/* Project chip */}
-          {proj && (
+          {/* Project chip (hidden for LifeLog project items since we're already in the LifeLog stream) */}
+          {proj && proj.id !== LIFE_LOG_PROJECT_ID && (
             <span className="chip !py-0.5 text-[10.5px] flex items-center gap-1">
               <span className="h-[6px] w-[6px] rounded-full shrink-0" style={{ background: proj.color }} />
               <span className="font-semibold text-[var(--mut)]">#{proj.name}</span>
             </span>
           )}
 
-          {/* Tag chips */}
-          {t.tags.map((tag) => (
-            <span
-              key={tag}
-              className="chip !py-0.5 text-[10px]"
-              style={{
-                borderColor: `color-mix(in srgb, ${state.tagColors[tag] ?? "var(--accent)"} 45%, var(--line))`,
-              }}
-            >
+          {/* Tag chips (filter out category tag if category chip is already displayed) */}
+          {t.tags
+            .filter((tag) => !isLifeLogItem || !allCategories.some((c) => c.tag === tag))
+            .map((tag) => (
               <span
-                className="h-[6px] w-[6px] rounded-full"
-                style={{ background: state.tagColors[tag] ?? "var(--accent)" }}
-              />
-              @{tag}
-            </span>
-          ))}
+                key={tag}
+                className="chip !py-0.5 text-[10px]"
+                style={{
+                  borderColor: `color-mix(in srgb, ${state.tagColors[tag] ?? "var(--accent)"} 45%, var(--line))`,
+                }}
+              >
+                <span
+                  className="h-[6px] w-[6px] rounded-full"
+                  style={{ background: state.tagColors[tag] ?? "var(--accent)" }}
+                />
+                @{tag}
+              </span>
+            ))}
 
           {/* Subtasks steps chip */}
           {t.subtasks.length > 0 && (
