@@ -5,14 +5,18 @@ const fs = require('fs');
 let mainWindow = null;
 let popoutWindow = null;
 
-// Ensure persistent local storage directory
+// Ensure persistent local storage directory and encrypted attachments folder
 function getStoragePaths() {
   const userData = app.getPath('userData');
+  const attachmentsDir = path.join(userData, 'attachments');
   if (!fs.existsSync(userData)) {
     fs.mkdirSync(userData, { recursive: true });
   }
+  if (!fs.existsSync(attachmentsDir)) {
+    fs.mkdirSync(attachmentsDir, { recursive: true });
+  }
   const vaultFile = path.join(userData, 'lifelog-vault.json');
-  return { dir: userData, file: vaultFile };
+  return { dir: userData, file: vaultFile, attachmentsDir };
 }
 
 function createMainWindow() {
@@ -26,7 +30,7 @@ function createMainWindow() {
     minHeight: 600,
     backgroundColor: '#07090e',
     show: false,
-    icon: path.join(__dirname, '../public/icon-512.png'),
+    icon: path.join(__dirname, 'icons/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -85,7 +89,7 @@ function createTimerPopoutWindow() {
     alwaysOnTop: true,
     resizable: true,
     autoHideMenuBar: true,
-    icon: path.join(__dirname, '../public/icon-512.png'),
+    icon: path.join(__dirname, 'icons/icon.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
@@ -136,24 +140,73 @@ ipcMain.handle('lifelog:load-vault', async () => {
   }
 });
 
-// 3. Return native storage directory info
+// 3. Save individual encrypted attachment to dedicated attachments directory
+ipcMain.handle('lifelog:save-attachment', async (_event, { id, data }) => {
+  try {
+    const { attachmentsDir } = getStoragePaths();
+    const safeId = path.basename(id);
+    const targetFile = path.join(attachmentsDir, `${safeId}.enc`);
+    const tempFile = `${targetFile}.tmp`;
+    fs.writeFileSync(tempFile, data, 'utf8');
+    fs.renameSync(tempFile, targetFile);
+    return { success: true, path: targetFile };
+  } catch (err) {
+    console.error('Failed to write encrypted attachment to disk:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
+// 4. Load individual encrypted attachment from dedicated attachments directory
+ipcMain.handle('lifelog:load-attachment', async (_event, id) => {
+  try {
+    const { attachmentsDir } = getStoragePaths();
+    const safeId = path.basename(id);
+    const targetFile = path.join(attachmentsDir, `${safeId}.enc`);
+    if (fs.existsSync(targetFile)) {
+      return fs.readFileSync(targetFile, 'utf8');
+    }
+    return null;
+  } catch (err) {
+    console.error('Failed to read encrypted attachment from disk:', err);
+    return null;
+  }
+});
+
+// 5. Delete individual encrypted attachment from disk
+ipcMain.handle('lifelog:delete-attachment', async (_event, id) => {
+  try {
+    const { attachmentsDir } = getStoragePaths();
+    const safeId = path.basename(id);
+    const targetFile = path.join(attachmentsDir, `${safeId}.enc`);
+    if (fs.existsSync(targetFile)) {
+      fs.unlinkSync(targetFile);
+    }
+    return { success: true };
+  } catch (err) {
+    console.error('Failed to delete encrypted attachment from disk:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
+// 6. Return native storage directory info
 ipcMain.handle('lifelog:get-storage-info', async () => {
   const paths = getStoragePaths();
   return {
     dir: paths.dir,
     file: paths.file,
+    attachmentsDir: paths.attachmentsDir,
     platform: process.platform,
   };
 });
 
-// 4. Open native storage directory in OS File Explorer / Finder / File Manager
+// 7. Open native storage directory in OS File Explorer / Finder / File Manager
 ipcMain.handle('lifelog:open-storage-folder', async () => {
   const { dir } = getStoragePaths();
   await shell.openPath(dir);
   return true;
 });
 
-// 5. Open Timer Popout
+// 8. Open Timer Popout
 ipcMain.handle('lifelog:open-timer-popout', async () => {
   createTimerPopoutWindow();
   return true;

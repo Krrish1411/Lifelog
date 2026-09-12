@@ -151,11 +151,11 @@ export function SettingsView() {
   const [importPw, setImportPw] = useState("");
   const [importPayload, setImportPayload] = useState<string | null>(null);
   const [importErr, setImportErr] = useState("");
-  const [electronStoragePath, setElectronStoragePath] = useState<string | null>(null);
+  const [electronStorage, setElectronStorage] = useState<{ file: string; attachmentsDir?: string } | null>(null);
   useEffect(() => {
     if (typeof window !== "undefined" && window.electronAPI) {
       window.electronAPI.getStorageInfo().then((info) => {
-        if (info?.file) setElectronStoragePath(info.file);
+        if (info?.file) setElectronStorage({ file: info.file, attachmentsDir: info.attachmentsDir });
       }).catch(() => {});
     }
   }, []);
@@ -1489,16 +1489,21 @@ export function SettingsView() {
                     </Btn>
                   </div>
 
-                  {electronStoragePath && (
+                  {electronStorage && (
                     <div className="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                      <div className="space-y-0.5 min-w-0">
+                      <div className="space-y-1 min-w-0">
                         <div className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-400">
                           <Folder size={13} />
                           <span>Native Local Storage (Desktop)</span>
                         </div>
-                        <div className="text-[11px] font-mono text-[var(--mut)] truncate" title={electronStoragePath}>
-                          {electronStoragePath}
+                        <div className="text-[11px] font-mono text-[var(--mut)] truncate" title={electronStorage.file}>
+                          Vault: {electronStorage.file}
                         </div>
+                        {electronStorage.attachmentsDir && (
+                          <div className="text-[11px] font-mono text-cyan-400/80 truncate" title={electronStorage.attachmentsDir}>
+                            Encrypted Attachments: {electronStorage.attachmentsDir}
+                          </div>
+                        )}
                       </div>
                       <Btn
                         size="sm"

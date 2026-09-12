@@ -59,6 +59,7 @@
   "build": {
     "appId": "com.lifelog.app",
     "productName": "LifeLog",
+    "publish": null,
     "directories": {
       "output": "release"
     },
@@ -73,20 +74,24 @@
         "deb",
         "tar.gz"
       ],
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "electron/icons/icon.png"
     },
     "win": {
       "target": [
         "nsis",
         "portable"
-      ]
+      ],
+      "icon": "electron/icons/icon.ico"
     },
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
-      "category": "public.app-category.productivity"
+      "category": "public.app-category.productivity",
+      "icon": "electron/icons/icon.icns",
+      "identity": null
     }
   }
 }

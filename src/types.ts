@@ -395,7 +395,10 @@ export interface ElectronAPI {
   platform: string;
   saveVault: (data: string) => Promise<{ success: boolean; path?: string; error?: string }>;
   loadVault: () => Promise<string | null>;
-  getStorageInfo: () => Promise<{ dir: string; file: string; platform: string }>;
+  saveAttachment: (id: string, data: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+  loadAttachment: (id: string) => Promise<string | null>;
+  deleteAttachment: (id: string) => Promise<{ success: boolean; error?: string }>;
+  getStorageInfo: () => Promise<{ dir: string; file: string; attachmentsDir?: string; platform: string }>;
   openStorageFolder: () => Promise<boolean>;
   openTimerPopout: () => Promise<boolean>;
 }

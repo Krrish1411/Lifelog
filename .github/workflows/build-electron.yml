@@ -9,6 +9,9 @@ concurrency:
   group: "desktop-build"
   cancel-in-progress: true
 
+env:
+  CSC_IDENTITY_AUTO_DISCOVERY: false
+
 jobs:
   build-linux:
     name: Build Linux (AppImage, Deb, tar.gz)
@@ -23,6 +26,11 @@ jobs:
           node-version: 22
           cache: 'npm'
 
+      - name: Install Linux Build Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libarchive-tools libfuse2 || sudo apt-get install -y libarchive-tools libfuse2t64 || true
+
       - name: Install Dependencies
         run: npm install
 
@@ -30,7 +38,7 @@ jobs:
         run: npm run build
 
       - name: Build Linux Desktop Packages
-        run: npx electron-builder --linux
+        run: npx electron-builder --linux --publish never
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -63,7 +71,7 @@ jobs:
         run: npm run build
 
       - name: Build Windows Desktop Packages
-        run: npx electron-builder --win
+        run: npx electron-builder --win --publish never
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -93,7 +101,7 @@ jobs:
         run: npm run build
 
       - name: Build macOS Desktop Packages
-        run: npx electron-builder --mac
+        run: npx electron-builder --mac --publish never -c.mac.identity=null
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
@@ -104,3 +112,4 @@ jobs:
             release/*.zip
           if-no-files-found: warn
           retention-days: 30
+
