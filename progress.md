@@ -101,7 +101,8 @@ This document provides a concise yet comprehensive summary of the recent enhance
   - Un-ignored `build/` in `.gitignore` and committed explicit multi-size icons: `build/icon.ico` (multi-size 16-256px), `build/icon.icns` (Apple ICNS), and `build/icon.png` (512x512) alongside `electron/icons/`.
   - Added `"publish": null` to `package.json` and passed `--publish never` across all platform jobs.
   - Configured `CSC_IDENTITY_AUTO_DISCOVERY: false` and `identity: null` to permit clean, unsigned CI builds.
-  - Added `sudo apt-get install -y libarchive-tools libfuse2` on the Linux runner.
+  - Added required `deb` package metadata (`author`, `homepage`, `repository`, `license`, `linux.maintainer`) to satisfy `FpmTarget` validation.
+  - Enabled `APPIMAGE_EXTRACT_AND_RUN: 1` and installed `libarchive-tools`, `libfuse2`, and `desktop-file-utils` on Ubuntu runners.
 
 ### B. Database Architecture: Web Browser vs. Desktop vs. Android
 - **Web Browser (IndexedDB + Web Crypto AES-256-GCM)**:
@@ -121,5 +122,10 @@ This document provides a concise yet comprehensive summary of the recent enhance
 
 - **TypeScript Compilation**: `npm run typecheck` &rarr; `tsc --noEmit` passed with 0 errors.
 - **Vite Production Build**: `npm run build` &rarr; built production bundle in `< 3.0s`.
-- **Git Remote Synchronization**: Pushed to `origin/main` (commit `3a6a5905`).
+- **GitHub Actions Multi-Platform Artifacts (Run ID 34704912740 - 100% GREEN)**:
+  - 🐧 **Linux**: `LifeLog-Desktop-Linux` (350.61 MB) — `.AppImage`, `.deb`, `.tar.gz`
+  - 🪟 **Windows**: `LifeLog-Desktop-Windows` (223.41 MB) — Setup `.exe` (NSIS) & Portable `.exe`
+  - 🍎 **macOS**: `LifeLog-Desktop-macOS` (261.73 MB) — `.dmg` & `.zip`
+- **Zero Local Disk Wear**: 100% of compilation and packaging executed in the GitHub Actions cloud.
+
 
