@@ -389,3 +389,19 @@ export const FONT_PAIRS: Record<FontPair, { label: string; family: string }> = {
   jakarta: { label: "Plus Jakarta Sans", family: "Plus Jakarta Sans" },
   nunito: { label: "Nunito Sans", family: "Nunito Sans" },
 };
+
+export interface ElectronAPI {
+  isElectron: boolean;
+  platform: string;
+  saveVault: (data: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+  loadVault: () => Promise<string | null>;
+  getStorageInfo: () => Promise<{ dir: string; file: string; platform: string }>;
+  openStorageFolder: () => Promise<boolean>;
+  openTimerPopout: () => Promise<boolean>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}

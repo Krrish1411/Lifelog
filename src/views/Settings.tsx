@@ -29,6 +29,7 @@ import {
   Cloud,
   History,
   CheckSquare,
+  Folder,
 } from "lucide-react";
 import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey } from "../types";
 import {
@@ -150,6 +151,15 @@ export function SettingsView() {
   const [importPw, setImportPw] = useState("");
   const [importPayload, setImportPayload] = useState<string | null>(null);
   const [importErr, setImportErr] = useState("");
+  const [electronStoragePath, setElectronStoragePath] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.electronAPI) {
+      window.electronAPI.getStorageInfo().then((info) => {
+        if (info?.file) setElectronStoragePath(info.file);
+      }).catch(() => {});
+    }
+  }, []);
+
   const [quotesDraft, setQuotesDraft] = useState(s.customQuotes.join("\n"));
   useEffect(() => setQuotesDraft(s.customQuotes.join("\n")), [s.customQuotes]);
 
@@ -1478,6 +1488,31 @@ export function SettingsView() {
                       <FileText size={13} /> Paste backup
                     </Btn>
                   </div>
+
+                  {electronStoragePath && (
+                    <div className="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                      <div className="space-y-0.5 min-w-0">
+                        <div className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-400">
+                          <Folder size={13} />
+                          <span>Native Local Storage (Desktop)</span>
+                        </div>
+                        <div className="text-[11px] font-mono text-[var(--mut)] truncate" title={electronStoragePath}>
+                          {electronStoragePath}
+                        </div>
+                      </div>
+                      <Btn
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          window.electronAPI?.openStorageFolder();
+                          toast("Opened storage directory in file manager", "ok");
+                        }}
+                        className="shrink-0 gap-1.5 text-xs font-bold cursor-pointer"
+                      >
+                        <Folder size={12} /> Open Storage Folder
+                      </Btn>
+                    </div>
+                  )}
 
                   <div className="rounded-xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                     <div className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: "var(--accent)" }}>

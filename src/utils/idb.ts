@@ -39,6 +39,20 @@ export function openDB(): Promise<IDBDatabase | null> {
 }
 
 export async function loadStateFromIDB(): Promise<State | null> {
+  // If running in Electron, attempt to load latest state from native local file
+  if (typeof window !== "undefined" && window.electronAPI) {
+    try {
+      const diskData = await window.electronAPI.loadVault();
+      if (diskData) {
+        const key = await getDeviceKey();
+        const state = await decryptEnvelope<State>(key, diskData);
+        if (state) return state;
+      }
+    } catch (e) {
+      console.warn("Electron loadVault fallback:", e);
+    }
+  }
+
   const db = await openDB();
   if (!db) return null;
   return new Promise((resolve) => {
@@ -70,6 +84,15 @@ export async function loadStateFromIDB(): Promise<State | null> {
 export async function saveStateToIDB(state: State): Promise<void> {
   const key = await getDeviceKey();
   const encrypted = await encryptEnvelope(key, state);
+
+  // If running in Electron, mirror encrypted state directly into native local file
+  if (typeof window !== "undefined" && window.electronAPI) {
+    try {
+      await window.electronAPI.saveVault(encrypted);
+    } catch (e) {
+      console.warn("Electron saveVault error:", e);
+    }
+  }
 
   // Synchronously backup to localStorage so any window can immediately access latest state
   try {
