@@ -3,6 +3,16 @@
   "productName": "LifeLog",
   "version": "1.0.0",
   "description": "LifeLog Sovereign Productivity Operating System",
+  "author": {
+    "name": "Krrish1411",
+    "email": "Tablenovo1411@gmail.com"
+  },
+  "homepage": "https://github.com/Krrish1411/Lifelog",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Krrish1411/Lifelog.git"
+  },
+  "license": "MIT",
   "main": "electron/main.cjs",
   "private": true,
   "type": "module",
@@ -74,6 +84,7 @@
         "deb",
         "tar.gz"
       ],
+      "maintainer": "Krrish1411 <Tablenovo1411@gmail.com>",
       "category": "Utility",
       "icon": "electron/icons/icon.png"
     },

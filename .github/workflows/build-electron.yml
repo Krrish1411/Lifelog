@@ -11,6 +11,7 @@ concurrency:
 
 env:
   CSC_IDENTITY_AUTO_DISCOVERY: false
+  APPIMAGE_EXTRACT_AND_RUN: 1
 
 jobs:
   build-linux:
@@ -29,7 +30,7 @@ jobs:
       - name: Install Linux Build Dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y libarchive-tools libfuse2 || sudo apt-get install -y libarchive-tools libfuse2t64 || true
+          sudo apt-get install -y libarchive-tools libfuse2 desktop-file-utils || sudo apt-get install -y libarchive-tools libfuse2t64 desktop-file-utils || true
 
       - name: Install Dependencies
         run: npm install
