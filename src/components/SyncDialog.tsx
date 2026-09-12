@@ -16,10 +16,7 @@ import {
   Lock,
   Trash2,
   CheckCircle2,
-  Cloud,
-  History,
   GitMerge,
-  Sparkles,
 } from "lucide-react";
 import { useApp } from "../store";
 import { syncEngine } from "../sync/syncEngine";
@@ -868,45 +865,6 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
             )}
           </div>
         )}
-
-        {/* Upcoming Cloud & Pro Features banner */}
-        <div className="mt-4 pt-4 border-t border-[var(--line)] space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text)]">
-              <Sparkles size={14} className="text-amber-500" />
-              <span>Upcoming Pro Cloud Infrastructure</span>
-            </div>
-            <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
-              Paid Pro Feature
-            </span>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-            <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--panel2)] space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-[var(--text)] flex items-center gap-1">
-                  <Cloud size={13} className="text-blue-400" /> 2.1 Async Cloud Drop-Box
-                </span>
-                <span className="text-[9px] font-mono px-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">PRO</span>
-              </div>
-              <p className="text-[11px] text-[var(--mut)] leading-snug">
-                Sync across devices asynchronously without both needing to be online at the same time. Encrypted with your passkey via GitHub Gist or Cloudflare KV.
-              </p>
-            </div>
-
-            <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--panel2)] space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="font-bold text-[var(--text)] flex items-center gap-1">
-                  <History size={13} className="text-purple-400" /> 2.3 Time-Machine Rollback
-                </span>
-                <span className="text-[9px] font-mono px-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">PRO</span>
-              </div>
-              <p className="text-[11px] text-[var(--mut)] leading-snug">
-                Rolling hourly cryptographic snapshot checkpoints. Roll back corrupted edits or unintended wipes with instant time-travel restoration.
-              </p>
-            </div>
-          </div>
-        </div>
       </div>
 
       <DiffConflictModal

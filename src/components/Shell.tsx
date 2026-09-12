@@ -27,7 +27,6 @@ import {
   Timer,
   Trash2,
   X,
-  Coffee,
   Sparkles,
 } from "lucide-react";
 import type { Priority, TokenKey, ViewId } from "../types";
@@ -576,18 +575,6 @@ export function Shell() {
             )}
           </button>
 
-          {/* Buy Me a Coffee button */}
-          <a
-            href="https://www.buymeacoffee.com/Krrish1411"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-9 w-9 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-transform active:scale-95 cursor-pointer"
-            title="Support LifeLog on Buy Me a Coffee"
-            aria-label="Buy Me a Coffee"
-          >
-            <Coffee size={15} />
-          </a>
-
           {/* Theme quick toggle */}
           <button
             type="button"
@@ -689,16 +676,6 @@ export function Shell() {
             >
               {state.settings.themeMode === "dark" ? <Sun size={15} /> : <Moon size={15} />}
             </button>
-            <a
-              href="https://www.buymeacoffee.com/Krrish1411"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Support on Buy Me a Coffee"
-              aria-label="Buy Me a Coffee"
-              className="flex h-9 w-9 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
-            >
-              <Coffee size={15} />
-            </a>
             <button
               onClick={() => setPaletteOpen(true)}
               title="Command Palette (Ctrl+K / K)"
@@ -791,18 +768,6 @@ export function Shell() {
               {state.settings.themeMode === "dark" ? <Sun size={14} /> : <Moon size={14} />}
             </button>
 
-            <a
-              href="https://www.buymeacoffee.com/Krrish1411"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Support on Buy Me a Coffee"
-              aria-label="Buy Me a Coffee"
-              className="flex h-8 px-2.5 items-center gap-1.5 rounded-lg border text-xs font-semibold transition-all hover:scale-105 cursor-pointer text-amber-500 bg-amber-500/10 border-amber-500/30"
-            >
-              <Coffee size={13} />
-              <span className="hidden sm:inline">Coffee</span>
-            </a>
-
             <button
               onClick={() => setPaletteOpen(true)}
               className="flex h-8 w-8 items-center justify-center rounded-lg border transition-all cursor-pointer"
@@ -880,17 +845,6 @@ export function Shell() {
             >
               {state.settings.themeMode === "dark" ? <Sun size={14} /> : <Moon size={14} />}
             </button>
-
-            <a
-              href="https://www.buymeacoffee.com/Krrish1411"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-8 w-8 items-center justify-center rounded-lg border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
-              title="Support on Buy Me a Coffee"
-              aria-label="Buy Me a Coffee"
-            >
-              <Coffee size={14} />
-            </a>
 
             <button
               onClick={() => setPaletteOpen(true)}
@@ -983,17 +937,6 @@ export function Shell() {
             >
               {state.settings.themeMode === "dark" ? <Sun size={15} /> : <Moon size={15} />}
             </button>
-
-            <a
-              href="https://www.buymeacoffee.com/Krrish1411"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex h-9 w-9 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
-              title="Support on Buy Me a Coffee"
-              aria-label="Buy Me a Coffee"
-            >
-              <Coffee size={15} />
-            </a>
           </div>
 
           <div className="mt-3 flex w-full flex-col items-center gap-1 px-1.5">
@@ -1119,17 +1062,6 @@ export function Shell() {
           >
             {state.settings.themeMode === "dark" ? <Sun size={14} /> : <Moon size={14} />}
           </button>
-
-          <a
-            href="https://www.buymeacoffee.com/Krrish1411"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex h-8 w-8 items-center justify-center rounded-xl border text-amber-500 bg-amber-500/10 border-amber-500/30 transition-all hover:scale-105 cursor-pointer"
-            title="Support on Buy Me a Coffee"
-            aria-label="Buy Me a Coffee"
-          >
-            <Coffee size={14} />
-          </a>
 
           <button
             onClick={() => setPaletteOpen(true)}

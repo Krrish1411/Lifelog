@@ -1512,64 +1512,6 @@ export function SettingsView() {
               ),
               true
             )}
-
-            {/* Upcoming Pro Cloud Infrastructure */}
-            {section(
-              "Upcoming Pro Cloud Infrastructure",
-              "Advanced zero-knowledge cloud synchronization and time-travel recovery planned for the commercial Pro edition.",
-              (
-                <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs font-bold text-[var(--text)]">
-                      <Sparkles size={14} className="text-amber-500" />
-                      <span>Commercial Pro Upgrade Roadmap</span>
-                    </div>
-                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500 border border-amber-500/30">
-                      Paid Pro Feature
-                    </span>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
-                    <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
-                          <Cloud size={14} className="text-blue-400" /> 2.1 Async Cloud Drop
-                        </span>
-                        <span className="text-[9px] font-mono px-1 rounded bg-blue-500/10 text-blue-400 border border-blue-500/20">PRO</span>
-                      </div>
-                      <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
-                        Sync devices asynchronously without requiring both to be online simultaneously. Encrypted with your local passkey via GitHub Gist or Cloudflare KV.
-                      </p>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
-                          <History size={14} className="text-purple-400" /> 2.3 Time-Machine
-                        </span>
-                        <span className="text-[9px] font-mono px-1 rounded bg-purple-500/10 text-purple-400 border border-purple-500/20">PRO</span>
-                      </div>
-                      <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
-                        Rolling hourly cryptographic snapshot checkpoints. Roll back corrupted edits or unintended task wipes with instant point-in-time recovery.
-                      </p>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-[var(--text)] flex items-center gap-1.5">
-                          <Calendar size={14} className="text-emerald-400" /> 4.3 Calendar .ICS Sync
-                        </span>
-                        <span className="text-[9px] font-mono px-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">PRO</span>
-                      </div>
-                      <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
-                        Two-way iCalendar (.ics) feed synchronization. Seamlessly project your LifeLog time-blocks and habits directly to Google Calendar, Apple Calendar & Outlook.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ),
-              true
-            )}
           </>
         )}
 

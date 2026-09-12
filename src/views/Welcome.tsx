@@ -5,6 +5,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  Coffee,
   ExternalLink,
   FileText,
   Flame,
@@ -107,7 +108,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
   return (
     <div
-      className="relative min-h-screen w-full overflow-y-auto bg-[var(--bg)] text-[var(--text)] select-text"
+      className="fixed inset-0 h-screen w-full overflow-y-auto bg-[var(--bg)] text-[var(--text)] select-text z-50 overscroll-y-auto"
       style={{
         paddingBottom: "max(calc(var(--safe-bottom, 12px) + 24px), 36px)",
       }}
@@ -157,6 +158,17 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            <a
+              href="https://www.buymeacoffee.com/Krrish1411"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 rounded-xl border border-amber-500/35 bg-amber-500/10 px-2.5 sm:px-3 py-1.5 text-[11.5px] sm:text-[12.5px] font-bold text-amber-600 dark:text-amber-400 transition-all hover:bg-amber-500/20 active:scale-95 cursor-pointer shadow-sm"
+              title="Support LifeLog on Buy Me a Coffee"
+              aria-label="Buy Me a Coffee"
+            >
+              <Coffee size={14} className="text-amber-500 shrink-0" />
+              <span className="hidden xs:inline sm:inline">Buy Me a Coffee</span>
+            </a>
             <a
               href="#features"
               className="hidden text-[13px] font-bold text-[var(--mut)] transition-colors hover:text-[var(--text)] sm:inline-block"

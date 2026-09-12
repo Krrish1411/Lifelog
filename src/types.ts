@@ -96,6 +96,8 @@ export interface Habit {
   color: string;
   createdAt: number;
   completions: string[]; // ISO dates
+  time?: string; // scheduled time-block on calendar (HH:mm)
+  order?: number; // ordering index
 }
 
 export interface Folder {

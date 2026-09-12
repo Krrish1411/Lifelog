@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   CalendarDays,
   Check,
@@ -36,6 +36,7 @@ import {
 } from "../utils/core";
 import { parseNaturalLanguageTask } from "../utils/nlp";
 import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, Select, TagInput, TextInput, TextArea, Toggle, cn } from "./ui";
+import { MentionAutocomplete } from "./MentionAutocomplete";
 
 const defaultRec = (dueIso: string): Recurrence => {
   const wd = dueIso ? (parseIso(dueIso).getDay() + 6) % 7 : 0;
@@ -66,6 +67,7 @@ export function TaskDialog() {
   const [endTime, setEndTime] = useState("");
   const [duration, setDuration] = useState("60");
   const [notes, setNotes] = useState("");
+  const notesRef = useRef<HTMLTextAreaElement>(null);
   const [privateNote, setPrivateNote] = useState("");
   const [reveal, setReveal] = useState(false);
   const [repeats, setRepeats] = useState(false);
@@ -1123,7 +1125,23 @@ export function TaskDialog() {
 
         {/* Notes */}
         <Labeled label="Notes">
-          <TextArea className="min-h-[64px] resize-y" value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Context, links, acceptance criteria…" />
+          <div className="relative w-full">
+            <TextArea
+              ref={notesRef}
+              className="min-h-[64px] resize-y"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder="Context, links, acceptance criteria… (type @ for tasks, # for projects, [ for notes)"
+            />
+            <MentionAutocomplete
+              textareaRef={notesRef}
+              value={notes}
+              onChange={setNotes}
+              tasks={state.tasks}
+              projects={state.projects}
+              notes={state.notes}
+            />
+          </div>
         </Labeled>
 
         {/* Encrypted Private Note */}

@@ -46,6 +46,7 @@ export interface CalendarItem {
   durationMin: number;
   snoozed?: boolean;
   done?: boolean;
+  isHabit?: boolean;
 }
 
 export interface UnscheduledItem {
@@ -129,8 +130,11 @@ export function CalendarView() {
     }
 
     // Project daily habits onto Calendar as reminder blocks (Feature 1.3)
-    for (const h of state.habits) {
+    const sortedHabits = [...state.habits].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+    sortedHabits.forEach((h, hIdx) => {
       const habitDays = new Set([...h.completions, todayIso()]);
+      const defaultMin = 7 * 60 + 30 + (hIdx * 25);
+      const habitTime = h.time || minToTime(defaultMin);
       for (const d of habitDays) {
         const isDone = h.completions.includes(d);
         const item: CalendarItem = {
@@ -141,15 +145,16 @@ export function CalendarView() {
           emoji: h.emoji,
           projectId: "habits-stream",
           date: d,
-          time: "08:00",
+          time: habitTime,
           durationMin: 20,
           done: isDone,
+          isHabit: true,
         };
         const arr = m.get(d) ?? [];
         arr.push(item);
         m.set(d, arr);
       }
-    }
+    });
 
     for (const arr of m.values()) {
       arr.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
@@ -264,18 +269,39 @@ export function CalendarView() {
 
     let taskId = taskIdFallback;
     let blockId: string | undefined = undefined;
+    let isHabit = false;
 
     if (rawData) {
       try {
         const parsed = JSON.parse(rawData);
         taskId = parsed.taskId;
         blockId = parsed.blockId;
+        isHabit = Boolean(parsed.isHabit);
       } catch {
         // ignore
       }
     }
 
     if (!taskId) return;
+
+    // Check if it's a habit
+    const habit = state.habits.find((h) => h.id === taskId);
+    if (isHabit || habit) {
+      const newTime = min !== null ? minToTime(min) : "08:00";
+      set((s) => ({
+        ...s,
+        habits: s.habits.map((h) => {
+          if (h.id !== taskId) return h;
+          return {
+            ...h,
+            time: newTime,
+          };
+        }),
+      }));
+      toast(`Rescheduled habit “${habit?.name ?? "habit"}” to ${newTime}`, "ok");
+      setHover(null);
+      return;
+    }
 
     set((s) => ({
       ...s,
@@ -677,7 +703,7 @@ export function CalendarView() {
                         </div>
                       )}
                     </div>
-                    {task && (
+                    {task ? (
                       <button
                         type="button"
                         onClick={(e) => {
@@ -697,7 +723,39 @@ export function CalendarView() {
                           className={task.done ? "text-accent" : "opacity-40"}
                         />
                       </button>
-                    )}
+                    ) : b.isHabit ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          const habit = state.habits.find((h) => h.id === b.taskId);
+                          if (habit) {
+                            const has = habit.completions.includes(b.date);
+                            set((s) => ({
+                              ...s,
+                              habits: s.habits.map((h) =>
+                                h.id === habit.id
+                                  ? {
+                                      ...h,
+                                      completions: has
+                                        ? h.completions.filter((d) => d !== b.date)
+                                        : [...h.completions, b.date],
+                                    }
+                                  : h
+                              ),
+                            }));
+                            toast(has ? `Unchecked habit “${habit.name}”` : `Completed habit “${habit.name}”! 🎉`, "ok");
+                          }
+                        }}
+                        className="p-1 rounded hover:bg-[var(--panel)] shrink-0 text-mut hover:text-accent"
+                        title={b.done ? "Mark incomplete" : "Mark done"}
+                      >
+                        <Check
+                          size={14}
+                          className={b.done ? "text-accent" : "opacity-40"}
+                        />
+                      </button>
+                    ) : null}
                   </div>
                 );
               })}
@@ -852,13 +910,34 @@ export function CalendarView() {
                           if (b.done) return;
                           e.dataTransfer.setData(
                             "lifelog/drag",
-                            JSON.stringify({ taskId: b.taskId, blockId: b.blockId })
+                            JSON.stringify({ taskId: b.taskId, blockId: b.blockId, isHabit: !!b.isHabit })
                           );
                           e.dataTransfer.setData("lifelog/task", b.taskId);
                           e.stopPropagation();
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
+                          if (b.isHabit) {
+                            const habit = state.habits.find((h) => h.id === b.taskId);
+                            if (habit) {
+                              const has = habit.completions.includes(b.date);
+                              set((s) => ({
+                                ...s,
+                                habits: s.habits.map((h) =>
+                                  h.id === habit.id
+                                    ? {
+                                        ...h,
+                                        completions: has
+                                          ? h.completions.filter((d) => d !== b.date)
+                                          : [...h.completions, b.date],
+                                      }
+                                    : h
+                                ),
+                              }));
+                              toast(has ? `Unchecked habit “${habit.name}”` : `Completed habit “${habit.name}”! 🎉`, "ok");
+                            }
+                            return;
+                          }
                           openTaskDialog({ taskId: b.taskId });
                         }}
                         className={cn(
@@ -989,22 +1068,6 @@ function Header({
         <Btn variant="soft" size="sm" onClick={() => navigate(1)} aria-label="Next">
           <ChevronRight size={14} />
         </Btn>
-
-        {/* Feature 4.3 Two-Way .ICS Calendar Sync (Upcoming Paid Pro Feature) */}
-        <button
-          type="button"
-          onClick={() => {
-            alert("Feature 4.3: Two-Way External Calendar .ICS Sync (Google Calendar, Apple iCal, Outlook) is an upcoming Paid Pro feature!");
-          }}
-          className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl border text-xs font-semibold text-amber-500 bg-amber-500/10 border-amber-500/30 hover:bg-amber-500/20 cursor-pointer transition-all"
-          title="Two-Way External Calendar .ICS Sync (Upcoming Pro Feature)"
-        >
-          <Sparkles size={12} />
-          <span className="hidden sm:inline">.ICS Sync</span>
-          <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-1 rounded bg-amber-500/20 text-amber-500">
-            PRO
-          </span>
-        </button>
         <div className="ml-auto sm:ml-0">
           <Seg
             options={[
@@ -1024,18 +1087,97 @@ function Header({
 }
 
 function Tray({ unscheduled }: { unscheduled: UnscheduledItem[] }) {
-  const { state, openTaskDialog } = useApp();
+  const { state, set, toast, openTaskDialog } = useApp();
+  const [isHot, setIsHot] = useState(false);
+
+  const handleDropOnTray = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsHot(false);
+    const rawData = e.dataTransfer.getData("lifelog/drag");
+    const taskIdFallback = e.dataTransfer.getData("lifelog/task");
+
+    let taskId = taskIdFallback;
+    let blockId: string | undefined = undefined;
+    let isHabit = false;
+
+    if (rawData) {
+      try {
+        const parsed = JSON.parse(rawData);
+        taskId = parsed.taskId;
+        blockId = parsed.blockId;
+        isHabit = Boolean(parsed.isHabit);
+      } catch {}
+    }
+
+    if (!taskId) return;
+
+    if (isHabit || state.habits.some((h) => h.id === taskId)) {
+      const habit = state.habits.find((h) => h.id === taskId);
+      set((s) => ({
+        ...s,
+        habits: s.habits.map((h) => (h.id === taskId ? { ...h, time: undefined } : h)),
+      }));
+      toast(`Reset habit “${habit?.name ?? "habit"}” calendar time block`, "ok");
+      return;
+    }
+
+    const task = state.tasks.find((t) => t.id === taskId);
+    if (!task) return;
+
+    set((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) => {
+        if (t.id !== taskId) return t;
+
+        // If it was a multi-block task:
+        if (blockId && t.timeBlocks) {
+          return {
+            ...t,
+            timeBlocks: t.timeBlocks.map((b) =>
+              b.id === blockId
+                ? {
+                    ...b,
+                    time: null,
+                    date: null,
+                  }
+                : b
+            ),
+          };
+        }
+
+        // Single block task: clear dueTime so it leaves the calendar time-grid and returns to unscheduled!
+        return {
+          ...t,
+          dueTime: null,
+        };
+      }),
+    }));
+
+    toast(`Unscheduled “${task.title}” · returned to tray`, "ok");
+  };
+
   return (
-    <div className="card flex items-center gap-2 overflow-x-auto p-2.5 w-full max-w-full scrollbar-none">
+    <div
+      onDragOver={(e) => {
+        e.preventDefault();
+        setIsHot(true);
+      }}
+      onDragLeave={() => setIsHot(false)}
+      onDrop={handleDropOnTray}
+      className={cn(
+        "card flex items-center gap-2 overflow-x-auto p-2.5 w-full max-w-full scrollbar-none transition-all",
+        isHot && "ring-2 ring-[var(--accent)] bg-[var(--accent-soft)]"
+      )}
+    >
       <span
-        className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider"
-        style={{ color: "var(--mut)" }}
+        className="flex shrink-0 items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider transition-colors"
+        style={{ color: isHot ? "var(--accent)" : "var(--mut)" }}
       >
-        <Inbox size={13} /> Drag to schedule ({unscheduled.length})
+        <Inbox size={13} /> {isHot ? "Release to unblock time & return task" : `Drag to schedule (${unscheduled.length})`}
       </span>
-      {unscheduled.length === 0 && (
+      {unscheduled.length === 0 && !isHot && (
         <span className="text-[12px] font-semibold" style={{ color: "var(--mut)" }}>
-          Everything is scheduled — tidy calendar.
+          Everything is scheduled — drag blocks here to unblock time.
         </span>
       )}
       {unscheduled.map((item, idx) => {

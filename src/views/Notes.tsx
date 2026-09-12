@@ -14,6 +14,7 @@ import { applyLinePrefix, applyWrap, renderMarkdown } from "../utils/markdown";
 import { consumeDailyNote } from "../utils/nav";
 import { useBodyScrollLock } from "../utils/scrollLock";
 import { Btn, EmptyState, Modal, SearchInput, Seg, Select, TextInput, cn } from "../components/ui";
+import { MentionAutocomplete } from "../components/MentionAutocomplete";
 
 interface Draft { title: string; text: string }
 const MAX_ATTACH = 50 * 1024 * 1024; // 50 MB per attachment
@@ -1022,25 +1023,38 @@ export function NotesView() {
 
                 {/* Note Body Textarea or Markdown View */}
                 {preview === "write" ? (
-                  <textarea
-                    ref={taRef}
-                    className="note-page flex-1 min-h-[320px] w-full resize-none border-0 !bg-transparent text-[15px] sm:text-[15.5px] leading-[1.75] text-[var(--text)] placeholder:text-[var(--mut)]/30 focus:outline-none focus:ring-0 !p-0 mt-4 pb-28"
-                    autoCapitalize="sentences"
-                    autoComplete="on"
-                    autoCorrect="on"
-                    spellCheck={true}
-                    {...({ writingsuggestions: "true" } as any)}
-                    value={draft.text}
-                    onChange={(e) => {
-                      setDraft((d) => ({ ...d, text: e.target.value }));
-                      dirty.current = true;
-                    }}
-                    placeholder={
-                      selNote.daily
-                        ? "# Intentions\n- [ ] Finish hero wireframe\n\n# Log\n==Highlight== what mattered today…"
-                        : "# Start writing freely\n**Bold**, *italic*, ==highlight==, checklists, lists…"
-                    }
-                  />
+                  <>
+                    <textarea
+                      ref={taRef}
+                      className="note-page flex-1 min-h-[320px] w-full resize-none border-0 !bg-transparent text-[15px] sm:text-[15.5px] leading-[1.75] text-[var(--text)] placeholder:text-[var(--mut)]/30 focus:outline-none focus:ring-0 !p-0 mt-4 pb-28"
+                      autoCapitalize="sentences"
+                      autoComplete="on"
+                      autoCorrect="on"
+                      spellCheck={true}
+                      {...({ writingsuggestions: "true" } as any)}
+                      value={draft.text}
+                      onChange={(e) => {
+                        setDraft((d) => ({ ...d, text: e.target.value }));
+                        dirty.current = true;
+                      }}
+                      placeholder={
+                        selNote.daily
+                          ? "# Intentions\n- [ ] Finish hero wireframe\n\n# Log\n==Highlight== what mattered today…"
+                          : "# Start writing freely\n**Bold**, *italic*, ==highlight==, checklists, lists…"
+                      }
+                    />
+                    <MentionAutocomplete
+                      textareaRef={taRef}
+                      value={draft.text}
+                      onChange={(newText) => {
+                        setDraft((d) => ({ ...d, text: newText }));
+                        dirty.current = true;
+                      }}
+                      tasks={state.tasks}
+                      projects={state.projects}
+                      notes={state.notes}
+                    />
+                  </>
                 ) : (
                   <div
                     className="note-page flex-1 min-h-[320px] w-full overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--bg)]/40 p-5 mt-4 leading-relaxed pb-28"

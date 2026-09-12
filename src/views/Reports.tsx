@@ -1,12 +1,12 @@
-import { useMemo, useState } from "react";
-import { Flame, Lightbulb, Settings2, Target, Clock, Printer } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Flame, Lightbulb, Settings2, Target, Clock, Printer, Check, Search } from "lucide-react";
 import { useApp } from "../store";
 import {
   MONTHS, WEEKDAYS_SHORT, addDaysIso, fmtDayShort, fmtDur, isoDate, listDates, parseIso,
   sessionMinutes, streakStats, todayIso, weekStartIso,
 } from "../utils/core";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
-import { BarRow, Btn, EmptyState, Seg, cn } from "../components/ui";
+import { BarRow, Btn, EmptyState, Modal, Seg, cn } from "../components/ui";
 
 type Preset = "week" | "last7" | "month" | "last30" | "all" | "custom";
 
@@ -19,6 +19,12 @@ export function ReportsView() {
     return isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
   });
   const [to, setTo] = useState(() => todayIso());
+  const [exportModalOpen, setExportModalOpen] = useState(false);
+  const [pdfScope, setPdfScope] = useState<"summary" | "top5" | "custom" | "all">("summary");
+  const [selectedTaskKeys, setSelectedTaskKeys] = useState<Set<string>>(new Set());
+  const [taskSearchQuery, setTaskSearchQuery] = useState("");
+  const [isPrinting, setIsPrinting] = useState(false);
+  const [activePrintScope, setActivePrintScope] = useState<"summary" | "top5" | "custom" | "all">("summary");
 
   const applyPreset = (p: Preset) => {
     setPreset(p);
@@ -181,6 +187,22 @@ export function ReportsView() {
     accurate: calibration.filter((r) => r.status === "accurate").length,
   }), [calibration]);
 
+  useEffect(() => {
+    if (selectedTaskKeys.size === 0 && calibration.length > 0) {
+      setSelectedTaskKeys(new Set(calibration.slice(0, 5).map((c) => c.key)));
+    }
+  }, [calibration]);
+
+  const displayedCalibration = useMemo(() => {
+    if (!isPrinting) return calibration;
+    if (activePrintScope === "summary") return [];
+    if (activePrintScope === "top5") return calibration.slice(0, 5);
+    if (activePrintScope === "custom") {
+      return calibration.filter((r) => selectedTaskKeys.has(r.key));
+    }
+    return calibration;
+  }, [calibration, isPrinting, activePrintScope, selectedTaskKeys]);
+
   /* ---- productivity analytics: last 8 weeks ---- */
   const weeklyTrend = useMemo(() => {
     const ws0 = weekStartIso(today);
@@ -303,7 +325,7 @@ export function ReportsView() {
           </p>
         </div>
         <div className="flex items-center gap-2 shrink-0 no-print">
-          <Btn variant="primary" onClick={() => window.print()} className="gap-1.5 text-xs font-bold shadow-sm">
+          <Btn variant="primary" onClick={() => setExportModalOpen(true)} className="gap-1.5 text-xs font-bold shadow-sm">
             <Printer size={13} />
             <span>Export PDF / Print</span>
           </Btn>
@@ -630,9 +652,13 @@ export function ReportsView() {
         {w.estimateTasks && widgetCard("Estimate calibration", "over / under by dimension", (
           calibration.length === 0 ? (
             <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No estimated tasks with tracked time in this range.</div>
+          ) : isPrinting && activePrintScope === "summary" ? (
+            <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-xs text-[var(--mut)] text-center">
+              <b>Executive Summary Mode</b>: Detailed per-task rows omitted for a concise, instant export. Total planned: <b className="text-[var(--text)]">{fmtDur(estVsActual.planned)}</b> · Tracked: <b className="text-[var(--text)]">{fmtDur(estVsActual.actual)}</b>.
+            </div>
           ) : (
             <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2 no-print">
                 <Seg
                   options={[{ value: "task", label: "Tasks" }, { value: "project", label: "Projects" }, { value: "tag", label: "Tags" }]}
                   value={calibDim} onChange={setCalibDim} size="sm"
@@ -642,7 +668,7 @@ export function ReportsView() {
                 <span className="chip !py-0 text-[10.5px]" style={{ color: "var(--mut)" }}>{calibSummary.accurate} on target</span>
               </div>
               <div className="flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1">
-                {calibration.map((r) => {
+                {displayedCalibration.map((r) => {
                   const max = Math.max(r.planned, r.actual, 1);
                   const col = r.status === "over" ? "var(--danger)" : r.status === "under" ? "var(--ok)" : "var(--accent)";
                   return (
@@ -718,6 +744,169 @@ export function ReportsView() {
           )
         ))}
       </div>
+
+      {/* PDF Export Modal */}
+      <Modal
+        open={exportModalOpen}
+        onClose={() => setExportModalOpen(false)}
+        title="Export PDF / Print Report"
+        width={560}
+      >
+        <div className="flex flex-col gap-4 text-xs">
+          <p style={{ color: "var(--mut)" }} className="leading-relaxed">
+            Choose what to include in your PDF report. Omitting detailed itemized rows prevents browser freezing and produces a clean, executive summary.
+          </p>
+
+          <div className="flex flex-col gap-2">
+            {[
+              {
+                id: "summary",
+                title: "⚡ Executive Summary (Instant, 0 Lag)",
+                desc: "Includes summary totals, category breakdowns, habit streaks, and top tags. Omits detailed per-task rows.",
+              },
+              {
+                id: "top5",
+                title: "🎯 Summary + Top 5 Misses",
+                desc: "High-level summary plus the top 5 largest estimate variances for quick audit.",
+              },
+              {
+                id: "custom",
+                title: "📋 Custom Task Selection",
+                desc: "Choose specific tasks or projects to include in the breakdown.",
+              },
+              {
+                id: "all",
+                title: `📜 Full Detailed (${calibration.length} items)`,
+                desc: "Includes every single estimated item in this date range.",
+              },
+            ].map((opt) => {
+              const selected = pdfScope === opt.id;
+              return (
+                <div
+                  key={opt.id}
+                  onClick={() => setPdfScope(opt.id as any)}
+                  className="cursor-pointer rounded-2xl border p-3 transition-all"
+                  style={{
+                    borderColor: selected ? "var(--accent)" : "var(--line)",
+                    background: selected ? "color-mix(in srgb, var(--accent) 8%, var(--panel2))" : "var(--panel2)",
+                  }}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-sm" style={{ color: selected ? "var(--accent)" : "var(--text)" }}>
+                      {opt.title}
+                    </span>
+                    <span
+                      className="h-4 w-4 rounded-full border flex items-center justify-center text-[10px]"
+                      style={{
+                        borderColor: selected ? "var(--accent)" : "var(--line)",
+                        background: selected ? "var(--accent)" : "transparent",
+                        color: "#fff",
+                      }}
+                    >
+                      {selected && <Check className="h-2.5 w-2.5 stroke-[3]" />}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-[11px]" style={{ color: "var(--mut)" }}>
+                    {opt.desc}
+                  </p>
+                </div>
+              );
+            })}
+          </div>
+
+          {pdfScope === "custom" && (
+            <div className="flex flex-col gap-2 rounded-2xl border p-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+              <div className="flex items-center gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--mut)]" />
+                  <input
+                    type="text"
+                    value={taskSearchQuery}
+                    onChange={(e) => setTaskSearchQuery(e.target.value)}
+                    placeholder="Search tasks..."
+                    className="w-full rounded-xl border py-1.5 pl-8 pr-3 text-xs outline-none focus:border-[var(--accent)]"
+                    style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTaskKeys(new Set(calibration.map((c) => c.key)))}
+                  className="rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition hover:border-[var(--accent)]"
+                  style={{ borderColor: "var(--line)", color: "var(--mut)" }}
+                >
+                  Select All
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedTaskKeys(new Set())}
+                  className="rounded-lg border px-2.5 py-1.5 text-[11px] font-medium transition hover:border-[var(--accent)]"
+                  style={{ borderColor: "var(--line)", color: "var(--mut)" }}
+                >
+                  Clear
+                </button>
+              </div>
+
+              <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
+                {calibration
+                  .filter((c) => !taskSearchQuery || c.name.toLowerCase().includes(taskSearchQuery.toLowerCase()))
+                  .map((c) => {
+                    const isChecked = selectedTaskKeys.has(c.key);
+                    return (
+                      <label
+                        key={c.key}
+                        className="flex cursor-pointer items-center justify-between rounded-xl px-2 py-1.5 hover:bg-[var(--panel2)] transition"
+                      >
+                        <div className="flex items-center gap-2 min-w-0 pr-2">
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => {
+                              const next = new Set(selectedTaskKeys);
+                              if (isChecked) next.delete(c.key);
+                              else next.add(c.key);
+                              setSelectedTaskKeys(next);
+                            }}
+                            className="rounded accent-[var(--accent)]"
+                          />
+                          <span className="truncate text-xs">{c.emoji ? `${c.emoji} ` : ""}{c.name}</span>
+                        </div>
+                        <span className="shrink-0 text-[10.5px] font-mono text-[var(--mut)]">
+                          {fmtDur(c.actual)} / {fmtDur(c.planned)}
+                        </span>
+                      </label>
+                    );
+                  })}
+              </div>
+              <div className="text-[10px] text-[var(--mut)] text-right">
+                {selectedTaskKeys.size} of {calibration.length} items selected
+              </div>
+            </div>
+          )}
+
+          <div className="flex items-center justify-end gap-2 pt-2 border-t" style={{ borderColor: "var(--line)" }}>
+            <Btn variant="ghost" onClick={() => setExportModalOpen(false)}>
+              Cancel
+            </Btn>
+            <Btn
+              variant="primary"
+              onClick={() => {
+                setActivePrintScope(pdfScope);
+                setIsPrinting(true);
+                setExportModalOpen(false);
+                setTimeout(() => {
+                  window.print();
+                  setTimeout(() => {
+                    setIsPrinting(false);
+                  }, 1000);
+                }, 150);
+              }}
+            >
+              <Printer className="h-4 w-4 mr-1.5" />
+              Generate PDF
+            </Btn>
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 }
