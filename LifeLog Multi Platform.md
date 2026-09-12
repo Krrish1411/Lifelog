@@ -11,9 +11,9 @@ Comprehensive implementation roadmap and progress tracking for LifeLog across An
 | **Phase 1: Critical Bug Fixes & Code Parity** | Android check-in spacebar fix & unifying `Lifelog-Android` with `Lifelog-main` | **COMPLETED** | `73cedbc` |
 | **Phase 2: Master Conversion Skill Guide** | `Webapp-2-Androidapk.md` comprehensive universal production conversion guide | **COMPLETED** | `5c9fe5f` |
 | **Phase 3: Zero-Cloud P2P Sync Engine** | WebRTC DataChannels + AES-GCM-256 PBKDF2 encryption + QR / Ticket Pairing UI + Live "Always Sync" | **COMPLETED** | `96798d8` |
-| **Phase 4: Desktop Architecture & Engine Setup** | Tauri v2 project scaffold + Linux WebKitGTK 4.x (`webkit2gtk-4.1`) + Windows/Mac targets | **READY TO EXECUTE** | Pending |
-| **Phase 5: Desktop Native Features & UX** | System Tray with live focus countdown badge, native OS notifications, window controls | **READY TO EXECUTE** | Pending |
-| **Phase 6: Multi-Platform Release Pipeline** | GitHub Actions CI/CD matrix (APK, Linux AppImage/deb, Windows msi/exe, macOS dmg) | **READY TO EXECUTE** | Pending |
+| **Phase 4: Desktop Architecture & Engine Setup** | Electron project scaffold + Chromium GPU engine + Windows/Linux/Mac targets | **PLANNED (ELECTRON)** | In Planning |
+| **Phase 5: Desktop Native Features & UX** | System Tray with live focus countdown badge, native OS notifications, window controls | **PLANNED (ELECTRON)** | In Planning |
+| **Phase 6: Multi-Platform Release Pipeline** | GitHub Actions CI/CD matrix (APK, Linux AppImage/deb, Windows msi/exe, macOS dmg) | **PLANNED** | In Planning |
 
 ---
 
@@ -64,26 +64,23 @@ Comprehensive implementation roadmap and progress tracking for LifeLog across An
 
 ---
 
-### Phase 4: Desktop Architecture & Engine Setup (NEXT UP)
-- [ ] **Tauri v2 Configuration (`src-tauri/tauri.conf.json`)**:
-  - Configure bundle identifier (`com.lifelog.desktop`), window dimensions (1280x800 min 900x600), dark title bar.
-- [ ] **Linux WebKitGTK 4.x Engine**:
-  - Specify `webkit2gtk-4.1` dependency in `Cargo.toml` and packaging config to satisfy user requirement (v4 of WebKitGTK).
-- [ ] **Desktop Build Scripts**:
-  - Add `npm run tauri:dev` and `npm run tauri:build` scripts in `package.json`.
-- [ ] **Verification**:
-  - Verify Rust compilation and window creation.
+### Phase 4: Electron Desktop Architecture Setup (PLANNED)
+- [ ] **Electron Scaffold**:
+  - Point Electron `BrowserWindow` at `dist/index.html`.
+  - Configure window dimensions (1280x800 min 900x600), custom frame/titlebar, dark background.
+- [ ] **Desktop Packaging**:
+  - Configure `electron-builder` for Linux (`.AppImage`, `.deb`, `.tar.gz`), Windows (`.exe`, `.msi`), and macOS (`.dmg`).
 
-### Phase 5: Desktop Native Features & UX (PENDING)
+### Phase 5: Electron Desktop Native Features (PLANNED)
 - [ ] **System Tray Integration**:
-  - Native tray icon with menu (Show/Hide LifeLog, Quick Add Task, Pause/Resume Focus Timer, Quit).
-  - Real-time tray badge displaying active Pomodoro countdown.
+  - Native tray icon with context menu (Show/Hide LifeLog, Quick Add Task, Pause/Resume Focus Timer, Quit).
+  - Real-time tray tooltip displaying active Pomodoro countdown.
 - [ ] **Native OS Notifications**:
-  - Bridge HTML5 / Tauri notification API to native Windows Action Center, Linux libnotify, and macOS Notification Center.
+  - Native HTML5 Notification API supported directly out-of-the-box in Electron.
   - Background notifications when timers complete or scheduled tasks are due.
-- [ ] **Desktop Keyboard Shortucts & Window State**:
-  - Global hotkey support (e.g. `Ctrl+Alt+L` to summon LifeLog from background).
-  - Window geometry persistence (remembers last window size and position across restarts).
+- [ ] **Desktop Global Shortcuts & Window Geometry**:
+  - Register global hotkeys (`Ctrl+Shift+Space`) to summon quick-add.
+  - Persist window geometry (size, position, maximized state) across launches.
 
 ### Phase 6: Multi-Platform Release Pipeline (PENDING)
 - [ ] **GitHub Actions Matrix Workflow (`.github/workflows/release.yml`)**:

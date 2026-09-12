@@ -87,7 +87,6 @@ import {
   isLinuxDesktop,
   isNative,
   isNativeMobile,
-  isTauri,
   playChimeSound,
   requestNativeNotificationPermission,
   sendNativeTestNotification,
@@ -800,9 +799,8 @@ export function SettingsView() {
               )
             )}
 
-            {/* Mobile Interface Engine (Phones & Small Screens only - hidden on PC) */}
-            {!isTauri &&
-              section(
+            {/* Mobile Interface Engine (Phones & Small Screens) */}
+            {section(
                 "Mobile Interface Engine (Phones & Small Screens)",
                 "Choose your navigation and shell style on mobile devices. Classic Native is the default engine for maximum battery life and fluid ergonomics.",
                 (

@@ -3,10 +3,9 @@ import { Coffee, Pause, Play, Square, Target, Timer, Plus, ExternalLink, Sparkle
 import { useApp } from "../store";
 import type { Session } from "../types";
 import { fmtHMS, sessionSeconds } from "../utils/core";
-import { triggerHaptic, isTauri } from "../utils/native";
+import { triggerHaptic } from "../utils/native";
 import { playTimerFinishSound } from "../utils/audio";
 import { useApplyTheme } from "../utils/useApplyTheme";
-import { invoke } from "@tauri-apps/api/core";
 import { Btn, cn } from "./ui";
 
 export function TimerPopout() {
@@ -126,13 +125,7 @@ export function TimerPopout() {
     toast(mode === "break" ? "Break started" : `Started ${min}m session`, "ok");
   };
 
-  const focusMainWindow = async () => {
-    if (isTauri) {
-      try {
-        await invoke("show_window");
-        return;
-      } catch {}
-    }
+  const focusMainWindow = () => {
     if (typeof window !== "undefined" && window.opener) {
       window.opener.focus();
     }
@@ -163,13 +156,12 @@ export function TimerPopout() {
         }}
       />
 
-      {/* Top Header / Window Drag Region */}
+      {/* Top Header */}
       <div
-        data-tauri-drag-region
-        className="relative z-10 flex w-full items-center justify-between border-b pb-2.5 cursor-grab active:cursor-grabbing"
+        className="relative z-10 flex w-full items-center justify-between border-b pb-2.5"
         style={{ borderColor: "var(--line)" }}
       >
-        <div className="flex items-center gap-2" data-tauri-drag-region>
+        <div className="flex items-center gap-2">
           <span
             className={cn("h-2.5 w-2.5 rounded-full shrink-0", running && !openPause && "ring-pulse")}
             style={{ background: openPause ? "var(--warn)" : running ? "var(--ok)" : "var(--mut)" }}

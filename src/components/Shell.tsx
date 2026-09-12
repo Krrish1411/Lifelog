@@ -69,10 +69,7 @@ import {
   triggerHaptic,
   initNotificationChannels,
   initRunningTimerTrayListener,
-  isTauri,
-  updateDesktopTray,
   sendDesktopNotification,
-  initDesktopQuickAdd,
   openTimerPopout,
 } from "../utils/native";
 import { Dashboard } from "../views/Dashboard";
@@ -206,14 +203,6 @@ export function Shell() {
     return syncEngine.onStatusChange((s) => setSyncStatus(s));
   }, []);
 
-
-  // Desktop Global Shortcut (Ctrl+Shift+Space / Cmd+Shift+Space) Quick Add
-  useEffect(() => {
-    return initDesktopQuickAdd(() => {
-      openTaskDialog();
-    });
-  }, [openTaskDialog]);
-
   // Android Native Status Bar & System Bars Sync
   useEffect(() => {
     initNativeSystemBars();
@@ -280,33 +269,9 @@ export function Shell() {
   };
 
   /* ---------- global session watchdog: finish countdowns wherever you are ---------- */
-  const lastTrayTitleRef = useRef<string>("");
-  const lastTrayTooltipRef = useRef<string>("");
-
   useEffect(() => {
     const t = setInterval(() => {
       const running = state.sessions.find((s) => s.status === "running");
-
-      // Live Desktop System Tray Countdown (deduplicated to prevent IPC event-loop flooding)
-      if (isTauri) {
-        let title = "LifeLog";
-        let tooltip = "LifeLog — Focus & Productivity";
-        if (running) {
-          const secs = sessionSeconds(running);
-          const remaining = running.plannedMin ? Math.max(0, running.plannedMin * 60 - secs) : secs;
-          const mm = Math.floor(remaining / 60);
-          const ss = remaining % 60;
-          const timeStr = `${mm}:${ss < 10 ? "0" : ""}${ss}`;
-          const prefix = running.mode === "break" ? "☕" : "🍅";
-          title = `${prefix} ${timeStr}`;
-          tooltip = `LifeLog: ${running.mode === "break" ? "Break" : "Focus"} (${timeStr} remaining)`;
-        }
-        if (title !== lastTrayTitleRef.current || tooltip !== lastTrayTooltipRef.current) {
-          lastTrayTitleRef.current = title;
-          lastTrayTooltipRef.current = tooltip;
-          updateDesktopTray(title, tooltip);
-        }
-      }
 
       if (!running || running.mode === "flow" || !running.plannedMin) return;
       if (sessionSeconds(running) >= running.plannedMin * 60) {
@@ -325,23 +290,12 @@ export function Shell() {
         }));
         playTimerChime(running.mode === "break" ? "break" : "complete");
         if (state.settings.notifyEnabled) {
-          if (isTauri) {
-            sendDesktopNotification(
-              running.mode === "break" ? "Break Finished ☕" : "LifeLog Timer Complete 🎯",
-              running.mode === "break"
-                ? "Break is over — ready to focus again."
-                : "Focus session finished and saved to your log."
-            );
-          } else if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-            try {
-              new Notification(running.mode === "break" ? "Break Finished" : "LifeLog Timer Complete", {
-                body:
-                  running.mode === "break"
-                    ? "Break is over — ready to focus again."
-                    : "Focus session finished and saved to your log.",
-              });
-            } catch {}
-          }
+          sendDesktopNotification(
+            running.mode === "break" ? "Break Finished ☕" : "LifeLog Timer Complete 🎯",
+            running.mode === "break"
+              ? "Break is over — ready to focus again."
+              : "Focus session finished and saved to your log."
+          );
         }
         toast(running.mode === "break" ? "Break over — back to it" : "Timer complete — session saved to your log", "warn");
       }

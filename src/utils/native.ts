@@ -3,141 +3,60 @@ import { Haptics, ImpactStyle, NotificationType } from "@capacitor/haptics";
 import { App as CapApp } from "@capacitor/app";
 import { StatusBar, Style } from "@capacitor/status-bar";
 import { LocalNotifications } from "@capacitor/local-notifications";
-import { isTauri as checkIsTauri, invoke } from "@tauri-apps/api/core";
-import { getCurrentWindow } from "@tauri-apps/api/window";
-import { listen } from "@tauri-apps/api/event";
-import { isPermissionGranted, requestPermission, sendNotification } from "@tauri-apps/plugin-notification";
 
 export const isNativeMobile = Capacitor.isNativePlatform();
-export const isTauri = typeof window !== "undefined" && checkIsTauri();
-export const isNative = isNativeMobile || isTauri;
-export const platformType = isTauri ? "desktop" : isNativeMobile ? "android" : "web";
+export const isTauri = false;
+export const isNative = isNativeMobile;
+export const platformType = isNativeMobile ? "android" : "web";
 const ua = typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() : "";
 export const isLinux = typeof window !== "undefined" && ua.includes("linux") && !ua.includes("android");
-export const isLinuxDesktop = isTauri && isLinux;
+export const isLinuxDesktop = false;
 
 /**
- * Send native desktop notification via Tauri.
+ * Send desktop / web notification via standard Web Notification API.
  */
 export async function sendDesktopNotification(title: string, body?: string): Promise<void> {
-  if (!isTauri) return;
-  try {
-    let granted = await isPermissionGranted();
-    if (!granted) {
-      const perm = await requestPermission();
-      granted = perm === "granted";
+  if (typeof Notification !== "undefined" && Notification.permission === "granted") {
+    try {
+      new Notification(title, { body, icon: "/icon-192.png" });
+    } catch (err) {
+      console.warn("Desktop notification error:", err);
     }
-    if (granted) {
-      sendNotification({ title, body });
-    }
-  } catch (err) {
-    console.warn("Desktop notification error:", err);
   }
 }
 
 /**
- * Update desktop system tray title and tooltip (e.g. live countdown).
+ * Desktop system tray update placeholder (for future Electron IPC).
  */
-export async function updateDesktopTray(title: string, tooltip: string): Promise<void> {
-  if (!isTauri) return;
-  try {
-    await invoke("update_tray_status", { title, tooltip });
-  } catch {}
+export async function updateDesktopTray(_title: string, _tooltip: string): Promise<void> {
+  // Available for Electron desktop integration
 }
 
 /**
- * Listen for global shortcut (Ctrl+Shift+Space / Cmd+Shift+Space) quick-capture event.
+ * Desktop global shortcut listener placeholder (for future Electron IPC).
  */
-export function initDesktopQuickAdd(onQuickAdd: () => void): () => void {
-  if (!isTauri) return () => {};
-  let unlisten: (() => void) | undefined;
-  listen("trigger-quick-add", () => {
-    onQuickAdd();
-  }).then((fn) => {
-    unlisten = fn;
-  });
-  return () => {
-    if (unlisten) unlisten();
-  };
+export function initDesktopQuickAdd(_onQuickAdd: () => void): () => void {
+  return () => {};
 }
 
 /**
- * Desktop Window Controls (Minimize, Maximize/Restore, Close)
+ * Desktop Window Controls placeholders (for future Electron IPC).
  */
-export async function minimizeDesktopWindow(): Promise<void> {
-  if (!isTauri) return;
-  try {
-    const appWindow = getCurrentWindow();
-    await appWindow.minimize();
-  } catch (err) {
-    console.warn("Minimize window error:", err);
-  }
-}
+export async function minimizeDesktopWindow(): Promise<void> {}
 
-export async function toggleMaximizeDesktopWindow(): Promise<void> {
-  if (!isTauri) return;
-  try {
-    const appWindow = getCurrentWindow();
-    await appWindow.toggleMaximize();
-  } catch (err) {
-    console.warn("Toggle maximize window error:", err);
-  }
-}
+export async function toggleMaximizeDesktopWindow(): Promise<void> {}
 
 export async function closeDesktopWindow(): Promise<void> {
-  if (!isTauri) return;
-  try {
-    await invoke("hide_to_tray");
-  } catch {
-    try {
-      const appWindow = getCurrentWindow();
-      await appWindow.close();
-    } catch (err) {
-      console.warn("Close window error:", err);
-    }
+  if (typeof window !== "undefined") {
+    window.close();
   }
 }
 
 /**
  * Opens the compact floating always-on-top Timer Popout window.
- * In desktop (Tauri):
- *   Uses native WebviewWindow IPC to summon or instantiate the dedicated popout window.
- * In web / browser:
- *   Opens a centered popup window with window.open.
+ * Uses standard window.open (compatible with all web browsers and Electron).
  */
 export async function openTimerPopout(): Promise<void> {
-  if (isTauri) {
-    try {
-      await invoke("open_timer_popout");
-      return;
-    } catch {
-      try {
-        const { WebviewWindow } = await import("@tauri-apps/api/webviewWindow");
-        const existing = await WebviewWindow.getByLabel("timer-popout");
-        if (existing) {
-          await existing.show();
-          await existing.unminimize();
-          await existing.setFocus();
-          return;
-        }
-        const win = new WebviewWindow("timer-popout", {
-          url: "index.html#timer-popout",
-          title: "LifeLog Timer",
-          width: 360,
-          height: 480,
-          minWidth: 300,
-          minHeight: 380,
-          resizable: true,
-          alwaysOnTop: true,
-        });
-        return;
-      } catch (err) {
-        console.warn("Tauri openTimerPopout error, falling back to window.open", err);
-      }
-    }
-  }
-
-  // Web & mobile fallback
   if (typeof window !== "undefined") {
     const w = 360;
     const h = 480;
@@ -287,7 +206,6 @@ function hashStringToInt(str: string): number {
 export async function initNotificationChannels(): Promise<void> {
   if (!isNativeMobile) return;
   try {
-    // Delete custom sound channels so Android applies native OS default notification sound
     try {
       await LocalNotifications.deleteChannel({ id: "focus-timer" });
       await LocalNotifications.deleteChannel({ id: "task-reminders" });
@@ -295,7 +213,6 @@ export async function initNotificationChannels(): Promise<void> {
       await LocalNotifications.deleteChannel({ id: "task-reminders-v2" });
     } catch {}
 
-    // Android Notification Channels without custom sound play the system OS notification sound
     await LocalNotifications.createChannel({
       id: "focus-channel-os",
       name: "Focus & Pomodoro Timer",
@@ -318,19 +235,11 @@ export async function initNotificationChannels(): Promise<void> {
 }
 
 /**
- * Request system notification permissions (Tauri Desktop, Android POST_NOTIFICATIONS, or Browser).
+ * Request system notification permissions (Android POST_NOTIFICATIONS or Browser / Electron).
  */
 export async function requestNativeNotificationPermission(): Promise<boolean> {
-  if (isTauri) {
-    try {
-      const p = await requestPermission();
-      return p === "granted";
-    } catch {
-      return false;
-    }
-  }
   if (!isNativeMobile) {
-    if ("Notification" in window) {
+    if (typeof Notification !== "undefined") {
       const p = await Notification.requestPermission();
       return p === "granted";
     }
@@ -350,15 +259,8 @@ export async function requestNativeNotificationPermission(): Promise<boolean> {
  * Check current notification permission status.
  */
 export async function checkNativeNotificationPermission(): Promise<boolean> {
-  if (isTauri) {
-    try {
-      return await isPermissionGranted();
-    } catch {
-      return false;
-    }
-  }
   if (!isNativeMobile) {
-    return "Notification" in window && Notification.permission === "granted";
+    return typeof Notification !== "undefined" && Notification.permission === "granted";
   }
   try {
     const status = await LocalNotifications.checkPermissions();
@@ -420,17 +322,10 @@ export async function cancelTaskDueNotification(taskId: string): Promise<void> {
 }
 
 /**
- * Triggers a test notification (Desktop, Native Android or Browser) to verify push alert permissions.
+ * Triggers a test notification (Native Android or Browser / Electron) to verify push alert permissions.
  */
 export async function testNotificationAlert(): Promise<boolean> {
   try {
-    if (isTauri) {
-      await sendDesktopNotification(
-        "🔔 LifeLog Test Alarm",
-        "Your desktop notifications are working properly!"
-      );
-      return true;
-    }
     if (isNativeMobile) {
       await LocalNotifications.schedule({
         notifications: [
@@ -446,26 +341,10 @@ export async function testNotificationAlert(): Promise<boolean> {
       return true;
     } else {
       if (typeof Notification !== "undefined" && Notification.permission === "granted") {
-        if ("serviceWorker" in navigator && navigator.serviceWorker.controller) {
-          navigator.serviceWorker.ready
-            .then((reg) => {
-              reg.showNotification("🔔 LifeLog Test Notification", {
-                body: "Desktop notification and chime are working properly!",
-                icon: "/icon-192.png",
-              });
-            })
-            .catch(() => {
-              new Notification("🔔 LifeLog Test Notification", {
-                body: "Desktop notification and chime are working properly!",
-                icon: "/icon-192.png",
-              });
-            });
-        } else {
-          new Notification("🔔 LifeLog Test Notification", {
-            body: "Desktop notification and chime are working properly!",
-            icon: "/icon-192.png",
-          });
-        }
+        new Notification("🔔 LifeLog Test Notification", {
+          body: "Desktop notification and chime are working properly!",
+          icon: "/icon-192.png",
+        });
         return true;
       }
       return false;
@@ -486,10 +365,6 @@ export async function scheduleTimerEndNotification(
   mode: string
 ): Promise<void> {
   if (durationMs <= 0) return;
-  if (isTauri) {
-    // On desktop, tray status reflects live progress; notifications fire on completion in Shell
-    return;
-  }
   if (!isNativeMobile) return;
   try {
     const targetDate = new Date(Date.now() + durationMs);
@@ -526,17 +401,12 @@ export async function cancelTimerEndNotification(): Promise<void> {
 }
 
 /**
- * Send an immediate test notification with sound and system tray display.
+ * Send an immediate test notification with sound.
  */
 export async function sendNativeTestNotification(): Promise<void> {
   await triggerHaptic("success");
 
-  if (isTauri) {
-    await sendDesktopNotification(
-      "LifeLog Desktop Active 🚀",
-      "Native desktop notifications and system tray live countdown are enabled!"
-    );
-  } else if (isNativeMobile) {
+  if (isNativeMobile) {
     await LocalNotifications.schedule({
       notifications: [
         {
@@ -548,25 +418,24 @@ export async function sendNativeTestNotification(): Promise<void> {
         },
       ],
     });
+  } else {
+    await sendDesktopNotification(
+      "LifeLog Notification Active 🚀",
+      "Notifications are enabled and working properly!"
+    );
   }
 }
 
 const RUNNING_TIMER_NOTIF_ID = 88888;
 
 /**
- * Show a persistent/running timer status notification in the Android shade or desktop system tray.
+ * Show a persistent/running timer status notification in the Android shade.
  */
 export async function showRunningTimerNotification(
   taskTitle: string,
   mode: string,
   remainingSeconds?: number
 ): Promise<void> {
-  if (isTauri) {
-    const modePrefix = mode === "break" ? "☕" : "🍅";
-    const timeStr = remainingSeconds !== undefined ? ` · ${Math.floor(remainingSeconds / 60)}m left` : "";
-    updateDesktopTray(`${modePrefix}${timeStr}`, `LifeLog: ${taskTitle || "Focus"} (${mode})`);
-    return;
-  }
   if (!isNativeMobile) return;
   try {
     const modeLabel = mode === "break" ? "☕ Break" : "🎯 Focus";
@@ -589,13 +458,9 @@ export async function showRunningTimerNotification(
 }
 
 /**
- * Dismiss running timer notification and reset desktop system tray.
+ * Dismiss running timer notification.
  */
 export async function dismissRunningTimerNotification(): Promise<void> {
-  if (isTauri) {
-    updateDesktopTray("LifeLog", "LifeLog — Focus & Productivity");
-    return;
-  }
   if (!isNativeMobile) return;
   try {
     await LocalNotifications.cancel({
@@ -633,4 +498,3 @@ export function initRunningTimerTrayListener(
     handle.then((h) => h.remove()).catch(() => {});
   };
 }
-

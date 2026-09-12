@@ -1,5 +1,3 @@
-import { isTauri } from "./native";
-import { emit, listen } from "@tauri-apps/api/event";
 import type { State } from "../types";
 
 export interface StateSyncMessage {
@@ -26,6 +24,7 @@ try {
 
 /**
  * Broadcasts state updates to all other windows (main, popout, etc.)
+ * Uses BroadcastChannel (supported natively in all modern browsers and Electron).
  */
 export async function broadcastWindowState(state: State): Promise<void> {
   const msg: StateSyncMessage = {
@@ -35,21 +34,11 @@ export async function broadcastWindowState(state: State): Promise<void> {
     timestamp: Date.now(),
   };
 
-  // 1. BroadcastChannel (standard web/webview communication)
   if (broadcastChannel) {
     try {
       broadcastChannel.postMessage(msg);
     } catch (e) {
       console.warn("BroadcastChannel postMessage error:", e);
-    }
-  }
-
-  // 2. Tauri IPC emit (desktop-level event broadcast across all WebviewWindows)
-  if (isTauri) {
-    try {
-      await emit("lifelog_state_sync", msg);
-    } catch (e) {
-      // Ignored if event plugin not available
     }
   }
 }
@@ -67,12 +56,6 @@ export async function requestLatestState(): Promise<void> {
   if (broadcastChannel) {
     try {
       broadcastChannel.postMessage(msg);
-    } catch {}
-  }
-
-  if (isTauri) {
-    try {
-      await emit("lifelog_state_sync", msg);
     } catch {}
   }
 }
@@ -103,29 +86,12 @@ export function onWindowStateSync(
     }
   };
 
-  // 1. Listen on BroadcastChannel
   if (broadcastChannel) {
     const handleBcMessage = (e: MessageEvent<StateSyncMessage>) => {
       handleMessage(e.data);
     };
     broadcastChannel.addEventListener("message", handleBcMessage);
     unsubs.push(() => broadcastChannel?.removeEventListener("message", handleBcMessage));
-  }
-
-  // 2. Listen on Tauri IPC events
-  if (isTauri) {
-    let unlistenTauri: (() => void) | null = null;
-    listen<StateSyncMessage>("lifelog_state_sync", (event) => {
-      handleMessage(event.payload);
-    })
-      .then((unlistenFn) => {
-        unlistenTauri = unlistenFn;
-      })
-      .catch(() => {});
-
-    unsubs.push(() => {
-      if (unlistenTauri) unlistenTauri();
-    });
   }
 
   return () => {
