@@ -123,12 +123,14 @@ export function Modal({
     >
       <div
         className={cn(
-          "pop w-full rounded-3xl border glass-elevated flex flex-col overflow-hidden",
+          "pop w-full rounded-3xl border flex flex-col overflow-hidden shadow-2xl",
           compact ? "max-h-[85vh] my-auto" : "max-h-[90vh]"
         )}
         style={{
           maxWidth: `min(${typeof targetWidth === "number" ? `${targetWidth}px` : targetWidth}, calc(100vw - 24px))`,
-          borderColor: "color-mix(in srgb, var(--line) 85%, transparent)",
+          background: "var(--panel)",
+          borderColor: "var(--line)",
+          boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--line)",
         }}
       >
         <div
@@ -136,7 +138,7 @@ export function Modal({
             "flex items-center justify-between border-b shrink-0",
             compact ? "px-4 py-3" : "px-5 py-4"
           )}
-          style={{ borderColor: "color-mix(in srgb, var(--line) 80%, transparent)" }}
+          style={{ borderColor: "var(--line)" }}
         >
           <div className="font-display text-[16px] font-bold tracking-tight">{title}</div>
           <button
@@ -152,10 +154,13 @@ export function Modal({
         {footer && (
           <div
             className={cn(
-              "flex items-center justify-end gap-2 border-t shrink-0 glass-regular",
+              "flex items-center justify-end gap-2 border-t shrink-0",
               compact ? "px-4 py-2.5" : "px-4 py-3 sm:px-5 sm:py-3.5"
             )}
-            style={{ borderColor: "var(--line)" }}
+            style={{
+              borderColor: "var(--line)",
+              background: "color-mix(in srgb, var(--panel2) 50%, var(--panel))",
+            }}
           >
             {footer}
           </div>

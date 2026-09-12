@@ -263,16 +263,18 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
       onMouseDown={(e) => e.target === e.currentTarget && onClose()}
     >
       <div
-        className="w-full max-w-2xl rounded-3xl border glass-elevated shadow-2xl overflow-hidden flex flex-col max-h-[74vh] pop"
+        className="w-full max-w-2xl rounded-3xl border shadow-2xl overflow-hidden flex flex-col max-h-[74vh] pop"
         style={{
-          borderColor: "color-mix(in srgb, var(--line) 85%, transparent)",
+          background: "var(--panel)",
+          borderColor: "var(--line)",
+          boxShadow: "0 25px 60px -15px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--line)",
         }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Search header */}
         <div
           className="flex items-center px-4 py-3.5 border-b gap-3"
-          style={{ borderColor: "color-mix(in srgb, var(--line) 80%, transparent)" }}
+          style={{ borderColor: "var(--line)" }}
         >
           <Search className="w-5 h-5 text-[var(--mut)] shrink-0" />
           <input

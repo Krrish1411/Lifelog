@@ -38,6 +38,11 @@ import {
   sessionMinutes,
   todayIso,
   uid,
+  calcDurationBetweenTimes,
+  calcEndTimeFromDuration,
+  calcStartTimeFromDuration,
+  fmtTimeStr,
+  fmtTimeRange,
 } from "../utils/core";
 import {
   Btn,
@@ -163,7 +168,9 @@ export function TasksView({
   const isLifeLog = typeof sel === "object" && "project" in sel && sel.project === LIFE_LOG_PROJECT_ID;
   const [routineCat, setRoutineCat] = useState<string>("sleep");
   const [routineTitle, setRoutineTitle] = useState<string>("");
-  const [routineDuration, setRoutineDuration] = useState<string>("450");
+  const [routineDuration, setRoutineDuration] = useState<string>("510");
+  const [routineStartTime, setRoutineStartTime] = useState<string>("23:00");
+  const [routineEndTime, setRoutineEndTime] = useState<string>("07:30");
   const [routineDateChoice, setRoutineDateChoice] = useState<"today" | "yesterday" | "custom">("today");
   const [routineCustomDate, setRoutineCustomDate] = useState<string>(today);
 
@@ -174,6 +181,31 @@ export function TasksView({
   }, []);
 
   const effectiveLogDate = routineDateChoice === "yesterday" ? yesterday : routineDateChoice === "custom" ? routineCustomDate : today;
+
+  // Bidirectional auto-update handlers
+  const handleStartTimeChange = (newStart: string) => {
+    setRoutineStartTime(newStart);
+    if (newStart && routineDuration) {
+      const dur = parseInt(routineDuration, 10) || 30;
+      setRoutineEndTime(calcEndTimeFromDuration(newStart, dur));
+    }
+  };
+
+  const handleEndTimeChange = (newEnd: string) => {
+    setRoutineEndTime(newEnd);
+    if (newEnd && routineStartTime) {
+      const diff = calcDurationBetweenTimes(routineStartTime, newEnd);
+      setRoutineDuration(String(diff));
+    }
+  };
+
+  const handleDurationChange = (newDur: string) => {
+    setRoutineDuration(newDur);
+    const durNum = parseInt(newDur, 10);
+    if (durNum && routineStartTime) {
+      setRoutineEndTime(calcEndTimeFromDuration(routineStartTime, durNum));
+    }
+  };
 
   const handleQuickLog = (asCompleted: boolean) => {
     const cat = LIFE_LOG_CATEGORIES.find((c) => c.id === routineCat) || LIFE_LOG_CATEGORIES[0];
@@ -191,7 +223,7 @@ export function TasksView({
       estimateMin: durNum,
       durationMin: durNum,
       due: effectiveLogDate,
-      dueTime: null,
+      dueTime: routineStartTime || null,
       recurrence: null,
       subtasks: [],
       order: Date.now(),
@@ -205,7 +237,8 @@ export function TasksView({
 
     set((s) => ({ ...s, tasks: [newTask, ...s.tasks] }));
     setRoutineTitle("");
-    toast(asCompleted ? `Logged ${fmtDur(durNum)} ${cat.label}` : `Planned ${finalTitle}`, "ok");
+    const rangeText = routineStartTime ? ` · ${fmtTimeRange(routineStartTime, durNum, state.settings.timeFormat || "12h")}` : ` (${fmtDur(durNum)})`;
+    toast(asCompleted ? `Logged ${cat.label}${rangeText}` : `Planned ${finalTitle}`, "ok");
   };
 
   const lifeDayStats = useMemo(() => {
@@ -214,21 +247,45 @@ export function TasksView({
     const dayTasks = state.tasks.filter(
       (t) => t.projectId === LIFE_LOG_PROJECT_ID && (t.due === targetDate || (!t.due && isoDate(new Date(t.createdAt)) === targetDate))
     );
-    const totalMin = dayTasks.reduce((sum, t) => sum + (t.durationMin || t.estimateMin || 0), 0);
+
+    // Dynamic duration helper: if duration not logged, dynamically use focus tracked minutes!
+    const getTaskDuration = (t: Task) => {
+      const tracked = trackedByTask.get(t.id) || 0;
+      return (t.durationMin > 0 ? t.durationMin : tracked) || t.estimateMin || 0;
+    };
+
     const sleepMin = dayTasks
       .filter((t) => t.tags.includes("sleep"))
-      .reduce((sum, t) => sum + (t.durationMin || t.estimateMin || 0), 0);
-    const otherMin = Math.max(0, totalMin - sleepMin);
+      .reduce((sum, t) => sum + getTaskDuration(t), 0);
+
+    const routineMin = dayTasks
+      .filter((t) => !t.tags.includes("sleep"))
+      .reduce((sum, t) => sum + getTaskDuration(t), 0);
+
+    // Deep work & focus sessions for this date (from state.sessions):
+    const daySessions = state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === targetDate);
+    const totalDayFocusMin = daySessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
+    // Avoid double counting sessions on tasks that are already in dayTasks:
+    const focusOnLifeLogMin = daySessions
+      .filter((s) => s.taskId && dayTasks.some((t) => t.id === s.taskId))
+      .reduce((sum, s) => sum + sessionMinutes(s), 0);
+    const dedicatedWorkMin = Math.max(0, totalDayFocusMin - focusOnLifeLogMin);
+
+    const totalMin = sleepMin + routineMin + dedicatedWorkMin;
     const dayPct = Math.min(100, Math.round((totalMin / 1440) * 100)); // 1440 min = 24h
+    const unloggedMin = Math.max(0, 1440 - totalMin);
+
     return {
       totalMin,
       sleepMin,
-      otherMin,
+      routineMin,
+      workMin: dedicatedWorkMin,
+      unloggedMin,
       dayPct,
       count: dayTasks.length,
       targetDate,
     };
-  }, [isLifeLog, state.tasks, effectiveLogDate]);
+  }, [isLifeLog, state.tasks, state.sessions, effectiveLogDate, trackedByTask]);
 
   const openTasks = useMemo(() => state.tasks.filter((t) => !t.done), [state.tasks]);
   const inboxCount = openTasks.filter((t) => !t.due).length;
@@ -251,6 +308,10 @@ export function TasksView({
         const dateA = a.due || isoDate(new Date(a.createdAt));
         const dateB = b.due || isoDate(new Date(b.createdAt));
         if (dateA !== dateB) return dateB.localeCompare(dateA);
+        // On the same day, sort time-wise chronologically
+        if (a.dueTime && b.dueTime) return a.dueTime.localeCompare(b.dueTime);
+        if (a.dueTime) return -1;
+        if (b.dueTime) return 1;
         return (b.doneAt || b.createdAt) - (a.doneAt || a.createdAt);
       });
     }
@@ -930,11 +991,11 @@ export function TasksView({
 
         {/* Life Log Whole Day Tracker & Quick Routine Logger */}
         {isLifeLog && (
-          <div className="flex flex-col gap-3 mt-4">
+          <div className="flex flex-col gap-3.5 mt-4">
             {/* 1. Day Overview & Balance Summary Card */}
             {lifeDayStats && (
               <div
-                className="p-4 rounded-2xl border glass-regular shadow-xs flex flex-col gap-3"
+                className="p-4 rounded-2xl border shadow-xs flex flex-col gap-3 bg-[var(--panel)]"
                 style={{ borderColor: "color-mix(in srgb, var(--accent) 30%, var(--line))" }}
               >
                 <div className="flex flex-wrap items-center justify-between gap-2">
@@ -943,16 +1004,20 @@ export function TasksView({
                     <div>
                       <div className="font-display text-sm font-bold flex items-center gap-2">
                         <span>
-                          {effectiveLogDate === today ? "Today’s Routine Log" : effectiveLogDate === yesterday ? "Yesterday’s Routine Log" : `Log for ${effectiveLogDate}`}
+                          {effectiveLogDate === today ? "Today’s Whole Day Log" : effectiveLogDate === yesterday ? "Yesterday’s Whole Day Log" : `Log for ${effectiveLogDate}`}
                         </span>
                         <span className="text-xs font-mono px-2 py-0.5 rounded-full bg-[var(--accent-soft)] text-[var(--accent)] font-bold">
-                          {fmtDur(lifeDayStats.totalMin)} tracked
+                          {fmtDur(lifeDayStats.totalMin)} tracked ({lifeDayStats.dayPct}%)
                         </span>
                       </div>
-                      <div className="text-[11px] text-[var(--mut)]">
-                        {lifeDayStats.sleepMin > 0
-                          ? `😴 ${fmtDur(lifeDayStats.sleepMin)} Sleep · ${fmtDur(lifeDayStats.otherMin)} Routines & Activities`
-                          : "No sleep logged for this day yet · Log anytime below"}
+                      <div className="text-[11px] text-[var(--mut)] flex flex-wrap items-center gap-1.5 mt-0.5">
+                        <span className="text-indigo-400 font-semibold">😴 {fmtDur(lifeDayStats.sleepMin)} Sleep</span>
+                        <span>·</span>
+                        <span className="text-sky-400 font-semibold">🎯 {fmtDur(lifeDayStats.workMin)} Deep Work</span>
+                        <span>·</span>
+                        <span className="text-emerald-400 font-semibold">🧘 {fmtDur(lifeDayStats.routineMin)} Routines</span>
+                        <span>·</span>
+                        <span>⏳ {fmtDur(lifeDayStats.unloggedMin)} Unlogged</span>
                       </div>
                     </div>
                   </div>
@@ -1010,13 +1075,16 @@ export function TasksView({
                   </div>
                 )}
 
-                {/* 24-hour day coverage bar */}
+                {/* Segmented 24-hour day coverage bar */}
                 <div>
-                  <div className="flex items-center justify-between text-[11px] mb-1 font-semibold text-[var(--mut)]">
-                    <span>24h Day Coverage ({lifeDayStats.dayPct}%)</span>
-                    <span>{fmtDur(Math.max(0, 1440 - lifeDayStats.totalMin))} unlogged</span>
+                  <div className="flex items-center justify-between text-[11px] mb-1.5 font-semibold text-[var(--mut)]">
+                    <span className="flex items-center gap-2">
+                      <span>24h Day Timeline</span>
+                      <span className="font-mono text-[10px] text-[var(--text)] font-bold">({lifeDayStats.dayPct}% covered)</span>
+                    </span>
+                    <span className="font-mono text-[10px]">{fmtDur(lifeDayStats.unloggedMin)} free</span>
                   </div>
-                  <div className="h-2 rounded-full overflow-hidden flex bg-[var(--panel2)] border border-[var(--line)]">
+                  <div className="h-3 rounded-full overflow-hidden flex bg-[var(--panel2)] border border-[var(--line)]">
                     {lifeDayStats.sleepMin > 0 && (
                       <div
                         className="h-full bg-indigo-500 transition-all duration-300"
@@ -1024,29 +1092,56 @@ export function TasksView({
                         title={`Sleep: ${fmtDur(lifeDayStats.sleepMin)}`}
                       />
                     )}
-                    {lifeDayStats.otherMin > 0 && (
+                    {lifeDayStats.workMin > 0 && (
                       <div
-                        className="h-full bg-emerald-500 transition-all duration-300"
-                        style={{ width: `${Math.min(100, (lifeDayStats.otherMin / 1440) * 100)}%` }}
-                        title={`Routines & Activities: ${fmtDur(lifeDayStats.otherMin)}`}
+                        className="h-full bg-sky-500 transition-all duration-300"
+                        style={{ width: `${Math.min(100, (lifeDayStats.workMin / 1440) * 100)}%` }}
+                        title={`Deep Work & Focus: ${fmtDur(lifeDayStats.workMin)}`}
                       />
                     )}
+                    {lifeDayStats.routineMin > 0 && (
+                      <div
+                        className="h-full bg-emerald-500 transition-all duration-300"
+                        style={{ width: `${Math.min(100, (lifeDayStats.routineMin / 1440) * 100)}%` }}
+                        title={`Routines & Activities: ${fmtDur(lifeDayStats.routineMin)}`}
+                      />
+                    )}
+                  </div>
+
+                  {/* Timeline Legend */}
+                  <div className="flex flex-wrap items-center gap-3 text-[10.5px] font-medium text-[var(--mut)] mt-2 pt-1 border-t border-[var(--line)]/40">
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500 inline-block" />
+                      <span>Sleep ({fmtDur(lifeDayStats.sleepMin)})</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-sky-500 inline-block" />
+                      <span>Deep Work ({fmtDur(lifeDayStats.workMin)})</span>
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <span className="w-2 h-2 rounded-full bg-emerald-500 inline-block" />
+                      <span>Routines ({fmtDur(lifeDayStats.routineMin)})</span>
+                    </span>
+                    <span className="flex items-center gap-1.5 ml-auto">
+                      <span className="w-2 h-2 rounded-full bg-[var(--panel2)] border border-[var(--line)] inline-block" />
+                      <span>Unlogged ({fmtDur(lifeDayStats.unloggedMin)})</span>
+                    </span>
                   </div>
                 </div>
               </div>
             )}
 
-            {/* 2. Quick Routine & Sleep Logger Card */}
+            {/* 2. Quick Routine & Sleep Logger Card with Actual Time Entry */}
             <div
-              className="p-4 rounded-2xl border glass-regular shadow-xs flex flex-col gap-3.5"
+              className="p-4 rounded-2xl border shadow-xs flex flex-col gap-3.5 bg-[var(--panel)]"
               style={{ borderColor: "var(--line)" }}
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
-                  <span>✨</span> Quick Log Routine or Activity
+                  <span>✨</span> Quick Log Routine, Sleep or Activity
                 </div>
                 <div className="text-[11px] text-[var(--mut)]">
-                  Log anytime · Night or Day
+                  Log by actual clock time or duration
                 </div>
               </div>
 
@@ -1060,10 +1155,18 @@ export function TasksView({
                       type="button"
                       onClick={() => {
                         setRoutineCat(cat.id);
-                        if (cat.id === "sleep" && (!routineDuration || Number(routineDuration) <= 60)) {
-                          setRoutineDuration("450");
-                        } else if (cat.id !== "sleep" && Number(routineDuration) > 180) {
+                        if (cat.id === "sleep") {
+                          setRoutineStartTime("23:00");
+                          setRoutineEndTime("07:30");
+                          setRoutineDuration("510");
+                        } else {
+                          const now = new Date();
+                          const h = String(now.getHours()).padStart(2, "0");
+                          const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, "0");
+                          const s = `${h}:${m}`;
+                          setRoutineStartTime(s);
                           setRoutineDuration("45");
+                          setRoutineEndTime(calcEndTimeFromDuration(s, 45));
                         }
                       }}
                       className={cn(
@@ -1080,10 +1183,58 @@ export function TasksView({
                 })}
               </div>
 
-              {/* Duration selection */}
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-bold text-[var(--mut)] shrink-0">Duration:</span>
-                <div className="flex flex-wrap items-center gap-1">
+              {/* Actual Time Entry Inputs with Bidirectional Auto-Calc */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 p-3 rounded-xl border border-[var(--line)] bg-[var(--panel2)]">
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--mut)] mb-1">
+                    {routineCat === "sleep" ? "😴 Sleep at" : "⏰ Start time"}
+                  </label>
+                  <input
+                    type="time"
+                    value={routineStartTime}
+                    onChange={(e) => handleStartTimeChange(e.target.value)}
+                    className="inp !py-1.5 !px-2.5 text-xs w-full font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--mut)] mb-1">
+                    {routineCat === "sleep" ? "☀️ Wake up at" : "🏁 End time"}
+                  </label>
+                  <input
+                    type="time"
+                    value={routineEndTime}
+                    onChange={(e) => handleEndTimeChange(e.target.value)}
+                    className="inp !py-1.5 !px-2.5 text-xs w-full font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-[var(--mut)] mb-1">
+                    ⏱️ Duration
+                  </label>
+                  <div className="flex items-center gap-1.5">
+                    <input
+                      type="number"
+                      min={5}
+                      step={5}
+                      value={routineDuration}
+                      onChange={(e) => handleDurationChange(e.target.value)}
+                      placeholder="min"
+                      className="inp !py-1.5 !px-2 text-xs flex-1 text-right font-mono"
+                    />
+                    <span className="text-xs text-[var(--mut)] font-mono">min</span>
+                    {routineDuration && Number(routineDuration) >= 60 && (
+                      <span className="text-[11px] font-mono text-[var(--accent)] font-bold px-1.5 py-1 rounded bg-[var(--accent-soft)] shrink-0">
+                        {fmtDur(Number(routineDuration))}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Preset Chips Row */}
+                <div className="col-span-full flex flex-wrap items-center gap-1.5 pt-1 border-t border-[var(--line)]/50">
+                  <span className="text-[11px] font-bold text-[var(--mut)] mr-1">Presets:</span>
                   {routineCat === "sleep"
                     ? [
                         { m: 360, l: "6h" },
@@ -1096,11 +1247,11 @@ export function TasksView({
                         <button
                           key={item.m}
                           type="button"
-                          onClick={() => setRoutineDuration(String(item.m))}
+                          onClick={() => handleDurationChange(String(item.m))}
                           className={cn(
-                            "chip !py-1 !px-2.5 text-xs font-bold cursor-pointer transition-all",
+                            "chip !py-0.5 !px-2 text-[11px] font-bold cursor-pointer transition-all",
                             routineDuration === String(item.m)
-                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)]"
+                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)] shadow-xs"
                               : "hover:border-[var(--accent)]"
                           )}
                         >
@@ -1118,36 +1269,63 @@ export function TasksView({
                         <button
                           key={item.m}
                           type="button"
-                          onClick={() => setRoutineDuration(String(item.m))}
+                          onClick={() => handleDurationChange(String(item.m))}
                           className={cn(
-                            "chip !py-1 !px-2.5 text-xs font-bold cursor-pointer transition-all",
+                            "chip !py-0.5 !px-2 text-[11px] font-bold cursor-pointer transition-all",
                             routineDuration === String(item.m)
-                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)]"
+                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)] shadow-xs"
                               : "hover:border-[var(--accent)]"
                           )}
                         >
                           {item.l}
                         </button>
                       ))}
-                </div>
 
-                <div className="flex items-center gap-1.5 ml-auto">
-                  <input
-                    type="number"
-                    min={5}
-                    step={5}
-                    value={routineDuration}
-                    onChange={(e) => setRoutineDuration(e.target.value)}
-                    placeholder="Duration"
-                    className="inp !py-1 !px-2 text-xs w-[76px] text-right font-mono"
-                  />
-                  <span className="text-xs text-[var(--mut)] font-mono">min</span>
-                  {routineDuration && Number(routineDuration) >= 60 && (
-                    <span className="text-[11px] font-mono text-[var(--accent)] font-bold px-1.5 py-0.5 rounded bg-[var(--accent-soft)]">
-                      ({fmtDur(Number(routineDuration))})
-                    </span>
+                  {/* Sleep One-Click Schedules */}
+                  {routineCat === "sleep" && (
+                    <div className="flex flex-wrap items-center gap-1.5 pl-2 border-l border-[var(--line)] ml-1">
+                      {[
+                        { s: "23:00", e: "07:30", l: "11pm – 7:30am" },
+                        { s: "23:30", e: "07:00", l: "11:30pm – 7am" },
+                        { s: "00:00", e: "07:30", l: "12am – 7:30am" },
+                        { s: "22:30", e: "06:30", l: "10:30pm – 6:30am" },
+                      ].map((sc) => (
+                        <button
+                          key={sc.l}
+                          type="button"
+                          onClick={() => {
+                            setRoutineStartTime(sc.s);
+                            setRoutineEndTime(sc.e);
+                            setRoutineDuration(String(calcDurationBetweenTimes(sc.s, sc.e)));
+                          }}
+                          className={cn(
+                            "chip !py-0.5 !px-2 text-[10.5px] font-mono cursor-pointer transition-all",
+                            routineStartTime === sc.s && routineEndTime === sc.e
+                              ? "!bg-indigo-500 text-white !border-indigo-500 shadow-xs"
+                              : "hover:border-indigo-400 text-indigo-400"
+                          )}
+                        >
+                          {sc.l}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
+
+                {/* Range feedback badge */}
+                {routineStartTime && (
+                  <div className="col-span-full text-[11.5px] font-mono text-[var(--text)] pt-1 flex items-center gap-1.5 border-t border-[var(--line)]/50">
+                    <Clock size={12} className="text-[var(--accent)] shrink-0" />
+                    <span>
+                      {fmtTimeRange(routineStartTime, Number(routineDuration) || 30, state.settings.timeFormat || "12h")}
+                    </span>
+                    {routineCat === "sleep" && routineStartTime > (routineEndTime || "00:00") && (
+                      <span className="ml-auto text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                        🌙 Overnight
+                      </span>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* Title Input & Action buttons */}
@@ -1164,7 +1342,7 @@ export function TasksView({
                   }}
                   placeholder={
                     routineCat === "sleep"
-                      ? "Night sleep (e.g. 11pm - 6:30am)"
+                      ? "Night sleep (e.g. 11pm - 7:30am)"
                       : routineCat === "routine"
                       ? "Morning / Evening routine, skincare, meditation..."
                       : routineCat === "watch"
@@ -1183,7 +1361,7 @@ export function TasksView({
                     variant="primary"
                     size="sm"
                     onClick={() => handleQuickLog(true)}
-                    className="whitespace-nowrap flex-1 sm:flex-initial"
+                    className="whitespace-nowrap flex-1 sm:flex-initial cursor-pointer"
                   >
                     <Check size={13} /> <span>Log Routine Entry</span>
                   </Btn>
@@ -1192,7 +1370,7 @@ export function TasksView({
                     size="sm"
                     onClick={() => handleQuickLog(false)}
                     title="Plan as an active to-do item for later"
-                    className="whitespace-nowrap flex-1 sm:flex-initial"
+                    className="whitespace-nowrap flex-1 sm:flex-initial cursor-pointer"
                   >
                     <Plus size={13} /> <span>Plan To-Do</span>
                   </Btn>
@@ -1681,13 +1859,34 @@ function TaskCard({
                 ) : null;
               })()}
 
-              {/* Time logged */}
-              {(t.durationMin || t.estimateMin) ? (
-                <span className="chip !py-0.5 text-[10px] font-mono text-[var(--mut)]">
-                  <Clock size={10} className="text-sky-500" />
-                  <span>{fmtDur(t.durationMin || t.estimateMin)} {t.done ? "logged" : "planned"}</span>
-                </span>
-              ) : null}
+              {/* Time logged / range and dynamic focus */}
+              {(() => {
+                const durMin = (t.durationMin > 0 ? t.durationMin : tracked) || t.estimateMin || 0;
+                const timeFmt = state.settings.timeFormat || "12h";
+
+                return (
+                  <>
+                    {t.dueTime ? (
+                      <span className="chip !py-0.5 text-[10.5px] font-mono font-bold text-sky-500 border-sky-500/30 bg-sky-500/10">
+                        <Clock size={10} className="shrink-0" />
+                        <span>{fmtTimeRange(t.dueTime, durMin, timeFmt)}</span>
+                      </span>
+                    ) : durMin > 0 ? (
+                      <span className="chip !py-0.5 text-[10px] font-mono text-[var(--mut)]">
+                        <Clock size={10} className="text-sky-500" />
+                        <span>{fmtDur(durMin)} {t.done ? "logged" : "planned"}</span>
+                      </span>
+                    ) : null}
+
+                    {tracked > 0 && (
+                      <span className="chip !py-0.5 text-[10px] font-mono text-amber-500 border-amber-500/30 bg-amber-500/10 font-bold">
+                        <Zap size={10} className="shrink-0" />
+                        <span>⚡ {fmtDur(tracked)} focused</span>
+                      </span>
+                    )}
+                  </>
+                );
+              })()}
 
               {/* Date */}
               {t.due && (
@@ -1714,7 +1913,7 @@ function TaskCard({
                   <Calendar size={10} className="shrink-0" />
                   <span>
                     {overdue ? "Overdue: " : t.due === today ? "Today" : fmtDayShort(t.due)}
-                    {t.dueTime ? ` · ${t.dueTime}` : ""}
+                    {t.dueTime ? ` · ${fmtTimeStr(t.dueTime, state.settings.timeFormat || "12h")}` : ""}
                   </span>
                 </span>
               )}

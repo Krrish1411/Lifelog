@@ -68,9 +68,92 @@ export function fmtDur(min: number): string {
   if (m === 0) return `${h}h`;
   return `${h}h ${m}m`;
 }
-export function fmtClock(ts: number): string {
+export function fmtClock(ts: number, format: "12h" | "24h" = "24h"): string {
   const d = new Date(ts);
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+  const h = d.getHours();
+  const m = String(d.getMinutes()).padStart(2, "0");
+  if (format === "12h") {
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12}:${m} ${ampm}`;
+  }
+  return `${String(h).padStart(2, "0")}:${m}`;
+}
+
+export function parseTimeMinutes(timeStr: string): number {
+  if (!timeStr) return 0;
+  const parts = timeStr.split(":");
+  const h = parseInt(parts[0] || "0", 10);
+  const m = parseInt(parts[1] || "0", 10);
+  return (isNaN(h) ? 0 : h) * 60 + (isNaN(m) ? 0 : m);
+}
+
+export function minutesToTimeStr(totalMin: number): string {
+  const normalized = ((totalMin % 1440) + 1440) % 1440;
+  const h = Math.floor(normalized / 60);
+  const m = normalized % 60;
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Calculates duration between start and end times in minutes.
+ * Correctly accounts for overnight schedules (e.g. 23:00 to 07:30 = 510m / 8h 30m).
+ */
+export function calcDurationBetweenTimes(start: string, end: string): number {
+  if (!start || !end) return 0;
+  const sMin = parseTimeMinutes(start);
+  const eMin = parseTimeMinutes(end);
+  let diff = eMin - sMin;
+  if (diff <= 0) diff += 1440; // crosses midnight
+  return diff;
+}
+
+/**
+ * Given start time and duration, calculates the end time.
+ * e.g. "23:00" + 450m -> "06:30"
+ */
+export function calcEndTimeFromDuration(start: string, durationMin: number): string {
+  if (!start) return "07:00";
+  const sMin = parseTimeMinutes(start);
+  return minutesToTimeStr(sMin + durationMin);
+}
+
+/**
+ * Given end time and duration, calculates the start time.
+ * e.g. "07:30" - 510m -> "23:00"
+ */
+export function calcStartTimeFromDuration(end: string, durationMin: number): string {
+  if (!end) return "23:00";
+  const eMin = parseTimeMinutes(end);
+  return minutesToTimeStr(eMin - durationMin);
+}
+
+/**
+ * Formats a "HH:mm" time string according to 12h or 24h format.
+ * e.g. "23:00" -> "11:00 PM" (12h) or "23:00" (24h)
+ */
+export function fmtTimeStr(timeStr: string, format: "12h" | "24h" = "12h"): string {
+  if (!timeStr) return "";
+  const parts = timeStr.split(":");
+  const h = parseInt(parts[0] || "0", 10);
+  const m = parseInt(parts[1] || "0", 10);
+  if (isNaN(h) || isNaN(m)) return timeStr;
+  if (format === "12h") {
+    const ampm = h >= 12 ? "PM" : "AM";
+    const h12 = h % 12 || 12;
+    return `${h12}:${String(m).padStart(2, "0")} ${ampm}`;
+  }
+  return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+}
+
+/**
+ * Formats a time range display with duration.
+ * e.g. "11:00 PM – 7:30 AM (8h 30m)" or "23:00 – 07:30 (8h 30m)"
+ */
+export function fmtTimeRange(startTime: string, durationMin: number, format: "12h" | "24h" = "12h"): string {
+  if (!startTime) return fmtDur(durationMin);
+  const endTime = calcEndTimeFromDuration(startTime, durationMin);
+  return `${fmtTimeStr(startTime, format)} – ${fmtTimeStr(endTime, format)} (${fmtDur(durationMin)})`;
 }
 export function fmtDayShort(iso: string): string {
   const d = parseIso(iso);

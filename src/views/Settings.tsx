@@ -977,8 +977,8 @@ export function SettingsView() {
                       </button>
                     );
                   })}
-                  {(isLinux || isLinuxDesktop) && (
-                    <div className="col-span-full rounded-2xl border p-3.5 glass-clear space-y-2 border-l-4 mt-2" style={{ borderLeftColor: "var(--accent)" }}>
+                  {isLinuxDesktop && (
+                    <div className="col-span-full rounded-2xl border p-3.5 space-y-2 border-l-4 mt-2 bg-[var(--panel2)]" style={{ borderColor: "var(--line)", borderLeftColor: "var(--accent)" }}>
                       <div className="flex items-center justify-between">
                         <span className="text-xs font-bold uppercase tracking-wider text-[var(--text)] flex items-center gap-1.5">
                           <span>🐧</span> Linux Desktop Rendering
@@ -1505,6 +1505,27 @@ export function SettingsView() {
               )
             )}
 
+            {/* Time Format */}
+            {section(
+              "Time Format & Clock",
+              "Controls how hours, schedules, and sleep time entries are displayed.",
+              (
+                <div className="flex flex-col gap-2.5">
+                  <Seg
+                    options={[
+                      { value: "12h", label: "12-Hour (e.g. 11:00 PM)" },
+                      { value: "24h", label: "24-Hour (e.g. 23:00)" },
+                    ]}
+                    value={s.timeFormat || "12h"}
+                    onChange={(val) => patch({ timeFormat: val as "12h" | "24h" })}
+                  />
+                  <span className="text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>
+                    Applies across the Life Log routine tracker, calendar blocks, task timestamps, and session history.
+                  </span>
+                </div>
+              )
+            )}
+
             {/* Android Mobile Experience */}
             {section(
               "Mobile Architecture & Storage",
@@ -1693,13 +1714,22 @@ export function SettingsView() {
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-center gap-2.5">
                     <a
-                      href="https://buymeacoffee.com"
+                      href="https://buymeacoffee.com/Krrish1411"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-[12.5px] font-bold shadow-sm transition-all hover:scale-[1.02] active:scale-[0.98]"
-                      style={{ background: "#FFDD00", color: "#000000" }}
+                      className="inline-flex items-center gap-2 rounded-xl px-4 py-1.5 text-[20px] font-normal shadow-xs transition-all hover:scale-[1.03] active:scale-[0.97] border border-black/80"
+                      style={{
+                        background: "#FFDD00",
+                        color: "#000000",
+                        fontFamily: "'Cookie', cursive",
+                        lineHeight: 1.1,
+                      }}
                     >
-                      <Coffee size={15} /> Buy Me a Coffee
+                      <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M20 8h-1V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v10c0 2.2 1.8 4 4 4h10c2.2 0 4-1.8 4-4v-2h1c1.7 0 3-1.3 3-3s-1.3-3-3-3zm-3 8c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V6h14v10zm3-4h-1v-2h1c.6 0 1 .4 1 1s-.4 1-1 1z" fill="#000000"/>
+                        <path d="M6 9h2v4H6zm4 0h2v4h-2zm4 0h2v4h-2z" fill="#ffffff"/>
+                      </svg>
+                      <span>Buy me a coffee</span>
                     </a>
                     <a
                       href="https://github.com/sponsors"

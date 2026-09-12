@@ -27,6 +27,11 @@ import {
   setPosLabel,
   todayIso,
   uid,
+  fmtDur,
+  calcDurationBetweenTimes,
+  calcEndTimeFromDuration,
+  fmtTimeStr,
+  fmtTimeRange,
 } from "../utils/core";
 import { parseNaturalLanguageTask } from "../utils/nlp";
 import { Btn, ColorPicker, EmojiPicker, Labeled, Modal, Seg, Select, TagInput, TextInput, TextArea, Toggle, cn } from "./ui";
@@ -57,6 +62,7 @@ export function TaskDialog() {
   const [estimate, setEstimate] = useState("30");
   const [due, setDue] = useState("");
   const [dueTime, setDueTime] = useState("");
+  const [endTime, setEndTime] = useState("");
   const [duration, setDuration] = useState("60");
   const [notes, setNotes] = useState("");
   const [privateNote, setPrivateNote] = useState("");
@@ -94,7 +100,13 @@ export function TaskDialog() {
       setEstimate(String(editing.estimateMin || ""));
       setDue(editing.due ?? "");
       setDueTime(editing.dueTime ?? "");
-      setDuration(String(editing.durationMin || 60));
+      const dMin = editing.durationMin || 60;
+      setDuration(String(dMin));
+      if (editing.dueTime) {
+        setEndTime(calcEndTimeFromDuration(editing.dueTime, dMin));
+      } else {
+        setEndTime("");
+      }
       setNotes(editing.notes);
       setRepeats(!!editing.recurrence);
       setRec(editing.recurrence ?? defaultRec(editing.due ?? todayIso()));
@@ -106,15 +118,17 @@ export function TaskDialog() {
     } else {
       const preset = taskDialog.presetDate ?? "";
       const presetTime = taskDialog.presetTime ?? "";
+      const isLifeLogDialog = (taskDialog.projectId ?? state.projects[0]?.id) === LIFE_LOG_PROJECT_ID;
       setTitle("");
       setProjectId(taskDialog.projectId ?? state.projects[0]?.id ?? "");
-      setEmoji("");
+      setEmoji(isLifeLogDialog ? "😴" : "");
       setPriority("medium");
-      setTags([]);
-      setEstimate("30");
-      setDue(preset);
-      setDueTime(presetTime);
-      setDuration("60");
+      setTags(isLifeLogDialog ? ["sleep"] : []);
+      setEstimate(isLifeLogDialog ? "510" : "30");
+      setDue(preset || (isLifeLogDialog ? todayIso() : ""));
+      setDueTime(isLifeLogDialog ? "23:00" : presetTime);
+      setEndTime(isLifeLogDialog ? "07:30" : "");
+      setDuration(isLifeLogDialog ? "510" : "60");
       setNotes("");
       setPrivateNote("");
       setRepeats(false);
@@ -463,9 +477,54 @@ export function TaskDialog() {
               })}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <Labeled label="Time Spent / Duration" hint={tags.includes("sleep") ? "hours / minutes" : "minutes"}>
-                <div className="flex flex-col gap-1.5">
+            {/* Actual Time Entry & Bidirectional Auto-Update */}
+            <div className="flex flex-col gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Labeled label={tags.includes("sleep") ? "Sleep At" : "Start Time"} hint="start">
+                  <TextInput
+                    type="time"
+                    value={dueTime}
+                    onChange={(e) => {
+                      const newStart = e.target.value;
+                      setDueTime(newStart);
+                      if (newStart && duration) {
+                        setEndTime(calcEndTimeFromDuration(newStart, parseInt(duration, 10) || 60));
+                      }
+                    }}
+                  />
+                </Labeled>
+
+                <Labeled label={tags.includes("sleep") ? "Wake-up At" : "End Time"} hint="end">
+                  <TextInput
+                    type="time"
+                    value={endTime}
+                    onChange={(e) => {
+                      const newEnd = e.target.value;
+                      setEndTime(newEnd);
+                      if (newEnd && dueTime) {
+                        const diff = calcDurationBetweenTimes(dueTime, newEnd);
+                        setDuration(String(diff));
+                        setEstimate(String(diff));
+                      }
+                    }}
+                  />
+                </Labeled>
+
+                <Labeled label="Log Date" hint="defaults to today">
+                  <TextInput
+                    type="date"
+                    value={due || todayIso()}
+                    onChange={(e) => setDue(e.target.value)}
+                  />
+                </Labeled>
+              </div>
+
+              {/* Duration and Presets */}
+              <div className="flex flex-col gap-2 rounded-xl p-3 border border-[var(--line)] bg-[var(--panel2)]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-bold text-[var(--mut)]">
+                    Calculated Duration:
+                  </span>
                   <div className="flex items-center gap-1.5">
                     <TextInput
                       type="number"
@@ -473,75 +532,102 @@ export function TaskDialog() {
                       step={5}
                       value={duration}
                       onChange={(e) => {
-                        setDuration(e.target.value);
-                        setEstimate(e.target.value);
+                        const val = e.target.value;
+                        setDuration(val);
+                        setEstimate(val);
+                        const durNum = parseInt(val, 10);
+                        if (durNum && dueTime) {
+                          setEndTime(calcEndTimeFromDuration(dueTime, durNum));
+                        }
                       }}
-                      placeholder={tags.includes("sleep") ? "450 (7.5h)" : "30"}
+                      className="!w-20 text-right font-mono"
+                      placeholder="min"
                     />
+                    <span className="text-xs font-mono text-[var(--mut)]">min</span>
                     {duration && Number(duration) >= 60 && (
-                      <span className="text-[11px] font-mono text-[var(--accent)] shrink-0 font-bold px-1.5 py-0.5 rounded bg-[var(--accent-soft)]">
-                        {Math.floor(Number(duration) / 60)}h{Number(duration) % 60 ? ` ${Number(duration) % 60}m` : ""}
+                      <span className="text-[11px] font-mono text-[var(--accent)] font-bold px-2 py-0.5 rounded bg-[var(--accent-soft)]">
+                        {fmtDur(Number(duration))}
                       </span>
                     )}
                   </div>
-                  <div className="flex flex-wrap items-center gap-1">
-                    {tags.includes("sleep")
-                      ? [
-                          { m: 360, l: "6h" },
-                          { m: 420, l: "7h" },
-                          { m: 450, l: "7.5h" },
-                          { m: 480, l: "8h" },
-                          { m: 510, l: "8.5h" },
-                          { m: 540, l: "9h" },
-                        ].map((item) => (
-                          <button
-                            key={item.m}
-                            type="button"
-                            onClick={() => {
-                              setDuration(String(item.m));
-                              setEstimate(String(item.m));
-                            }}
-                            className={cn(
-                              "chip !py-1 !px-2 text-[10.5px] font-bold cursor-pointer transition-all",
-                              duration === String(item.m) && "!bg-[var(--accent)] !text-[var(--on-accent)]"
-                            )}
-                          >
-                            {item.l}
-                          </button>
-                        ))
-                      : [
-                          { m: 15, l: "15m" },
-                          { m: 30, l: "30m" },
-                          { m: 45, l: "45m" },
-                          { m: 60, l: "1h" },
-                          { m: 90, l: "1.5h" },
-                          { m: 120, l: "2h" },
-                        ].map((item) => (
-                          <button
-                            key={item.m}
-                            type="button"
-                            onClick={() => {
-                              setDuration(String(item.m));
-                              setEstimate(String(item.m));
-                            }}
-                            className={cn(
-                              "chip !py-1 !px-2 text-[10.5px] font-bold cursor-pointer transition-all",
-                              duration === String(item.m) && "!bg-[var(--accent)] !text-[var(--on-accent)]"
-                            )}
-                          >
-                            {item.l}
-                          </button>
-                        ))}
-                  </div>
                 </div>
-              </Labeled>
-              <Labeled label="Log Date" hint="defaults to today">
-                <TextInput
-                  type="date"
-                  value={due || todayIso()}
-                  onChange={(e) => setDue(e.target.value)}
-                />
-              </Labeled>
+
+                {/* Quick Presets */}
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] font-bold text-[var(--mut)] mr-1">Presets:</span>
+                  {tags.includes("sleep")
+                    ? [
+                        { m: 360, l: "6h" },
+                        { m: 420, l: "7h" },
+                        { m: 450, l: "7.5h" },
+                        { m: 480, l: "8h" },
+                        { m: 510, l: "8.5h" },
+                        { m: 540, l: "9h" },
+                      ].map((item) => (
+                        <button
+                          key={item.m}
+                          type="button"
+                          onClick={() => {
+                            setDuration(String(item.m));
+                            setEstimate(String(item.m));
+                            if (dueTime) {
+                              setEndTime(calcEndTimeFromDuration(dueTime, item.m));
+                            }
+                          }}
+                          className={cn(
+                            "chip !py-1 !px-2.5 text-xs font-bold cursor-pointer transition-all",
+                            duration === String(item.m)
+                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)] shadow-xs"
+                              : "hover:border-[var(--accent)]"
+                          )}
+                        >
+                          {item.l}
+                        </button>
+                      ))
+                    : [
+                        { m: 15, l: "15m" },
+                        { m: 30, l: "30m" },
+                        { m: 45, l: "45m" },
+                        { m: 60, l: "1h" },
+                        { m: 90, l: "1.5h" },
+                        { m: 120, l: "2h" },
+                      ].map((item) => (
+                        <button
+                          key={item.m}
+                          type="button"
+                          onClick={() => {
+                            setDuration(String(item.m));
+                            setEstimate(String(item.m));
+                            if (dueTime) {
+                              setEndTime(calcEndTimeFromDuration(dueTime, item.m));
+                            }
+                          }}
+                          className={cn(
+                            "chip !py-1 !px-2.5 text-xs font-bold cursor-pointer transition-all",
+                            duration === String(item.m)
+                              ? "!bg-[var(--accent)] !text-[var(--on-accent)] !border-[var(--accent)] shadow-xs"
+                              : "hover:border-[var(--accent)]"
+                          )}
+                        >
+                          {item.l}
+                        </button>
+                      ))}
+                </div>
+
+                {dueTime && (
+                  <div className="text-[11.5px] font-mono text-[var(--text)] pt-1 flex items-center gap-1.5 border-t border-[var(--line)]/60 mt-1">
+                    <Clock size={12} className="text-[var(--accent)] shrink-0" />
+                    <span>
+                      {fmtTimeRange(dueTime, Number(duration) || 30, state.settings.timeFormat || "12h")}
+                    </span>
+                    {tags.includes("sleep") && dueTime > (endTime || "00:00") && (
+                      <span className="ml-auto text-[10px] font-bold text-indigo-400 bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                        🌙 Overnight
+                      </span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         ) : (

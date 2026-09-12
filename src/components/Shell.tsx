@@ -1896,7 +1896,7 @@ function Overlays({
               {fmtDateLong(new Date())}
             </div>
           </div>
-          <div className="w-full rounded-2xl border p-4 glass-clear border-l-4 shadow-sm" style={{ borderLeftColor: "var(--accent)" }}>
+          <div className="w-full rounded-2xl border p-4 border-l-4 shadow-sm bg-[var(--panel2)]" style={{ borderColor: "var(--line)", borderLeftColor: "var(--accent)" }}>
             <div className="flex items-start gap-3">
               <Quote size={20} className="mt-0.5 shrink-0" style={{ color: "var(--accent)" }} />
               <p className="font-display text-[15.5px] font-semibold leading-relaxed" style={{ color: "var(--text)" }}>

@@ -189,6 +189,8 @@ export interface Settings {
   highContrast: boolean;
   /* Linux platform override */
   disableGlassOnLinux?: boolean;
+  /* Time format preference */
+  timeFormat?: "12h" | "24h";
 }
 
 /** Standard project ID dedicated to general life tracking / vibe coding / entertainment / learning */
@@ -338,6 +340,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reduceMotion: false,
   reduceTransparency: false,
   highContrast: false,
+  timeFormat: "12h",
 };
 
 export const STATE_VERSION = 1;
