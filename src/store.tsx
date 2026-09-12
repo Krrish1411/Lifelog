@@ -168,6 +168,7 @@ function mergeState(raw: Partial<State>): State {
         ...DEFAULT_SETTINGS.zenPanels,
         ...(base.settings?.zenPanels ?? {}),
       },
+      customLifeLogCategories: base.settings?.customLifeLogCategories ?? [],
     },
     meta: {
       createdAt: base.meta?.createdAt ?? Date.now(),

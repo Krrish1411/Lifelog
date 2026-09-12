@@ -191,6 +191,8 @@ export interface Settings {
   disableGlassOnLinux?: boolean;
   /* Time format preference */
   timeFormat?: "12h" | "24h";
+  /* User-defined LifeLog categories */
+  customLifeLogCategories?: LifeLogCategory[];
 }
 
 /** Standard project ID dedicated to general life tracking / vibe coding / entertainment / learning */
@@ -341,6 +343,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reduceTransparency: false,
   highContrast: false,
   timeFormat: "12h",
+  customLifeLogCategories: [],
 };
 
 export const STATE_VERSION = 1;

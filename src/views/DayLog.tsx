@@ -1,13 +1,42 @@
 import { useEffect, useMemo, useState } from "react";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, FileText, Flame, Pause, Timer } from "lucide-react";
+import {
+  CalendarDays,
+  Check,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  Flame,
+  Pause,
+  Timer,
+  Code,
+  Moon,
+  Clock,
+  Zap,
+  Sparkles,
+  ArrowRight,
+  CheckCircle2,
+} from "lucide-react";
 import { useApp } from "../store";
 import { decryptText, getDeviceKey } from "../utils/crypto";
 import {
-  WEEKDAYS_SHORT, addDaysIso, fmtClock, fmtDayShort, fmtDur, fmtNoteName, isoDate,
-  listDates, parseIso, sessionMinutes, todayIso, weekStartIso,
+  WEEKDAYS_SHORT,
+  addDaysIso,
+  fmtClock,
+  fmtDayShort,
+  fmtDur,
+  fmtNoteName,
+  isoDate,
+  listDates,
+  parseIso,
+  sessionMinutes,
+  todayIso,
+  weekStartIso,
+  fmtTimeRange,
+  fmtTimeStr,
 } from "../utils/core";
 import { requestDailyNote } from "../utils/nav";
 import { Btn, EmptyState, cn } from "../components/ui";
+import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID, type LifeLogCategory } from "../types";
 
 export function DayLogView() {
   const { state, setView } = useApp();
@@ -31,6 +60,7 @@ export function DayLogView() {
     () => state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === sel).sort((a, b) => a.startedAt - b.startedAt),
     [state.sessions, sel],
   );
+
   const dayDone = useMemo(
     () =>
       state.tasks.filter((t) => {
@@ -39,6 +69,7 @@ export function DayLogView() {
       }),
     [state.tasks, sel],
   );
+
   const byProject = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of daySessions) {
@@ -50,9 +81,51 @@ export function DayLogView() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [daySessions, state.tasks]);
 
+  const allCategories: LifeLogCategory[] = useMemo(() => {
+    return [...LIFE_LOG_CATEGORIES, ...(state.settings.customLifeLogCategories ?? [])];
+  }, [state.settings.customLifeLogCategories]);
+
+  // Tasks from LifeLog stream for the selected day:
+  const dayLifeLogTasks = useMemo(() => {
+    return state.tasks.filter((t) => {
+      if (t.projectId !== LIFE_LOG_PROJECT_ID) return false;
+      return (
+        t.due === sel ||
+        (!t.due && isoDate(new Date(t.createdAt)) === sel) ||
+        (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === sel)
+      );
+    });
+  }, [state.tasks, sel]);
+
+  const sleepTasks = useMemo(() => {
+    return dayLifeLogTasks.filter((t) => t.tags.includes("sleep"));
+  }, [dayLifeLogTasks]);
+
+  const routineTasks = useMemo(() => {
+    return dayLifeLogTasks.filter((t) => !t.tags.includes("sleep"));
+  }, [dayLifeLogTasks]);
+
+  const sleepMin = useMemo(() => {
+    return sleepTasks.reduce((acc, t) => {
+      const trk = daySessions.filter((s) => s.taskId === t.id).reduce((sum, s) => sum + sessionMinutes(s), 0);
+      return acc + ((t.durationMin > 0 ? t.durationMin : trk) || t.estimateMin || 0);
+    }, 0);
+  }, [sleepTasks, daySessions]);
+
+  const routineMin = useMemo(() => {
+    return routineTasks.reduce((acc, t) => {
+      const trk = daySessions.filter((s) => s.taskId === t.id).reduce((sum, s) => sum + sessionMinutes(s), 0);
+      return acc + ((t.durationMin > 0 ? t.durationMin : trk) || t.estimateMin || 0);
+    }, 0);
+  }, [routineTasks, daySessions]);
+
   const log = state.dayLogs[sel];
   const totalMin = tracked.get(sel) ?? 0;
   const focusSessions = daySessions.filter((s) => s.taskId && s.mode !== "break");
+
+  const dayTotalLoggedMin = sleepMin + routineMin + totalMin;
+  const dayPct = Math.min(100, Math.round((dayTotalLoggedMin / 1440) * 100));
+  const unloggedMin = Math.max(0, 1440 - dayTotalLoggedMin);
 
   /* decrypt daily note preview */
   useEffect(() => {
@@ -72,15 +145,21 @@ export function DayLogView() {
     if (ws !== weekStart) setWeekStart(ws);
   };
 
-  const d = parseIso(sel);
   const isToday = sel === today;
   const maxProj = byProject.length ? byProject[0][1] : 1;
+  const timeFmt = state.settings.timeFormat || "12h";
 
   return (
     <div className="flex flex-col gap-4">
+      {/* Header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-[24px] font-bold tracking-tight">Day Log</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="font-display text-[24px] font-bold tracking-tight">Day Log & Code Stream</h1>
+            <span className="chip !py-0.5 text-[10px] font-mono font-bold bg-[var(--accent-soft)] text-[var(--accent)] border-[var(--accent)]/30">
+              {fmtDur(dayTotalLoggedMin)} tracked
+            </span>
+          </div>
           <p className="text-[13px] font-semibold" style={{ color: "var(--mut)" }}>
             The complete record of {fmtDayShort(sel)}{isToday ? " — today" : ""}
           </p>
@@ -92,11 +171,12 @@ export function DayLogView() {
         </div>
       </div>
 
-      {/* week strip */}
+      {/* Week strip */}
       <div className="card engine-panel grid grid-cols-7 gap-1.5 p-2 w-full min-w-0 overflow-hidden">
         {week.map((iso, i) => {
           const active = iso === sel;
           const hasWork = (tracked.get(iso) ?? 0) > 0;
+          const hasLife = state.tasks.some((t) => t.projectId === LIFE_LOG_PROJECT_ID && (t.due === iso || (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === iso)));
           const dayDoneCount = state.tasks.filter((t) => (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === iso) || t.completions.some((c) => isoDate(new Date(c.at)) === iso)).length;
           return (
             <button
@@ -117,7 +197,8 @@ export function DayLogView() {
                 {parseIso(iso).getDate()}
               </span>
               <span className="flex h-[10px] items-center gap-1">
-                {hasWork && <span className="h-[6px] w-[6px] rounded-full shrink-0" style={{ background: "var(--ok)" }} title={`${fmtDur(tracked.get(iso) ?? 0)} tracked`} />}
+                {hasWork && <span className="h-[6px] w-[6px] rounded-full shrink-0 bg-sky-500" title={`${fmtDur(tracked.get(iso) ?? 0)} code focused`} />}
+                {hasLife && <span className="h-[6px] w-[6px] rounded-full shrink-0 bg-indigo-500" title="LifeLog tracked" />}
                 {dayDoneCount > 0 && <span className="h-[6px] w-[6px] rounded-full shrink-0" style={{ background: "var(--accent)" }} title={`${dayDoneCount} done`} />}
               </span>
             </button>
@@ -125,34 +206,93 @@ export function DayLogView() {
         })}
       </div>
 
-      {/* stat row */}
+      {/* 24-Hour Whole Day Balance & Code Log Bar */}
+      <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden flex flex-col gap-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-xl">🌊</span>
+            <div>
+              <span className="font-display text-[15px] font-bold tracking-tight">24h Day Balance & Code Record</span>
+              <div className="text-[11px] font-semibold text-[var(--mut)]">
+                {fmtDur(dayTotalLoggedMin)} of 24h accounted for ({dayPct}%)
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 text-xs font-mono font-bold">
+            <span className="text-indigo-400 flex items-center gap-1">😴 {fmtDur(sleepMin)} Sleep</span>
+            <span className="text-sky-400 flex items-center gap-1">💻 {fmtDur(totalMin)} Code & Focus</span>
+            <span className="text-emerald-400 flex items-center gap-1">🧘 {fmtDur(routineMin)} Routines</span>
+            <span className="text-[var(--mut)] flex items-center gap-1">⏳ {fmtDur(unloggedMin)} Free</span>
+          </div>
+        </div>
+
+        {/* 24h colored strip */}
+        <div className="h-3.5 w-full rounded-full overflow-hidden flex bg-[var(--panel2)] border border-[var(--line)]">
+          {sleepMin > 0 && (
+            <div
+              className="h-full bg-indigo-500 transition-all duration-300"
+              style={{ width: `${Math.min(100, (sleepMin / 1440) * 100)}%` }}
+              title={`Sleep: ${fmtDur(sleepMin)}`}
+            />
+          )}
+          {totalMin > 0 && (
+            <div
+              className="h-full bg-sky-500 transition-all duration-300"
+              style={{ width: `${Math.min(100, (totalMin / 1440) * 100)}%` }}
+              title={`Code & Focus: ${fmtDur(totalMin)}`}
+            />
+          )}
+          {routineMin > 0 && (
+            <div
+              className="h-full bg-emerald-500 transition-all duration-300"
+              style={{ width: `${Math.min(100, (routineMin / 1440) * 100)}%` }}
+              title={`Life & Routines: ${fmtDur(routineMin)}`}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* Stat Row */}
       <div className="stagger grid grid-cols-2 gap-2.5 lg:grid-cols-4 w-full min-w-0">
         {[
-          { icon: <Timer size={16} />, k: "Minutes focused", v: fmtDur(totalMin), hot: totalMin > 0 },
-          { icon: <Flame size={16} />, k: "Sessions", v: String(focusSessions.length), hot: focusSessions.length > 0 },
-          { icon: <Check size={16} />, k: "Tasks completed", v: String(dayDone.length), hot: dayDone.length > 0 },
-          { icon: <CalendarDays size={16} />, k: "Check-in", v: log?.energy != null ? `${log.moodEmoji ?? ""} ${log.energy}/5`.trim() : "—", hot: !!log?.updatedAt },
+          { icon: <Code size={16} />, k: "Code & Focus", v: fmtDur(totalMin), sub: `${focusSessions.length} session${focusSessions.length !== 1 ? "s" : ""}`, hot: totalMin > 0 },
+          { icon: <Moon size={16} />, k: "Sleep Tracked", v: fmtDur(sleepMin), sub: sleepTasks[0]?.dueTime ? fmtTimeRange(sleepTasks[0].dueTime, sleepMin, timeFmt) : `${sleepTasks.length} log${sleepTasks.length !== 1 ? "s" : ""}`, hot: sleepMin > 0 },
+          { icon: <Sparkles size={16} />, k: "Life & Routines", v: fmtDur(routineMin), sub: `${routineTasks.length} activit${routineTasks.length !== 1 ? "ies" : "y"}`, hot: routineMin > 0 },
+          { icon: <CheckCircle2 size={16} />, k: "Tasks Done", v: String(dayDone.length), sub: `${dayLifeLogTasks.filter((t) => t.done).length} routines`, hot: dayDone.length > 0 },
         ].map((x) => (
           <div key={x.k} className="card card-hover flex items-center gap-3 p-3.5 min-w-0 overflow-hidden">
             <span className="flex h-10 w-10 items-center justify-center rounded-xl shrink-0" style={{ background: "var(--accent-soft)", color: x.hot ? "var(--accent)" : "var(--mut)" }}>{x.icon}</span>
             <div className="min-w-0 flex-1">
-              <div className="font-mono text-[19px] font-bold leading-none tnum truncate" style={{ color: x.hot ? "var(--text)" : "var(--mut)" }}>{x.v}</div>
-              <div className="mt-1 text-[10px] font-bold uppercase tracking-wider truncate" style={{ color: "var(--mut)" }}>{x.k}</div>
+              <div className="font-mono text-[18px] font-bold leading-none tnum truncate" style={{ color: x.hot ? "var(--text)" : "var(--mut)" }}>{x.v}</div>
+              <div className="mt-1 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">
+                <span>{x.k}</span>
+                <span className="font-mono lowercase opacity-80">{x.sub}</span>
+              </div>
             </div>
           </div>
         ))}
       </div>
 
+      {/* Section 1: Code & Focus Timeline */}
       <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr] w-full min-w-0">
-        {/* focus by project — hour shapes */}
+        {/* Focus by Project (Code Distribution) */}
         <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
-          <div className="font-display text-[15px] font-bold tracking-tight">Focus by project</div>
-          <div className="mt-1 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Block length = share of the day’s focused time</div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-display text-[15px] font-bold tracking-tight">Code & Focus by Project</div>
+              <div className="mt-0.5 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Share of the day’s focused engineering time</div>
+            </div>
+            {totalMin > 0 && (
+              <span className="font-mono text-xs font-bold text-[var(--accent)]">
+                {fmtDur(totalMin)}
+              </span>
+            )}
+          </div>
           {byProject.length === 0 ? (
-            <EmptyState icon={Timer} title="No focus recorded" body="Start a session from the Focus tab and it will appear here, shaped by project." />
+            <EmptyState icon={Code} title="No coding focus recorded" body="Start a session from the Focus tab or task card and it will appear here, grouped by project." />
           ) : (
             <>
-              {/* proportional block bar */}
+              {/* Proportional Block Bar */}
               <div className="mt-3 flex h-[34px] w-full overflow-hidden rounded-xl border" style={{ borderColor: "var(--line)" }}>
                 {byProject.map(([pid, min]) => {
                   const p = state.projects.find((x) => x.id === pid);
@@ -198,10 +338,17 @@ export function DayLogView() {
           )}
         </div>
 
-        {/* session timeline */}
+        {/* Timestamped Session Timeline (Code Log) */}
         <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
-          <div className="font-display text-[15px] font-bold tracking-tight">Session timeline</div>
-          <div className="mt-1 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Every start, pause and completion — timestamped</div>
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="font-display text-[15px] font-bold tracking-tight">Code Session Timeline</div>
+              <div className="mt-0.5 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>Every code sprint, pause and completion — timestamped</div>
+            </div>
+            <Btn size="sm" variant="soft" onClick={() => setView("focus")}>
+              <Zap size={12} /> Focus
+            </Btn>
+          </div>
           {daySessions.length === 0 ? (
             <EmptyState icon={Flame} title="No sessions" body="This day has no focus sessions on record." />
           ) : (
@@ -214,7 +361,21 @@ export function DayLogView() {
                   <div key={s.id} className="flex items-center gap-2.5 rounded-xl border px-2.5 py-2 min-w-0 w-full" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                     <span className="h-[26px] w-[4px] shrink-0 rounded-full" style={{ background: s.mode === "break" ? "var(--mut)" : p?.color ?? "var(--accent)" }} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12.5px] font-bold">{s.mode === "break" ? "☕ Break" : `${t?.emoji ?? "▸"} ${t?.title ?? "Untitled task"}`}</div>
+                      <div className="truncate text-[12.5px] font-bold flex items-center gap-1.5">
+                        {s.mode === "break" ? (
+                          <span>☕ Break</span>
+                        ) : (
+                          <>
+                            <span>{t?.emoji ?? "💻"}</span>
+                            <span className="truncate">{t?.title ?? "Untitled task"}</span>
+                            {p && (
+                              <span className="chip !py-0 !text-[9.5px] font-semibold" style={{ color: p.color, borderColor: `${p.color}40` }}>
+                                #{p.name}
+                              </span>
+                            )}
+                          </>
+                        )}
+                      </div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold tnum" style={{ color: "var(--mut)" }}>
                         <span>{fmtClock(s.startedAt)} → {s.endedAt ? fmtClock(s.endedAt) : "…"}</span>
                         <span className="chip !border-0 !py-0 text-[9.5px]" style={{ background: "var(--panel2)" }}>{s.mode}</span>
@@ -230,22 +391,47 @@ export function DayLogView() {
         </div>
       </div>
 
+      {/* Section 2: Tasks Completed & LifeLog Stream */}
       <div className="grid gap-4 lg:grid-cols-[1.15fr_1fr] w-full min-w-0">
-        {/* tasks completed */}
+        {/* Tasks Completed (Normal Projects + LifeLog) */}
         <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
-          <div className="font-display text-[15px] font-bold tracking-tight">Tasks completed</div>
+          <div className="flex items-center justify-between">
+            <div className="font-display text-[15px] font-bold tracking-tight">Tasks & Activities Completed</div>
+            <span className="chip !py-0.5 text-xs font-mono font-bold text-[var(--ok)] border-[var(--ok)]/30">
+              {dayDone.length} finished
+            </span>
+          </div>
           {dayDone.length === 0 ? (
             <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>Nothing was completed on this day.</div>
           ) : (
-            <div className="mt-2.5 flex flex-col gap-1.5 w-full min-w-0">
+            <div className="mt-2.5 flex max-h-[300px] flex-col gap-1.5 overflow-y-auto pr-1 w-full min-w-0">
               {dayDone.map((t) => {
                 const at = t.done && t.doneAt && isoDate(new Date(t.doneAt)) === sel ? t.doneAt : t.completions.find((c) => isoDate(new Date(c.at)) === sel)?.at;
                 const p = state.projects.find((x) => x.id === t.projectId);
+                const isLife = t.projectId === LIFE_LOG_PROJECT_ID;
+                const cat = isLife ? allCategories.find((c) => t.tags.includes(c.tag)) : null;
+
                 return (
                   <div key={t.id} className="flex items-center gap-2.5 rounded-xl border px-2.5 py-2 min-w-0 w-full" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                     <Check size={14} className="shrink-0" style={{ color: "var(--ok)" }} />
-                    <span className="h-[8px] w-[8px] rounded-full shrink-0" style={{ background: p?.color }} />
-                    <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold">{t.emoji ? `${t.emoji} ` : ""}{t.title}</span>
+                    {isLife ? (
+                      <span className="text-xs shrink-0">{cat?.emoji || "🌊"}</span>
+                    ) : (
+                      <span className="h-[8px] w-[8px] rounded-full shrink-0" style={{ background: p?.color || "var(--accent)" }} />
+                    )}
+                    <div className="min-w-0 flex-1 truncate text-[12.5px] font-bold flex items-center gap-1.5">
+                      <span className="truncate">{t.emoji ? `${t.emoji} ` : ""}{t.title}</span>
+                      {p && !isLife && (
+                        <span className="chip !py-0 text-[9.5px] font-semibold shrink-0" style={{ color: p.color }}>
+                          #{p.name}
+                        </span>
+                      )}
+                      {cat && (
+                        <span className="chip !py-0 text-[9.5px] font-semibold shrink-0 text-[var(--accent)]">
+                          {cat.label}
+                        </span>
+                      )}
+                    </div>
                     {t.completions.length > 0 && !t.done && <span className="chip !py-0 text-[9.5px] shrink-0">↻ recurring</span>}
                     <span className="tnum shrink-0 font-mono text-[11px]" style={{ color: "var(--mut)" }}>{at ? fmtClock(at) : ""}</span>
                   </div>
@@ -255,29 +441,78 @@ export function DayLogView() {
           )}
         </div>
 
-        {/* daily note */}
+        {/* LifeLog Routine & Sleep Stream Card */}
         <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
           <div className="flex items-center justify-between">
-            <div className="font-display text-[15px] font-bold tracking-tight">Daily note · {fmtNoteName(sel)}</div>
-            <Btn size="sm" variant="soft" onClick={() => { requestDailyNote(sel); setView("notes"); }}>
-              <FileText size={12} /> Open note
+            <div className="font-display text-[15px] font-bold tracking-tight">Life Stream & Routines</div>
+            <Btn size="sm" variant="soft" onClick={() => setView("tasks")}>
+              <Sparkles size={12} /> LifeLog
             </Btn>
           </div>
-          {notePreview === null ? (
-            <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>Decrypting note…</div>
-          ) : notePreview === "" ? (
-            <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>No note written for this day yet — open it and capture what happened.</div>
-          ) : (
-            <div className="note-page mt-2.5 max-h-[190px] overflow-y-auto whitespace-pre-wrap rounded-xl border p-3 text-[13px]" style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--text)" }}>
-              {notePreview.slice(0, 700)}{notePreview.length > 700 ? "…" : ""}
+          {dayLifeLogTasks.length === 0 ? (
+            <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>
+              No sleep or routines logged for this date. Quick log routines from the Tasks/LifeLog tab.
             </div>
-          )}
-          {log?.mood && (
-            <div className="mt-2.5 text-[12px] font-semibold" style={{ color: "var(--mut)" }}>
-              Check-in: {log.moodEmoji ?? ""} energy {log.energy}/5 — “{log.mood}”
+          ) : (
+            <div className="mt-2.5 flex max-h-[300px] flex-col gap-1.5 overflow-y-auto pr-1 w-full min-w-0">
+              {dayLifeLogTasks.map((t) => {
+                const cat = allCategories.find((c) => t.tags.includes(c.tag));
+                const dur = t.durationMin || t.estimateMin || 0;
+                return (
+                  <div key={t.id} className="flex items-center gap-2.5 rounded-xl border px-2.5 py-2 min-w-0 w-full" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                    <span className="text-base shrink-0">{cat?.emoji || t.emoji || "🌊"}</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="truncate text-[12.5px] font-bold flex items-center gap-1.5">
+                        <span className="truncate">{t.title}</span>
+                        {cat && (
+                          <span className="chip !py-0 text-[9.5px] font-semibold text-[var(--accent)]">
+                            {cat.label}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold tnum" style={{ color: "var(--mut)" }}>
+                        {t.dueTime ? (
+                          <span className="text-sky-400 font-mono">
+                            {fmtTimeRange(t.dueTime, dur, timeFmt)}
+                          </span>
+                        ) : (
+                          <span>{t.done ? "Completed" : "Logged"}</span>
+                        )}
+                      </div>
+                    </div>
+                    <span className="tnum shrink-0 font-mono text-[12px] font-bold" style={{ color: "var(--accent)" }}>
+                      {fmtDur(dur)}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
+      </div>
+
+      {/* Section 3: Daily Note & Standup Log */}
+      <div className="card engine-panel p-4 w-full min-w-0 overflow-hidden">
+        <div className="flex items-center justify-between">
+          <div className="font-display text-[15px] font-bold tracking-tight">Daily Note & Code Standup · {fmtNoteName(sel)}</div>
+          <Btn size="sm" variant="soft" onClick={() => { requestDailyNote(sel); setView("notes"); }}>
+            <FileText size={12} /> Open Note
+          </Btn>
+        </div>
+        {notePreview === null ? (
+          <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>Decrypting note…</div>
+        ) : notePreview === "" ? (
+          <div className="mt-3 text-[12.5px]" style={{ color: "var(--mut)" }}>No note written for this day yet — open it and capture standup thoughts or what happened.</div>
+        ) : (
+          <div className="note-page mt-2.5 max-h-[190px] overflow-y-auto whitespace-pre-wrap rounded-xl border p-3 text-[13px]" style={{ borderColor: "var(--line)", background: "var(--bg)", color: "var(--text)" }}>
+            {notePreview.slice(0, 700)}{notePreview.length > 700 ? "…" : ""}
+          </div>
+        )}
+        {log?.mood && (
+          <div className="mt-2.5 text-[12px] font-semibold" style={{ color: "var(--mut)" }}>
+            Check-in: {log.moodEmoji ?? ""} energy {log.energy}/5 — “{log.mood}”
+          </div>
+        )}
       </div>
     </div>
   );

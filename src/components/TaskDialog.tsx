@@ -15,7 +15,7 @@ import {
   FileText,
   Search,
 } from "lucide-react";
-import type { Priority, Recurrence, Subtask, Task, TaskTimeBlock } from "../types";
+import type { Priority, Recurrence, Subtask, Task, TaskTimeBlock, LifeLogCategory } from "../types";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
@@ -82,6 +82,44 @@ export function TaskDialog() {
   const [npColor, setNpColor] = useState("#4fa3a5");
   const [saving, setSaving] = useState(false);
   const [splitChunkMin, setSplitChunkMin] = useState<number>(120);
+
+  // Custom Category State
+  const [newCatModal, setNewCatModal] = useState(false);
+  const [newCatEmoji, setNewCatEmoji] = useState("✨");
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatType, setNewCatType] = useState<LifeLogCategory["type"]>("routine");
+
+  const allCategories: LifeLogCategory[] = useMemo(() => {
+    const custom = state.settings.customLifeLogCategories ?? [];
+    return [...LIFE_LOG_CATEGORIES, ...custom];
+  }, [state.settings.customLifeLogCategories]);
+
+  const handleCreateCustomCategory = () => {
+    const name = newCatName.trim();
+    if (!name) return toast("Category needs a name", "err");
+    const tag = name.toLowerCase().replace(/[^a-z0-9_-]/g, "-") || `cat-${Date.now()}`;
+    const newCat: LifeLogCategory = {
+      id: `custom-${Date.now()}`,
+      emoji: newCatEmoji || "✨",
+      label: name,
+      tag,
+      type: newCatType,
+    };
+    set((s) => ({
+      ...s,
+      settings: {
+        ...s.settings,
+        customLifeLogCategories: [...(s.settings.customLifeLogCategories ?? []), newCat],
+      },
+    }));
+    const withoutCats = tags.filter((t) => !allCategories.some((c) => c.tag === t));
+    setTags([...withoutCats, newCat.tag]);
+    setEmoji(newCat.emoji);
+    setNewCatModal(false);
+    setNewCatName("");
+    setNewCatEmoji("✨");
+    toast(`Category "${name}" created!`, "ok");
+  };
 
   /* hydrate on open */
   useEffect(() => {
@@ -286,7 +324,7 @@ export function TaskDialog() {
     const key = await getDeviceKey();
     const encNote = privateNote.trim() ? await encryptText(key, privateNote) : null;
     const dueVal = due || (pid === LIFE_LOG_PROJECT_ID ? todayIso() : null);
-    const effectiveTags = pid === LIFE_LOG_PROJECT_ID && !tags.some(t => LIFE_LOG_CATEGORIES.some(c => c.tag === t))
+    const effectiveTags = pid === LIFE_LOG_PROJECT_ID && !tags.some(t => allCategories.some(c => c.tag === t))
       ? [...tags, "watch"]
       : tags;
     const effectiveEmoji = emoji || (pid === LIFE_LOG_PROJECT_ID ? "🌊" : null);
@@ -350,7 +388,8 @@ export function TaskDialog() {
   };
 
   return (
-    <Modal
+    <>
+      <Modal
       open={taskDialog.open}
       onClose={closeTaskDialog}
       title={editing ? "Edit task" : "New task"}
@@ -443,15 +482,15 @@ export function TaskDialog() {
               <span className="text-[11px] text-[var(--mut)]">Auto-tracked in Life Balance report</span>
             </div>
 
-            <div className="flex flex-wrap gap-1.5">
-              {LIFE_LOG_CATEGORIES.map((cat) => {
+            <div className="flex flex-wrap items-center gap-1.5">
+              {allCategories.map((cat) => {
                 const active = tags.includes(cat.tag);
                 return (
                   <button
                     key={cat.id}
                     type="button"
                     onClick={() => {
-                      const withoutCats = tags.filter((t) => !LIFE_LOG_CATEGORIES.some((c) => c.tag === t));
+                      const withoutCats = tags.filter((t) => !allCategories.some((c) => c.tag === t));
                       setTags([...withoutCats, cat.tag]);
                       setEmoji(cat.emoji);
                       if (!title.trim()) {
@@ -475,6 +514,15 @@ export function TaskDialog() {
                   </button>
                 );
               })}
+              <button
+                type="button"
+                onClick={() => setNewCatModal(true)}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-dashed text-xs font-bold transition-all cursor-pointer border-[var(--line)] text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                title="Add custom category"
+              >
+                <Plus size={13} />
+                <span>Category</span>
+              </button>
             </div>
 
             {/* Actual Time Entry & Bidirectional Auto-Update */}
@@ -1075,5 +1123,56 @@ export function TaskDialog() {
         )}
       </div>
     </Modal>
+
+    {/* Custom Category Modal */}
+    <Modal
+      open={newCatModal}
+      onClose={() => setNewCatModal(false)}
+      title="Add LifeLog Category"
+      width={400}
+      compact
+      zIndex={80}
+      footer={
+        <>
+          <Btn variant="ghost" size="sm" onClick={() => setNewCatModal(false)}>
+            Cancel
+          </Btn>
+          <Btn variant="primary" size="sm" onClick={handleCreateCustomCategory}>
+            Create Category
+          </Btn>
+        </>
+      }
+    >
+      <div className="flex flex-col gap-3 py-1">
+        <Labeled label="Category Name">
+          <TextInput
+            autoFocus
+            value={newCatName}
+            onChange={(e) => setNewCatName(e.target.value)}
+            placeholder="e.g. Gaming, Guitar, Cooking, Gym"
+            onKeyDown={(e) => e.key === "Enter" && handleCreateCustomCategory()}
+          />
+        </Labeled>
+        <div className="grid grid-cols-2 gap-3">
+          <Labeled label="Emoji Icon">
+            <EmojiPicker value={newCatEmoji} onChange={setNewCatEmoji} />
+          </Labeled>
+          <Labeled label="Category Type">
+            <select
+              value={newCatType}
+              onChange={(e) => setNewCatType(e.target.value as any)}
+              className="inp !py-2 text-xs w-full font-semibold"
+            >
+              <option value="routine">Routine / Life</option>
+              <option value="learning">Learning / Study</option>
+              <option value="entertainment">Entertainment</option>
+              <option value="creation">Creation / Build</option>
+              <option value="health">Health / Fitness</option>
+            </select>
+          </Labeled>
+        </div>
+      </div>
+    </Modal>
+  </>
   );
 }

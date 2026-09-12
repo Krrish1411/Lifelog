@@ -25,7 +25,7 @@ import {
   SlidersHorizontal,
   Filter,
 } from "lucide-react";
-import type { Priority, Project, Subtask, Task } from "../types";
+import type { Priority, Project, Subtask, Task, LifeLogCategory } from "../types";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
 import {
@@ -171,8 +171,14 @@ export function TasksView({
   const [routineDuration, setRoutineDuration] = useState<string>("510");
   const [routineStartTime, setRoutineStartTime] = useState<string>("23:00");
   const [routineEndTime, setRoutineEndTime] = useState<string>("07:30");
-  const [routineDateChoice, setRoutineDateChoice] = useState<"today" | "yesterday" | "custom">("today");
+  const [routineDateChoice, setRoutineDateChoice] = useState<"today" | "yesterday" | "custom" | "all">("today");
   const [routineCustomDate, setRoutineCustomDate] = useState<string>(today);
+
+  // Custom LifeLog Category Creation Modal State
+  const [newCatModal, setNewCatModal] = useState(false);
+  const [newCatEmoji, setNewCatEmoji] = useState("✨");
+  const [newCatName, setNewCatName] = useState("");
+  const [newCatType, setNewCatType] = useState<LifeLogCategory["type"]>("routine");
 
   const yesterday = useMemo(() => {
     const d = new Date();
@@ -181,6 +187,49 @@ export function TasksView({
   }, []);
 
   const effectiveLogDate = routineDateChoice === "yesterday" ? yesterday : routineDateChoice === "custom" ? routineCustomDate : today;
+
+  // Unified Categories: Built-in + User-Defined Custom Categories
+  const allCategories: LifeLogCategory[] = useMemo(() => {
+    const custom = state.settings.customLifeLogCategories ?? [];
+    return [...LIFE_LOG_CATEGORIES, ...custom];
+  }, [state.settings.customLifeLogCategories]);
+
+  const handleCreateCustomCategory = () => {
+    const name = newCatName.trim();
+    if (!name) return toast("Category needs a name", "err");
+    const tag = name.toLowerCase().replace(/[^a-z0-9_-]/g, "-") || `cat-${Date.now()}`;
+    const newCat: LifeLogCategory = {
+      id: `custom-${Date.now()}`,
+      emoji: newCatEmoji || "✨",
+      label: name,
+      tag,
+      type: newCatType,
+    };
+    set((s) => ({
+      ...s,
+      settings: {
+        ...s.settings,
+        customLifeLogCategories: [...(s.settings.customLifeLogCategories ?? []), newCat],
+      },
+    }));
+    setRoutineCat(newCat.id);
+    setNewCatModal(false);
+    setNewCatName("");
+    setNewCatEmoji("✨");
+    toast(`Category "${name}" created!`, "ok");
+  };
+
+  const handleDeleteCustomCategory = (catId: string, catName: string) => {
+    set((s) => ({
+      ...s,
+      settings: {
+        ...s.settings,
+        customLifeLogCategories: (s.settings.customLifeLogCategories ?? []).filter((c) => c.id !== catId),
+      },
+    }));
+    if (routineCat === catId) setRoutineCat("sleep");
+    toast(`Category "${catName}" removed`, "ok");
+  };
 
   // Bidirectional auto-update handlers
   const handleStartTimeChange = (newStart: string) => {
@@ -208,7 +257,7 @@ export function TasksView({
   };
 
   const handleQuickLog = (asCompleted: boolean) => {
-    const cat = LIFE_LOG_CATEGORIES.find((c) => c.id === routineCat) || LIFE_LOG_CATEGORIES[0];
+    const cat = allCategories.find((c) => c.id === routineCat) || allCategories[0] || LIFE_LOG_CATEGORIES[0];
     const durNum = Math.max(5, parseInt(routineDuration || "30", 10) || 30);
     const finalTitle = routineTitle.trim() || (cat.id === "sleep" ? "Night Sleep" : cat.id === "routine" ? "Daily Routine" : `${cat.label}`);
 
@@ -244,9 +293,23 @@ export function TasksView({
   const lifeDayStats = useMemo(() => {
     if (!isLifeLog) return null;
     const targetDate = effectiveLogDate;
-    const dayTasks = state.tasks.filter(
-      (t) => t.projectId === LIFE_LOG_PROJECT_ID && (t.due === targetDate || (!t.due && isoDate(new Date(t.createdAt)) === targetDate))
-    );
+    const daySessions = state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === targetDate);
+    const daySessionTaskIds = new Set(daySessions.map((s) => s.taskId).filter(Boolean));
+
+    const dayTasks = state.tasks.filter((t) => {
+      if (t.projectId === LIFE_LOG_PROJECT_ID) {
+        return (
+          t.due === targetDate ||
+          (!t.due && isoDate(new Date(t.createdAt)) === targetDate) ||
+          (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate)
+        );
+      }
+      // Other projects: include tasks completed, due, or focused on targetDate!
+      const wasDoneOnDate = t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate;
+      const wasDueOnDate = t.due === targetDate;
+      const hadSessionOnDate = daySessionTaskIds.has(t.id);
+      return wasDoneOnDate || wasDueOnDate || hadSessionOnDate;
+    });
 
     // Dynamic duration helper: if duration not logged, dynamically use focus tracked minutes!
     const getTaskDuration = (t: Task) => {
@@ -259,17 +322,18 @@ export function TasksView({
       .reduce((sum, t) => sum + getTaskDuration(t), 0);
 
     const routineMin = dayTasks
-      .filter((t) => !t.tags.includes("sleep"))
+      .filter((t) => t.projectId === LIFE_LOG_PROJECT_ID && !t.tags.includes("sleep"))
       .reduce((sum, t) => sum + getTaskDuration(t), 0);
 
-    // Deep work & focus sessions for this date (from state.sessions):
-    const daySessions = state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === targetDate);
+    // Deep work & focus sessions for this date (from state.sessions and normal project tasks):
     const totalDayFocusMin = daySessions.reduce((sum, s) => sum + sessionMinutes(s), 0);
-    // Avoid double counting sessions on tasks that are already in dayTasks:
     const focusOnLifeLogMin = daySessions
-      .filter((s) => s.taskId && dayTasks.some((t) => t.id === s.taskId))
+      .filter((s) => s.taskId && dayTasks.some((t) => t.id === s.taskId && t.projectId === LIFE_LOG_PROJECT_ID))
       .reduce((sum, s) => sum + sessionMinutes(s), 0);
-    const dedicatedWorkMin = Math.max(0, totalDayFocusMin - focusOnLifeLogMin);
+    const otherTasksDuration = dayTasks
+      .filter((t) => t.projectId !== LIFE_LOG_PROJECT_ID)
+      .reduce((sum, t) => sum + getTaskDuration(t), 0);
+    const dedicatedWorkMin = Math.max(totalDayFocusMin - focusOnLifeLogMin, otherTasksDuration);
 
     const totalMin = sleepMin + routineMin + dedicatedWorkMin;
     const dayPct = Math.min(100, Math.round((totalMin / 1440) * 100)); // 1440 min = 24h
@@ -296,7 +360,28 @@ export function TasksView({
 
   const list = useMemo(() => {
     if (isLifeLog) {
-      let base = state.tasks.filter((t) => t.projectId === LIFE_LOG_PROJECT_ID);
+      const targetDate = effectiveLogDate;
+      const daySessions = state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === targetDate);
+      const daySessionTaskIds = new Set(daySessions.map((s) => s.taskId).filter(Boolean));
+
+      let base = state.tasks.filter((t) => {
+        if (routineDateChoice === "all") {
+          return true;
+        }
+        if (t.projectId === LIFE_LOG_PROJECT_ID) {
+          return (
+            t.due === targetDate ||
+            (!t.due && isoDate(new Date(t.createdAt)) === targetDate) ||
+            (t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate)
+          );
+        }
+        // Include normal tasks from other projects active, completed, or focused on targetDate!
+        const wasDoneOnDate = t.done && t.doneAt && isoDate(new Date(t.doneAt)) === targetDate;
+        const wasDueOnDate = t.due === targetDate;
+        const hadSessionOnDate = daySessionTaskIds.has(t.id);
+        return wasDoneOnDate || wasDueOnDate || hadSessionOnDate;
+      });
+
       const q = query.trim().toLowerCase();
       if (q) {
         base = base.filter((t) =>
@@ -688,170 +773,178 @@ export function TasksView({
     <div className="flex w-full max-w-full items-start gap-4">
       {/* Desktop Docked Sidebar (hidden on mobile, visible on lg+) */}
       <aside
-        className="hidden lg:flex w-[230px] shrink-0 flex-col gap-3 sticky top-4 self-start rounded-2xl glass-regular p-3 select-none"
+        className="hidden lg:flex w-[240px] xl:w-[260px] shrink-0 flex-col sticky top-[calc(68px+var(--safe-top,0px))] h-[calc(100vh-84px-var(--safe-top,0px)-var(--safe-bottom,0px))] rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-xs select-none overflow-hidden"
       >
-        {/* Smart Views */}
-        <div className="flex flex-col gap-0.5">
-          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
-            Smart Views
-          </div>
-          {[
-            { id: "today", label: "Today", icon: CalendarPlus, count: todayCount },
-            { id: "inbox", label: "Inbox", icon: Inbox, count: inboxCount },
-            { id: "all", label: "All Tasks", icon: ListChecks, count: allCount },
-          ].map((sv) => {
-            const active = typeof sel === "string" && sel === sv.id;
-            const Icon = sv.icon;
-            return (
-              <button
-                key={sv.id}
-                type="button"
-                onClick={() => {
-                  triggerHaptic("light");
-                  setSel(sv.id as SmartView);
-                }}
-                className={cn(
-                  "flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[12.5px] font-bold transition-all cursor-pointer text-left",
-                  active
-                    ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                    : "text-[var(--text)] hover:bg-[var(--panel2)]"
-                )}
-              >
-                <Icon size={15} className={active ? "text-[var(--accent)]" : "text-[var(--mut)]"} />
-                <span className="flex-1 truncate">{sv.label}</span>
-                {sv.count > 0 && (
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 py-0.2 font-mono text-[10.5px] font-bold tnum shrink-0",
-                      active ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-[var(--panel2)] text-[var(--mut)]"
-                    )}
-                  >
-                    {sv.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Projects */}
-        <div className="flex flex-col gap-0.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
-          <div className="flex items-center justify-between px-2 py-1">
-            <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
-              Projects
-            </span>
-            <button
-              type="button"
-              onClick={() => openProject(null)}
-              className="text-[11px] font-bold text-[var(--accent)] hover:opacity-80 cursor-pointer"
-              title="Add project"
-            >
-              <Plus size={13} />
-            </button>
-          </div>
-          <div className="flex flex-col gap-0.5 max-h-[160px] overflow-y-auto pr-0.5">
-            {state.projects.length === 0 && (
-              <div className="px-2 py-1 text-[11px] text-[var(--mut)]">No projects yet</div>
-            )}
-            {state.projects.map((p) => {
-              const active = typeof sel === "object" && "project" in sel && sel.project === p.id;
-              const pCount = state.tasks.filter((t) => !t.done && t.projectId === p.id).length;
+        <div className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-3.5 pr-2">
+          {/* Smart Views */}
+          <div className="flex flex-col gap-0.5">
+            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
+              Smart Views
+            </div>
+            {[
+              { id: "today", label: "Today", icon: CalendarPlus, count: todayCount },
+              { id: "inbox", label: "Inbox", icon: Inbox, count: inboxCount },
+              { id: "all", label: "All Tasks", icon: ListChecks, count: allCount },
+            ].map((sv) => {
+              const active = typeof sel === "string" && sel === sv.id;
+              const Icon = sv.icon;
               return (
                 <button
-                  key={p.id}
+                  key={sv.id}
                   type="button"
                   onClick={() => {
                     triggerHaptic("light");
-                    setSel({ project: p.id });
+                    setSel(sv.id as SmartView);
                   }}
                   className={cn(
-                    "flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-[12.5px] font-bold transition-all cursor-pointer text-left group",
+                    "flex items-center gap-2.5 rounded-xl px-2.5 py-1.5 text-[12.5px] font-bold transition-all cursor-pointer text-left",
                     active
                       ? "bg-[var(--accent-soft)] text-[var(--accent)]"
                       : "text-[var(--text)] hover:bg-[var(--panel2)]"
                   )}
                 >
-                  {p.id === LIFE_LOG_PROJECT_ID ? (
-                    <span className="text-xs shrink-0">🌊</span>
-                  ) : (
-                    <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: p.color || "#4fa3a5" }} />
+                  <Icon size={15} className={active ? "text-[var(--accent)]" : "text-[var(--mut)]"} />
+                  <span className="flex-1 truncate">{sv.label}</span>
+                  {sv.count > 0 && (
+                    <span
+                      className={cn(
+                        "rounded-full px-1.5 py-0.2 font-mono text-[10.5px] font-bold tnum shrink-0",
+                        active ? "bg-[var(--accent)] text-[var(--on-accent)]" : "bg-[var(--panel2)] text-[var(--mut)]"
+                      )}
+                    >
+                      {sv.count}
+                    </span>
                   )}
-                  <span className="flex-1 truncate">{p.name}</span>
-                  {pCount > 0 && (
-                    <span className="text-[10.5px] text-[var(--mut)] tnum">{pCount}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Projects */}
+          <div className="flex flex-col gap-0.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
+            <div className="flex items-center justify-between px-2 py-1">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
+                Projects
+              </span>
+              <button
+                type="button"
+                onClick={() => openProject(null)}
+                className="text-[11px] font-bold text-[var(--accent)] hover:opacity-80 cursor-pointer"
+                title="Add project"
+              >
+                <Plus size={13} />
+              </button>
+            </div>
+            <div className="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto pr-0.5">
+              {state.projects.length === 0 && (
+                <div className="px-2 py-1 text-[11px] text-[var(--mut)]">No projects yet</div>
+              )}
+              {state.projects.map((p) => {
+                const active = typeof sel === "object" && "project" in sel && sel.project === p.id;
+                const pCount = state.tasks.filter((t) => !t.done && t.projectId === p.id).length;
+                return (
+                  <button
+                    key={p.id}
+                    type="button"
+                    onClick={() => {
+                      triggerHaptic("light");
+                      setSel({ project: p.id });
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 rounded-xl px-2.5 py-1.5 text-[12.5px] font-bold transition-all cursor-pointer text-left group",
+                      active
+                        ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                        : "text-[var(--text)] hover:bg-[var(--panel2)]"
+                    )}
+                  >
+                    {p.id === LIFE_LOG_PROJECT_ID ? (
+                      <span className="text-xs shrink-0">🌊</span>
+                    ) : (
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ background: p.color || "#4fa3a5" }} />
+                    )}
+                    <span className="flex-1 truncate">{p.name}</span>
+                    {pCount > 0 && (
+                      <span className="text-[10.5px] text-[var(--mut)] tnum">{pCount}</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Tags */}
+          {allTags.length > 0 && (
+            <div className="flex flex-col gap-0.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
+              <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
+                Tags
+              </div>
+              <div className="flex flex-wrap gap-1 px-1 max-h-[140px] overflow-y-auto">
+                {allTags.map((tag) => {
+                  const active = typeof sel === "object" && "tag" in sel && sel.tag === tag;
+                  const tagColor = state.tagColors[tag] || "var(--accent)";
+                  const count = state.tasks.filter((t) => !t.done && t.tags.includes(tag)).length;
+                  return (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => {
+                        triggerHaptic("light");
+                        setSel({ tag });
+                      }}
+                      className={cn(
+                        "flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-all cursor-pointer",
+                        active
+                          ? "bg-[var(--accent)] text-[var(--on-accent)]"
+                          : "border border-[var(--line)] bg-[var(--bg)] text-[var(--text)] hover:bg-[var(--panel2)]"
+                      )}
+                    >
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? "#ffffff" : tagColor }} />
+                      <span>#{tag}</span>
+                      <span className="text-[9.5px] opacity-70 tnum">{count}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Priority */}
+          <div className="flex flex-col gap-0.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
+            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
+              Priority
+            </div>
+            {PRIORITY_ORDER.map((pr) => {
+              const active = typeof sel === "object" && "priority" in sel && sel.priority === pr;
+              const meta = PRIORITY_META[pr];
+              const count = state.tasks.filter((t) => !t.done && t.priority === pr).length;
+              return (
+                <button
+                  key={pr}
+                  type="button"
+                  onClick={() => {
+                    triggerHaptic("light");
+                    setSel({ priority: pr });
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 rounded-xl px-2.5 py-1 text-[12px] font-bold transition-all cursor-pointer text-left",
+                    active
+                      ? "bg-[var(--accent-soft)] text-[var(--accent)]"
+                      : "text-[var(--text)] hover:bg-[var(--panel2)]"
                   )}
+                >
+                  <span className="h-2 w-2 rounded-full shrink-0" style={{ background: meta.color }} />
+                  <span className="flex-1 truncate">{meta.label}</span>
+                  {count > 0 && <span className="text-[10px] text-[var(--mut)] tnum">{count}</span>}
                 </button>
               );
             })}
           </div>
         </div>
 
-        {/* Tags */}
-        {allTags.length > 0 && (
-          <div className="flex flex-col gap-0.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
-            <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
-              Tags
-            </div>
-            <div className="flex flex-wrap gap-1 px-1 max-h-[120px] overflow-y-auto">
-              {allTags.map((tag) => {
-                const active = typeof sel === "object" && "tag" in sel && sel.tag === tag;
-                const tagColor = state.tagColors[tag] || "var(--accent)";
-                const count = state.tasks.filter((t) => !t.done && t.tags.includes(tag)).length;
-                return (
-                  <button
-                    key={tag}
-                    type="button"
-                    onClick={() => {
-                      triggerHaptic("light");
-                      setSel({ tag });
-                    }}
-                    className={cn(
-                      "flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-bold transition-all cursor-pointer",
-                      active
-                        ? "bg-[var(--accent)] text-[var(--on-accent)]"
-                        : "border border-[var(--line)] bg-[var(--bg)] text-[var(--text)] hover:bg-[var(--panel2)]"
-                    )}
-                  >
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: active ? "#ffffff" : tagColor }} />
-                    <span>#{tag}</span>
-                    <span className="text-[9.5px] opacity-70 tnum">{count}</span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Priority */}
-        <div className="flex flex-col gap-0.5 border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
-          <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: "var(--mut)" }}>
-            Priority
-          </div>
-          {PRIORITY_ORDER.map((pr) => {
-            const active = typeof sel === "object" && "priority" in sel && sel.priority === pr;
-            const meta = PRIORITY_META[pr];
-            const count = state.tasks.filter((t) => !t.done && t.priority === pr).length;
-            return (
-              <button
-                key={pr}
-                type="button"
-                onClick={() => {
-                  triggerHaptic("light");
-                  setSel({ priority: pr });
-                }}
-                className={cn(
-                  "flex items-center gap-2 rounded-xl px-2.5 py-1 text-[12px] font-bold transition-all cursor-pointer text-left",
-                  active
-                    ? "bg-[var(--accent-soft)] text-[var(--accent)]"
-                    : "text-[var(--text)] hover:bg-[var(--panel2)]"
-                )}
-              >
-                <span className="h-2 w-2 rounded-full shrink-0" style={{ background: meta.color }} />
-                <span className="flex-1 truncate">{meta.label}</span>
-                {count > 0 && <span className="text-[10px] text-[var(--mut)] tnum">{count}</span>}
-              </button>
-            );
-          })}
+        {/* Bottom Docked Quick Stats */}
+        <div className="p-3 border-t border-[var(--line)] bg-[var(--panel2)]/40 shrink-0 flex items-center justify-between text-[11px] font-semibold text-[var(--mut)]">
+          <span>{allCount} active · {todayCount} today</span>
+          <span className="font-mono text-[10px] opacity-75">{fmtDayShort(today)}</span>
         </div>
       </aside>
 
@@ -1060,6 +1153,18 @@ export function TasksView({
                     >
                       Custom
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setRoutineDateChoice("all")}
+                      className={cn(
+                        "px-2 py-1 rounded-lg font-bold transition-all cursor-pointer",
+                        routineDateChoice === "all"
+                          ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
+                          : "text-[var(--mut)] hover:text-[var(--text)]"
+                      )}
+                    >
+                      All
+                    </button>
                   </div>
                 </div>
 
@@ -1146,41 +1251,65 @@ export function TasksView({
               </div>
 
               {/* Category chips */}
-              <div className="flex flex-wrap gap-1.5">
-                {LIFE_LOG_CATEGORIES.map((cat) => {
+              <div className="flex flex-wrap items-center gap-1.5">
+                {allCategories.map((cat) => {
                   const active = routineCat === cat.id;
+                  const isCustom = cat.id.startsWith("custom-");
                   return (
-                    <button
-                      key={cat.id}
-                      type="button"
-                      onClick={() => {
-                        setRoutineCat(cat.id);
-                        if (cat.id === "sleep") {
-                          setRoutineStartTime("23:00");
-                          setRoutineEndTime("07:30");
-                          setRoutineDuration("510");
-                        } else {
-                          const now = new Date();
-                          const h = String(now.getHours()).padStart(2, "0");
-                          const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, "0");
-                          const s = `${h}:${m}`;
-                          setRoutineStartTime(s);
-                          setRoutineDuration("45");
-                          setRoutineEndTime(calcEndTimeFromDuration(s, 45));
-                        }
-                      }}
-                      className={cn(
-                        "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer",
-                        active
-                          ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-xs scale-105"
-                          : "bg-[var(--panel2)] border-[var(--line)] text-[var(--text)] hover:border-[var(--accent)]/60"
+                    <div key={cat.id} className="relative group/catchip">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRoutineCat(cat.id);
+                          if (cat.id === "sleep") {
+                            setRoutineStartTime("23:00");
+                            setRoutineEndTime("07:30");
+                            setRoutineDuration("510");
+                          } else {
+                            const now = new Date();
+                            const h = String(now.getHours()).padStart(2, "0");
+                            const m = String(Math.floor(now.getMinutes() / 5) * 5).padStart(2, "0");
+                            const s = `${h}:${m}`;
+                            setRoutineStartTime(s);
+                            setRoutineDuration("45");
+                            setRoutineEndTime(calcEndTimeFromDuration(s, 45));
+                          }
+                        }}
+                        className={cn(
+                          "flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer",
+                          active
+                            ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-xs scale-105"
+                            : "bg-[var(--panel2)] border-[var(--line)] text-[var(--text)] hover:border-[var(--accent)]/60"
+                        )}
+                      >
+                        <span>{cat.emoji}</span>
+                        <span>{cat.label}</span>
+                      </button>
+                      {isCustom && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteCustomCategory(cat.id, cat.label);
+                          }}
+                          className="absolute -top-1.5 -right-1.5 h-4 w-4 rounded-full bg-[var(--panel)] border border-[var(--line)] text-[var(--mut)] hover:text-[var(--accent)] flex items-center justify-center text-[10px] opacity-0 group-hover/catchip:opacity-100 transition-opacity cursor-pointer shadow-xs"
+                          title={`Delete "${cat.label}" category`}
+                        >
+                          ×
+                        </button>
                       )}
-                    >
-                      <span>{cat.emoji}</span>
-                      <span>{cat.label}</span>
-                    </button>
+                    </div>
                   );
                 })}
+                <button
+                  type="button"
+                  onClick={() => setNewCatModal(true)}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-xl border border-dashed text-xs font-bold transition-all cursor-pointer border-[var(--line)] text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--accent-soft)]"
+                  title="Add custom category"
+                >
+                  <Plus size={13} />
+                  <span>Category</span>
+                </button>
               </div>
 
               {/* Actual Time Entry Inputs with Bidirectional Auto-Calc */}
@@ -1351,7 +1480,7 @@ export function TasksView({
                       ? "Personal project / vibe coding / side app..."
                       : routineCat === "move"
                       ? "Gym workout / outdoor walk / running..."
-                      : `Log ${LIFE_LOG_CATEGORIES.find((c) => c.id === routineCat)?.label || "activity"} details...`
+                      : `Log ${allCategories.find((c) => c.id === routineCat)?.label || "activity"} details...`
                   }
                   className="inp flex-1 text-xs"
                 />
@@ -1494,6 +1623,55 @@ export function TasksView({
           </div>
         )}
 
+      {/* ================= custom category modal ================= */}
+      <Modal
+        open={newCatModal}
+        onClose={() => setNewCatModal(false)}
+        title="Add LifeLog Category"
+        width={400}
+        compact
+        footer={
+          <>
+            <Btn variant="ghost" size="sm" onClick={() => setNewCatModal(false)}>
+              Cancel
+            </Btn>
+            <Btn variant="primary" size="sm" onClick={handleCreateCustomCategory}>
+              Create Category
+            </Btn>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-3 py-1">
+          <Labeled label="Category Name">
+            <TextInput
+              autoFocus
+              value={newCatName}
+              onChange={(e) => setNewCatName(e.target.value)}
+              placeholder="e.g. Gaming, Guitar, Cooking, Gym"
+              onKeyDown={(e) => e.key === "Enter" && handleCreateCustomCategory()}
+            />
+          </Labeled>
+          <div className="grid grid-cols-2 gap-3">
+            <Labeled label="Emoji Icon">
+              <EmojiPicker value={newCatEmoji} onChange={setNewCatEmoji} />
+            </Labeled>
+            <Labeled label="Category Type">
+              <select
+                value={newCatType}
+                onChange={(e) => setNewCatType(e.target.value as any)}
+                className="inp !py-2 text-xs w-full font-semibold"
+              >
+                <option value="routine">Routine / Life</option>
+                <option value="learning">Learning / Study</option>
+                <option value="entertainment">Entertainment</option>
+                <option value="creation">Creation / Build</option>
+                <option value="health">Health / Fitness</option>
+              </select>
+            </Labeled>
+          </div>
+        </div>
+      </Modal>
+
       {/* ================= project dialog ================= */}
       <Modal
         open={projDialog.open}
@@ -1627,6 +1805,11 @@ function TaskCard({
   const overdue = !done && !!t.due && t.due < today;
   const snoozed = !!t.snoozedUntil && t.snoozedUntil > Date.now();
   const subDone = t.subtasks.filter((s) => s.done).length;
+
+  const allCategories: LifeLogCategory[] = useMemo(() => {
+    const custom = state.settings.customLifeLogCategories ?? [];
+    return [...LIFE_LOG_CATEGORIES, ...custom];
+  }, [state.settings.customLifeLogCategories]);
 
   const timeBlocks = t.timeBlocks ?? [];
   const completedBlocks = timeBlocks.filter((b) => b.done).length;
@@ -1850,7 +2033,7 @@ function TaskCard({
             <>
               {/* Category chip */}
               {(() => {
-                const cat = LIFE_LOG_CATEGORIES.find((c) => t.tags.includes(c.tag));
+                const cat = allCategories.find((c) => t.tags.includes(c.tag));
                 return cat ? (
                   <span className="chip !py-0.5 text-[10px] font-bold text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-soft)]">
                     <span>{cat.emoji}</span>

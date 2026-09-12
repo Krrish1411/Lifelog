@@ -1963,7 +1963,7 @@ function Overlays({
         onClose={() => resolveConfirm(false)}
         title={
           confirmReq?.danger ? (
-            <span className="flex items-center gap-2" style={{ color: "var(--danger)" }}>
+            <span className="flex items-center gap-2" style={{ color: "var(--accent)" }}>
               <Trash2 size={16} />
               {confirmReq?.title ?? "Confirm"}
             </span>
@@ -1980,15 +1980,10 @@ function Overlays({
               Cancel
             </Btn>
             <Btn
-              variant={confirmReq?.danger ? "danger" : "primary"}
+              variant="primary"
               disabled={blocked}
               size={confirmReq?.compact ? "sm" : "md"}
               onClick={() => resolveConfirm(true)}
-              style={
-                confirmReq?.danger
-                  ? { background: "var(--danger)", color: "#fff", borderColor: "var(--danger)" }
-                  : undefined
-              }
             >
               {confirmReq?.confirmLabel ?? "Confirm"}
             </Btn>
