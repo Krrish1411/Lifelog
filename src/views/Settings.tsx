@@ -1529,7 +1529,7 @@ export function SettingsView() {
             {/* Backups & Export */}
             {section(
               "Encrypted Vault & Backups",
-              "Everything lives on this device. Exports are plain JSON; backups add a master-password layer (PBKDF2 + AES-256-GCM).",
+              "Everything lives locally on this device. High-performance SQLite database with row-level AES-256-GCM encryption and zero passwords needed in daily use.",
               (
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-wrap gap-2">
