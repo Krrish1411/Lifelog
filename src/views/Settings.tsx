@@ -29,9 +29,6 @@ import {
   Cloud,
   History,
   CheckSquare,
-  Folder,
-  Database,
-  Key,
 } from "lucide-react";
 import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey } from "../types";
 import {
@@ -57,13 +54,6 @@ import {
   setVaultMasterPassword,
   getVaultAuthInfo,
 } from "../db/database";
-import {
-  getOrCreateRecoveryPhrase,
-  setRecoveryPhrase,
-  validatePhrase,
-  deriveKeyFromPhrase,
-} from "../security/recoveryPhrase";
-import { cacheMasterKeyOnDevice } from "../security/masterKey";
 import {
   contrast,
   download,
@@ -169,54 +159,6 @@ export function SettingsView() {
   const [importPw, setImportPw] = useState("");
   const [importPayload, setImportPayload] = useState<string | null>(null);
   const [importErr, setImportErr] = useState("");
-  const [electronStorage, setElectronStorage] = useState<{ file: string; sqliteFile?: string; attachmentsDir?: string } | null>(null);
-  const [showPhraseModal, setShowPhraseModal] = useState(false);
-  const [showRestorePhraseModal, setShowRestorePhraseModal] = useState(false);
-  const [restorePhraseInput, setRestorePhraseInput] = useState("");
-  const [currentPhrase, setCurrentPhrase] = useState("");
-  const [copiedPhrase, setCopiedPhrase] = useState(false);
-
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.electronAPI) {
-      window.electronAPI.getStorageInfo().then((info) => {
-        if (info?.file) setElectronStorage({ file: info.file, sqliteFile: info.sqliteFile, attachmentsDir: info.attachmentsDir });
-      }).catch(() => {});
-    }
-  }, []);
-
-  const handleOpenPhraseModal = () => {
-    setCurrentPhrase(getOrCreateRecoveryPhrase());
-    setCopiedPhrase(false);
-    setShowPhraseModal(true);
-  };
-
-  const handleCopyPhrase = () => {
-    if (!currentPhrase) return;
-    navigator.clipboard.writeText(currentPhrase);
-    setCopiedPhrase(true);
-    toast("12-word recovery phrase copied to clipboard!", "ok");
-    setTimeout(() => setCopiedPhrase(false), 2500);
-  };
-
-  const handleRestorePhrase = async () => {
-    const check = validatePhrase(restorePhraseInput);
-    if (!check.valid) {
-      toast(check.error || "Invalid 12-word phrase", "err");
-      return;
-    }
-    try {
-      const normalized = restorePhraseInput.trim().toLowerCase().split(/\s+/).join(" ");
-      setRecoveryPhrase(normalized);
-      const key = await deriveKeyFromPhrase(normalized);
-      await cacheMasterKeyOnDevice(key);
-      toast("Recovery phrase applied successfully! Reloading vault...", "ok");
-      setShowRestorePhraseModal(false);
-      setRestorePhraseInput("");
-      setTimeout(() => window.location.reload(), 600);
-    } catch (err) {
-      toast("Error applying recovery phrase: " + String(err), "err");
-    }
-  };
 
 
   const [quotesDraft, setQuotesDraft] = useState(s.customQuotes.join("\n"));
@@ -1583,43 +1525,11 @@ export function SettingsView() {
 
             {/* Backups & Export */}
             {section(
-              "Local Vault & Backups",
-              "Everything is encrypted at rest in high-performance SQLite using your local device key with zero passwords needed in daily use.",
+              "Vault Backups & Migration",
+              "Everything is encrypted at rest using your local device key. Export portable snapshots or create password-protected backups for safe cloud storage.",
               (
                 <div className="flex flex-col gap-3">
-                  {/* 1. SQLite Database Engine Status */}
-                  <div className="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-400">
-                        <Database size={13} />
-                        <span>Unified SQLite Database Engine</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono">1ms WAL · Device-Bound AES-256</span>
-                      </div>
-                      <div className="text-[11px] font-mono text-[var(--mut)] truncate" title={electronStorage?.sqliteFile || electronStorage?.file || "In-Memory / OPFS SQLite (Browser)"}>
-                        Storage: {electronStorage?.sqliteFile || electronStorage?.file || "IndexedDB / OPFS SQLite WASM Engine"}
-                      </div>
-                      {electronStorage?.attachmentsDir && (
-                        <div className="text-[11px] font-mono text-cyan-400/80 truncate" title={electronStorage.attachmentsDir}>
-                          Encrypted Attachments: {electronStorage.attachmentsDir}
-                        </div>
-                      )}
-                    </div>
-                    {electronStorage && (
-                      <Btn
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          window.electronAPI?.openStorageFolder();
-                          toast("Opened storage directory in file manager", "ok");
-                        }}
-                        className="shrink-0 gap-1.5 text-xs font-bold cursor-pointer"
-                      >
-                        <Folder size={12} /> Open Storage Folder
-                      </Btn>
-                    )}
-                  </div>
-
-                  {/* 2. Universal Snapshot & Migration Card */}
+                  {/* Universal Snapshot & Migration Card */}
                   <div className="rounded-xl border p-3.5 flex flex-col gap-3" style={{ borderColor: "var(--line)", background: "var(--panel)" }}>
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                       <div className="space-y-1 min-w-0">
@@ -1672,28 +1582,6 @@ export function SettingsView() {
                           onChange={onImportFile}
                         />
                       </label>
-
-                      <Btn
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const pasted = prompt("Paste your LifeLog backup or export JSON here:");
-                          if (!pasted || !pasted.trim()) return;
-                          try {
-                            const env = JSON.parse(pasted.trim()) as { kind?: string };
-                            if (env?.kind === "backup") {
-                              setImportPayload(pasted.trim()); setImportPw(""); setImportErr(""); setImportPwOpen(true);
-                              return;
-                            }
-                            finishImport(pasted.trim(), null);
-                          } catch {
-                            toast("Invalid data — must be valid LifeLog JSON", "err");
-                          }
-                        }}
-                        className="gap-1.5 text-xs font-semibold cursor-pointer"
-                      >
-                        <FileText size={12} /> Paste JSON
-                      </Btn>
                     </div>
 
                     <div className="text-[11px] text-[var(--mut)] bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
@@ -1701,38 +1589,6 @@ export function SettingsView() {
                       <span>
                         <strong>Security Tip:</strong> Unencrypted portable snapshots are intended for easy migration or trusted offline drives. Delete snapshot files after use or use password protection if uploading to cloud storage.
                       </span>
-                    </div>
-                  </div>
-
-                  {/* 3. 12-Word Recovery Phrase */}
-                  <div className="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-1.5 text-[12px] font-bold text-amber-400">
-                        <Key size={13} />
-                        <span>12-Word Hardware Recovery Phrase</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-mono">Optional</span>
-                      </div>
-                      <div className="text-[11px] font-semibold text-[var(--mut)]">
-                        Emergency recovery words generated on this device. Useful if migrating to another device manually.
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Btn
-                        size="sm"
-                        variant="soft"
-                        onClick={handleOpenPhraseModal}
-                        className="gap-1.5 text-xs font-bold cursor-pointer"
-                      >
-                        <Key size={12} /> View 12 Words
-                      </Btn>
-                      <Btn
-                        size="sm"
-                        variant="outline"
-                        onClick={() => setShowRestorePhraseModal(true)}
-                        className="gap-1.5 text-xs font-bold cursor-pointer"
-                      >
-                        <Upload size={12} /> Restore Phrase
-                      </Btn>
                     </div>
                   </div>
                 </div>
@@ -2108,78 +1964,6 @@ export function SettingsView() {
             {importErr}
           </div>
         )}
-      </Modal>
-
-      {/* 12-Word Recovery Phrase View Modal */}
-      <Modal
-        open={showPhraseModal}
-        onClose={() => setShowPhraseModal(false)}
-        title="🔐 Your 12-Word Recovery Phrase"
-        width={480}
-        footer={
-          <>
-            <Btn variant="ghost" onClick={() => setShowPhraseModal(false)}>
-              Close
-            </Btn>
-            <Btn variant="primary" onClick={handleCopyPhrase} className="gap-1.5 font-bold">
-              {copiedPhrase ? <Check size={13} className="text-emerald-400" /> : <Key size={13} />}
-              {copiedPhrase ? "Copied to Clipboard!" : "Copy 12 Words"}
-            </Btn>
-          </>
-        }
-      >
-        <p className="text-[12.5px] font-semibold text-[var(--mut)] mb-3">
-          Write these 12 words down in a secure place. They can restore your notes, tasks, habits, and backups on any device without passwords.
-        </p>
-        <div className="grid grid-cols-3 gap-2 p-3 rounded-xl border" style={{ borderColor: "var(--line)", background: "var(--panel)" }}>
-          {currentPhrase.split(" ").map((word, idx) => (
-            <div
-              key={idx}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-mono select-all"
-              style={{ borderColor: "var(--line)", background: "var(--bg)" }}
-            >
-              <span className="text-[10px] text-[var(--mut)] font-bold">{idx + 1}.</span>
-              <span className="font-bold text-amber-400">{word}</span>
-            </div>
-          ))}
-        </div>
-        <div className="mt-3 text-[11px] font-semibold text-[var(--mut)]">
-          ⚠️ Anyone with these 12 words can access and decrypt your local vault. Never share them publicly.
-        </div>
-      </Modal>
-
-      {/* 12-Word Recovery Phrase Restore Modal */}
-      <Modal
-        open={showRestorePhraseModal}
-        onClose={() => setShowRestorePhraseModal(false)}
-        title="Restore Vault from 12-Word Phrase"
-        width={460}
-        footer={
-          <>
-            <Btn variant="ghost" onClick={() => setShowRestorePhraseModal(false)}>
-              Cancel
-            </Btn>
-            <Btn
-              variant="primary"
-              disabled={!restorePhraseInput.trim()}
-              onClick={handleRestorePhrase}
-              className="gap-1.5 font-bold"
-            >
-              <Key size={13} /> Apply & Unlock Vault
-            </Btn>
-          </>
-        }
-      >
-        <p className="text-[12.5px] font-semibold text-[var(--mut)] mb-3">
-          Enter your 12 recovery words separated by spaces. This will regenerate the master encryption key and restore access to your encrypted vault and backups.
-        </p>
-        <textarea
-          rows={3}
-          className="inp w-full font-mono text-xs p-2.5 leading-relaxed"
-          placeholder="e.g. apple ocean tiger velvet puzzle lamp ..."
-          value={restorePhraseInput}
-          onChange={(e) => setRestorePhraseInput(e.target.value)}
-        />
       </Modal>
 
       {/* Unencrypted Snapshot Export Advisory Modal */}

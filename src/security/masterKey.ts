@@ -222,8 +222,6 @@ export async function decryptData<T = unknown>(
   }
 }
 
-import { deriveKeyFromPhrase, getOrCreateRecoveryPhrase } from "./recoveryPhrase";
-
 /**
  * Get the active database encryption key.
  * Priority:

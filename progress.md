@@ -28,12 +28,10 @@ This document provides a concise yet comprehensive summary of the recent enhance
 | `src/db/webSqlite.ts` | **NEW** | `sql.js` WebAssembly SQLite engine for Browser & Capacitor WebView with debounced snapshot persistence to IndexedDB. |
 | `src/db/database.ts` | **NEW** | Unified SQLite database layer with row-level AES-GCM-256 encryption, portable backup export/import, and automatic platform routing. |
 | `src/db/migrateLegacy.ts` | **NEW** | One-time automated migration utility (< 60ms) to convert legacy JSON/IDB data to normalized SQLite tables. |
-| `src/security/bip39Wordlist.ts` | **NEW** | Official standard 2048-word BIP-39 English dictionary for mnemonic recovery phrases. |
-| `src/security/recoveryPhrase.ts` | **NEW** | 12-word recovery phrase generator, validator, and PBKDF2-HMAC-SHA256 (100k rounds) key derivation. |
 | `src/security/masterKey.ts` | **NEW** | Prioritizes device-bound hardware key (`getDeviceKey()`) for instant 0-password <5ms local vault launch. |
 | `src/sync/syncTypes.ts` | Modified | Removed `KEY_SYNC` to ensure sovereign per-device encryption across P2P pairs. |
 | `src/sync/syncEngine.ts` | Modified | Pure P2P sync without key exchange; disconnect preserves all local data and keys intact. |
-| `src/views/Settings.tsx` | Modified | Added 1-click portable `.lifelog` snapshot with prominent unencrypted advisory, password protection, and smart unified import. |
+| `src/views/Settings.tsx` | Modified | Streamlined 1-click portable `.lifelog` snapshot, password-protected backup, and unified import. |
 | `src/store.tsx` | Modified | Integrated SQLite database boot & debounced persistence hooks with automated 1-time legacy migration. |
 
 ---
@@ -187,9 +185,9 @@ This document provides a concise yet comprehensive summary of the recent enhance
 - Sets `migrated_to_sqlite: 'true'` in the database `meta` table and is permanently bypassed on future launches.
 
 ### E. Settings UI Upgrades
-- Added **Unified SQLite Database Engine** status card with active path and "Open Storage Folder" button.
-- Added **12-Word Vault Recovery Phrase** card with interactive "View 12 Words" modal (numbered chips, 1-click copy) and "Restore Phrase" modal.
-- Added **Universal Backup & Restore (.lifelog)** export and import buttons supporting cross-platform file transfers.
+### E. Settings UI Streamlining
+- Streamlined **Vault Backups & Migration** card: removed technical SQLite engine diagnostic banner, redundant Paste JSON button, and 12-word recovery phrase card.
+- Clean 3-action layout: `Export Portable Snapshot (.lifelog)`, `Password-Protect (.lifelog)`, and `Import Backup (.lifelog / .json)`.
 
 ---
 
@@ -199,7 +197,7 @@ This document provides a concise yet comprehensive summary of the recent enhance
 - **Eliminated `KEY_SYNC`**: Removed key exchange message type from `src/sync/syncTypes.ts` and `src/sync/syncEngine.ts`.
 - **Independent Encryption**: WebRTC DTLS already provides transport-layer End-to-End Encryption. Peer devices transmit decrypted state records across the secure WebRTC channel. Each device encrypts and persists records into its local SQLite database using its own independent hardware device key (`getDeviceKey()`).
 - **Zero Key Wiping on Disconnect**: Unpairing or disconnecting sync leaves all local database records and keys 100% intact on both devices. Neither device ever loses access to its data.
-- **Instant <5ms Startup**: Reverted `getActiveVaultKey()` in `src/security/masterKey.ts` to prioritize `getDeviceKey()`, guaranteeing instant startup with zero password or 12-word recovery phrase popups.
+- **Instant <5ms Startup**: Reverted `getActiveVaultKey()` in `src/security/masterKey.ts` to prioritize `getDeviceKey()`, guaranteeing instant startup with zero password or recovery phrase popups.
 
 ---
 
@@ -223,6 +221,12 @@ This document provides a concise yet comprehensive summary of the recent enhance
   2. Password-protected `.lifelog` backups &rarr; prompts for master password, decrypts, and restores.
   3. Legacy plain JSON exports (`.json`) &rarr; restores cleanly.
   4. Raw SQLite binary databases (`.sqlite3`, `.db`) &rarr; restores directly via native Electron or Web SQLite WASM.
+
+### D. Complete Removal of 12-Word Phrase Engine & UI Clutter
+- Removed `src/security/recoveryPhrase.ts` and `src/security/bip39Wordlist.ts`.
+- Removed 12-word recovery phrase view/restore modals and state from `src/views/Settings.tsx`.
+- Removed internal SQLite engine diagnostic card (end users do not need technical engine status).
+- Removed redundant `Paste JSON` button in favor of unified file import.
 
 ---
 
