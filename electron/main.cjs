@@ -5,8 +5,11 @@ const fs = require('fs');
 let mainWindow = null;
 let popoutWindow = null;
 
-// Optimize Chromium memory & V8 garbage collection footprint
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
+// Optimize Chromium memory, GPU render targets & V8 garbage collection footprint
+app.commandLine.appendSwitch('enable-low-end-device-mode');
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128');
+app.commandLine.appendSwitch('renderer-process-limit', '1');
+app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
 
 // Ensure persistent local storage directory and encrypted attachments folder
 function getStoragePaths() {
@@ -66,6 +69,18 @@ function createMainWindow() {
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
+
+  // Purge unused display and memory caches when window loses focus or minimizes
+  const trimMemory = () => {
+    try {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        mainWindow.webContents.session.clearCache().catch(() => {});
+      }
+    } catch {}
+  };
+
+  mainWindow.on('blur', trimMemory);
+  mainWindow.on('minimize', trimMemory);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
