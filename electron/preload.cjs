@@ -11,4 +11,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStorageInfo: () => ipcRenderer.invoke('lifelog:get-storage-info'),
   openStorageFolder: () => ipcRenderer.invoke('lifelog:open-storage-folder'),
   openTimerPopout: () => ipcRenderer.invoke('lifelog:open-timer-popout'),
+
+  // Native SQLite operations
+  dbInit: () => ipcRenderer.invoke('lifelog:db-init'),
+  dbLoadAll: () => ipcRenderer.invoke('lifelog:db-load-all'),
+  dbSaveRow: (table, row) => ipcRenderer.invoke('lifelog:db-save-row', { table, row }),
+  dbDeleteRow: (table, id) => ipcRenderer.invoke('lifelog:db-delete-row', { table, id }),
+  dbBatchSave: (table, rows) => ipcRenderer.invoke('lifelog:db-batch-save', { table, rows }),
+  dbExec: (sql) => ipcRenderer.invoke('lifelog:db-exec', sql),
+  dbQuery: (sql, params) => ipcRenderer.invoke('lifelog:db-query', { sql, params }),
+  dbExportBackup: (customPath) => ipcRenderer.invoke('lifelog:db-export-backup', customPath),
+  dbImportBackup: (customPath) => ipcRenderer.invoke('lifelog:db-import-backup', customPath),
 });

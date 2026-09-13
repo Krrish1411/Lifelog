@@ -26,6 +26,8 @@ import {
   saveErasedFlag,
   migrateToIDB,
 } from "./utils/idb";
+import { loadFullStateFromDb, saveFullStateToDb } from "./db/database";
+import { runOneTimeLegacyMigration } from "./db/migrateLegacy";
 import {
   cancelTaskDueNotification,
   isLinuxDesktop,
@@ -233,27 +235,40 @@ export function AppProvider({ children }: { children: ReactNode }) {
     loadStoredFont();
     let cancelled = false;
     (async () => {
-      const key = await getDeviceKey();
       let next: State | null = null;
       
-      // Try migrating from localStorage to IndexedDB (one-time)
+      // 1. One-time legacy migration to unified SQLite engine
       try {
-        await migrateToIDB();
-      } catch {
-        // Migration failed, continue with normal loading
+        const migrated = await runOneTimeLegacyMigration();
+        if (migrated) next = mergeState(migrated);
+      } catch (e) {
+        console.warn("[LifeLog] SQLite migration check:", e);
       }
       
-      // First try IndexedDB
-      try {
-        const idbState = await loadStateFromIDB();
-        if (idbState) next = mergeState(idbState);
-      } catch {
-        next = null;
-      }
-      
-      // Fallback to localStorage if IDB failed
+      // 2. Load from unified SQLite database
       if (!next) {
         try {
+          const dbState = await loadFullStateFromDb();
+          if (dbState) next = mergeState(dbState);
+        } catch (e) {
+          console.warn("[LifeLog] SQLite loadState:", e);
+        }
+      }
+
+      // 3. Fallback to legacy IndexedDB if SQLite empty
+      if (!next) {
+        try {
+          const idbState = await loadStateFromIDB();
+          if (idbState) next = mergeState(idbState);
+        } catch {
+          next = null;
+        }
+      }
+      
+      // 4. Fallback to localStorage if IDB failed
+      if (!next) {
+        try {
+          const key = await getDeviceKey();
           const raw = localStorage.getItem(LS_KEY);
           if (raw) next = mergeState(await decryptEnvelope<State>(key, raw));
         } catch {
@@ -276,20 +291,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /* ----- persist (debounced, encrypted) ----- */
+  /* ----- persist (debounced, row-level encrypted to SQLite) ----- */
   useEffect(() => {
     if (!state) return;
     const t = setTimeout(async () => {
+      // 1. Persist to unified SQLite database
       try {
-        // Try IndexedDB first, fallback to localStorage
+        await saveFullStateToDb(state);
+      } catch (e) {
+        console.error("[LifeLog] SQLite save error:", e);
+      }
+
+      // 2. Mirror to IDB / localStorage as passive backup
+      try {
         await saveStateToIDB(state);
       } catch {
-        // IDB failed, use localStorage as fallback
         try {
           const key = await getDeviceKey();
           localStorage.setItem(LS_KEY, await encryptEnvelope(key, state));
         } catch {
-          /* storage full / private mode — keep working in memory */
+          /* storage full / private mode */
         }
       }
     }, 400);

@@ -390,6 +390,19 @@ export const FONT_PAIRS: Record<FontPair, { label: string; family: string }> = {
   nunito: { label: "Nunito Sans", family: "Nunito Sans" },
 };
 
+export interface SqliteAllData {
+  meta: { key: string; value: string }[];
+  tasks: { id: string; project_id?: string; updated_at: number; is_deleted: number; encrypted_payload: string }[];
+  notes: { id: string; folder_id?: string; updated_at: number; is_deleted: number; encrypted_payload: string }[];
+  attachments: { id: string; note_id: string; mime_type?: string; byte_size?: number; created_at?: number; encrypted_blob: string }[];
+  habits: { id: string; updated_at: number; is_deleted: number; encrypted_payload: string }[];
+  projects: { id: string; updated_at: number; is_deleted: number; encrypted_payload: string }[];
+  folders: { id: string; updated_at: number; encrypted_payload: string }[];
+  sessions: { id: string; started_at?: number; updated_at: number; encrypted_payload: string }[];
+  dayLogs: { day_iso: string; updated_at: number; encrypted_payload: string }[];
+  appSettings: { id: string; encrypted_payload: string }[];
+}
+
 export interface ElectronAPI {
   isElectron: boolean;
   platform: string;
@@ -398,9 +411,20 @@ export interface ElectronAPI {
   saveAttachment: (id: string, data: string) => Promise<{ success: boolean; path?: string; error?: string }>;
   loadAttachment: (id: string) => Promise<string | null>;
   deleteAttachment: (id: string) => Promise<{ success: boolean; error?: string }>;
-  getStorageInfo: () => Promise<{ dir: string; file: string; attachmentsDir?: string; platform: string }>;
+  getStorageInfo: () => Promise<{ dir: string; file: string; sqliteFile?: string; attachmentsDir?: string; platform: string }>;
   openStorageFolder: () => Promise<boolean>;
   openTimerPopout: () => Promise<boolean>;
+
+  // SQLite IPC methods
+  dbInit: () => Promise<{ success: boolean; path?: string; error?: string }>;
+  dbLoadAll: () => Promise<SqliteAllData | null>;
+  dbSaveRow: (table: string, row: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
+  dbDeleteRow: (table: string, id: string) => Promise<{ success: boolean; error?: string }>;
+  dbBatchSave: (table: string, rows: Record<string, unknown>[]) => Promise<{ success: boolean; error?: string }>;
+  dbExec: (sql: string) => Promise<{ success: boolean; error?: string }>;
+  dbQuery: <T = unknown>(sql: string, params?: unknown[]) => Promise<T[]>;
+  dbExportBackup: (customPath?: string) => Promise<{ success?: boolean; path?: string; canceled?: boolean; error?: string }>;
+  dbImportBackup: (customPath?: string) => Promise<{ success?: boolean; canceled?: boolean; error?: string }>;
 }
 
 declare global {

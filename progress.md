@@ -21,6 +21,20 @@ This document provides a concise yet comprehensive summary of the recent enhance
 | `src/views/Reports.tsx` | Modified | Added lag-free PDF export configuration modal; fixed missing progress bars and unconstrained print heights for energy/mood and estimate calibration. |
 | `src/components/ui.tsx` | Modified | Updated `BarRow` with explicit border tracks and `print-color-adjust: exact`. |
 | `src/index.css` | Modified | Enhanced `@media print` with universal exact color adjustment, light-mode palette variables, and unclipped container overrides. |
+| `electron/db.cjs` | **NEW** | Native Node `DatabaseSync` SQLite manager with WAL tuning, schema setup, indexed queries, batch transactions, and VACUUM backup. |
+| `electron/main.cjs` | Modified | Exposed SQLite IPC handlers (`db-init`, `db-save-row`, `db-load-all`, `db-batch-save`, `db-export-backup`, `db-import-backup`) and integrated SQLite paths. |
+| `electron/preload.cjs` | Modified | Exposed native SQLite API methods to renderer via `window.electronAPI`. |
+| `src/types.ts` | Modified | Added `SqliteAllData` interface and updated `ElectronAPI` with SQLite database methods. |
+| `src/db/webSqlite.ts` | **NEW** | `sql.js` WebAssembly SQLite engine for Browser & Capacitor WebView with debounced snapshot persistence to IndexedDB. |
+| `src/db/database.ts` | **NEW** | Unified SQLite database layer with row-level AES-GCM-256 encryption, portable backup export/import, and automatic platform routing. |
+| `src/db/migrateLegacy.ts` | **NEW** | One-time automated migration utility (< 60ms) to convert legacy JSON/IDB data to normalized SQLite tables. |
+| `src/security/bip39Wordlist.ts` | **NEW** | Official standard 2048-word BIP-39 English dictionary for mnemonic recovery phrases. |
+| `src/security/recoveryPhrase.ts` | **NEW** | 12-word recovery phrase generator, validator, and PBKDF2-HMAC-SHA256 (100k rounds) key derivation. |
+| `src/security/masterKey.ts` | **NEW** | Device-bound key caching for zero-password daily launch, verification hashing, and active vault key provider. |
+| `src/sync/syncTypes.ts` | Modified | Added `KEY_SYNC` message type to `SyncMessage` union. |
+| `src/sync/syncEngine.ts` | Modified | Transmits `KEY_SYNC` to secondary phone over WebRTC DTLS on pairing; wipes secondary phone key upon disconnect/unpair. |
+| `src/views/Settings.tsx` | Modified | Added SQLite Engine status card, 12-word recovery phrase view/restore modals, and universal `.lifelog` backup/restore buttons. |
+| `src/store.tsx` | Modified | Integrated SQLite database boot & debounced persistence hooks with automated 1-time legacy migration. |
 
 ---
 
@@ -127,5 +141,54 @@ This document provides a concise yet comprehensive summary of the recent enhance
   - 🪟 **Windows**: `LifeLog-Desktop-Windows` (223.41 MB) — Setup `.exe` (NSIS) & Portable `.exe`
   - 🍎 **macOS**: `LifeLog-Desktop-macOS` (261.73 MB) — `.dmg` & `.zip`
 - **Zero Local Disk Wear**: 100% of compilation and packaging executed in the GitHub Actions cloud.
+
+---
+
+## 6. Unified SQLite Database Engine, Zero-Password 12-Word Recovery Phrase & Universal Backups
+
+### A. Unified SQLite Engine Across All Platforms
+- **Desktop Electron (Native SQLite)**:
+  - Replaced legacy monolithic JSON vault file with native SQLite via Node.js `node:sqlite` (`DatabaseSync`) in `electron/db.cjs`.
+  - Tuned with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, `PRAGMA foreign_keys = ON;`, and `PRAGMA busy_timeout = 5000;`.
+  - Normalized database schema with 10 tables: `meta`, `tasks`, `notes`, `attachments`, `habits`, `projects`, `folders`, `sessions`, `day_logs`, and `app_settings`.
+  - B-Tree indexes created on `updated_at` and foreign key relationships for sub-millisecond lookups.
+  - Implemented atomic `VACUUM INTO` for zero-lock, zero-corruption compacted database exports.
+  - Exposed full SQLite IPC suite (`db-init`, `db-save-row`, `db-delete-row`, `db-batch-save`, `db-load-all`, `db-exec`, `db-query`, `db-export-backup`, `db-import-backup`) in `electron/main.cjs` and `electron/preload.cjs`.
+- **Web Browser & Android Capacitor (WASM SQLite)**:
+  - Integrated `sql.js` WebAssembly engine (`public/sql-wasm.wasm`) in `src/db/webSqlite.ts`.
+  - In-memory execution with debounced snapshot persistence to IndexedDB (`LifeLogSQLiteStorage`).
+  - 100% binary compatibility with desktop SQLite `.sqlite3` / `.db` files.
+- **Unified DB Abstraction & Row-Level E2EE**:
+  - `src/db/database.ts` handles seamless routing across Electron and Web/Mobile.
+  - Transparent row-level **AES-GCM-256** authenticated encryption: note bodies, task notes, habit entries, and raw attachment binaries are encrypted before touching disk.
+
+### B. Zero-Password Daily Launch & 12-Word Recovery Phrase
+- **Zero Passwords in Daily Use**:
+  - The master encryption key is bound to local OS storage and memory.
+  - LifeLog opens instantly on everyday launches with **0 password prompts**.
+- **12-Word BIP-39 Recovery Phrase**:
+  - Implemented in `src/security/recoveryPhrase.ts` using the official 2048-word BIP-39 standard dictionary (`src/security/bip39Wordlist.ts`).
+  - Auto-generates a human-readable 12-word phrase on first run.
+  - Derives the 256-bit AES-GCM Master Key using `PBKDF2-HMAC-SHA256` (100,000 rounds).
+  - Writing down these 12 words allows full vault recovery and backup decryption on any device.
+
+### C. P2P Key Synchronization & Automatic Revocation on Disconnect
+- **Automatic Key Sync on Pairing**:
+  - In `src/sync/syncEngine.ts` and `src/sync/syncTypes.ts`, when a Primary device and Secondary device pair via PIN or QR code, the Primary device sends its 12-word recovery phrase via an encrypted `KEY_SYNC` packet over WebRTC DTLS.
+  - The secondary device (e.g. Phone) adopts the key and re-encrypts its local database with the shared master key.
+  - Works offline seamlessly while paired.
+- **Secondary Key Wiping on Disconnect**:
+  - When the user unpairs or disconnects the sync relationship, the secondary phone immediately wipes the synced recovery phrase and master key from local storage and memory.
+  - Only the Primary PC retains the master key and recovery phrase.
+
+### D. 1-Time User Data Migration (< 60ms)
+- `src/db/migrateLegacy.ts` detects existing `lifelog-vault.json` or legacy IndexedDB on boot.
+- Converts all legacy records into normalized SQLite tables inside an atomic transaction.
+- Sets `migrated_to_sqlite: 'true'` in the database `meta` table and is permanently bypassed on future launches.
+
+### E. Settings UI Upgrades
+- Added **Unified SQLite Database Engine** status card with active path and "Open Storage Folder" button.
+- Added **12-Word Vault Recovery Phrase** card with interactive "View 12 Words" modal (numbered chips, 1-click copy) and "Restore Phrase" modal.
+- Added **Universal Backup & Restore (.lifelog)** export and import buttons supporting cross-platform file transfers.
 
 

@@ -28,6 +28,7 @@ export type SyncMessage =
   | { type: "FORCE_REPLACE_STATE"; state: State; timestamp: number; masterDeviceName?: string }
   | { type: "MASTER_SETUP_EVENT"; mode: "clone_to_peer" | "two_way"; masterDeviceName: string; timestamp: number }
   | { type: "ROLE_SELECTION"; mode: "clone_to_peer" | "two_way"; masterDeviceName: string; timestamp: number }
+  | { type: "KEY_SYNC"; phrase: string; masterDeviceName: string; timestamp: number }
   | { type: "DELTA_STATE"; delta: PartialStateDelta; timestamp: number }
   | { type: "PING"; timestamp: number }
   | { type: "PONG"; timestamp: number }

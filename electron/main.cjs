@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const dbManager = require('./db.cjs');
 
 let mainWindow = null;
 let popoutWindow = null;
@@ -20,7 +21,8 @@ function getStoragePaths() {
     fs.mkdirSync(attachmentsDir, { recursive: true });
   }
   const vaultFile = path.join(userData, 'lifelog-vault.json');
-  return { dir: userData, file: vaultFile, attachmentsDir };
+  const sqliteFile = path.join(userData, 'lifelog.sqlite3');
+  return { dir: userData, file: vaultFile, sqliteFile, attachmentsDir };
 }
 
 function createMainWindow() {
@@ -214,6 +216,7 @@ ipcMain.handle('lifelog:get-storage-info', async () => {
   return {
     dir: paths.dir,
     file: paths.file,
+    sqliteFile: paths.sqliteFile,
     attachmentsDir: paths.attachmentsDir,
     platform: process.platform,
   };
@@ -232,9 +235,139 @@ ipcMain.handle('lifelog:open-timer-popout', async () => {
   return true;
 });
 
+// ---------------- SQLite Native IPC Handlers ----------------
+
+ipcMain.handle('lifelog:db-init', async () => {
+  try {
+    const { sqliteFile } = getStoragePaths();
+    dbManager.initDatabase(sqliteFile);
+    return { success: true, path: sqliteFile };
+  } catch (err) {
+    console.error('Database init error:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('lifelog:db-load-all', async () => {
+  try {
+    return dbManager.loadAllData();
+  } catch (err) {
+    console.error('Database loadAll error:', err);
+    return null;
+  }
+});
+
+ipcMain.handle('lifelog:db-save-row', async (_event, { table, row }) => {
+  try {
+    dbManager.saveRow(table, row);
+    return { success: true };
+  } catch (err) {
+    console.error(`Database saveRow error for ${table}:`, err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('lifelog:db-delete-row', async (_event, { table, id }) => {
+  try {
+    dbManager.deleteRow(table, id);
+    return { success: true };
+  } catch (err) {
+    console.error(`Database deleteRow error for ${table}:`, err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('lifelog:db-batch-save', async (_event, { table, rows }) => {
+  try {
+    dbManager.batchSave(table, rows);
+    return { success: true };
+  } catch (err) {
+    console.error(`Database batchSave error for ${table}:`, err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('lifelog:db-exec', async (_event, sql) => {
+  try {
+    dbManager.execSql(sql);
+    return { success: true };
+  } catch (err) {
+    console.error('Database exec error:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('lifelog:db-query', async (_event, { sql, params }) => {
+  try {
+    return dbManager.queryAll(sql, params);
+  } catch (err) {
+    console.error('Database query error:', err);
+    return [];
+  }
+});
+
+// 9. Export portable encrypted backup (.lifelog or .sqlite3)
+ipcMain.handle('lifelog:db-export-backup', async (_event, customPath) => {
+  try {
+    let targetPath = customPath;
+    if (!targetPath) {
+      const now = new Date().toISOString().slice(0, 10);
+      const res = await dialog.showSaveDialog(mainWindow, {
+        title: 'Export LifeLog Vault Backup',
+        defaultPath: `lifelog_backup_${now}.lifelog`,
+        filters: [
+          { name: 'LifeLog Backup (*.lifelog)', extensions: ['lifelog'] },
+          { name: 'SQLite Database (*.sqlite3, *.db)', extensions: ['sqlite3', 'db'] },
+          { name: 'All Files', extensions: ['*'] }
+        ]
+      });
+      if (res.canceled || !res.filePath) {
+        return { canceled: true };
+      }
+      targetPath = res.filePath;
+    }
+    return dbManager.exportBackup(targetPath);
+  } catch (err) {
+    console.error('Database exportBackup error:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
+// 10. Import portable encrypted backup (.lifelog or .sqlite3)
+ipcMain.handle('lifelog:db-import-backup', async (_event, customPath) => {
+  try {
+    let sourcePath = customPath;
+    if (!sourcePath) {
+      const res = await dialog.showOpenDialog(mainWindow, {
+        title: 'Import LifeLog Vault Backup',
+        filters: [
+          { name: 'LifeLog Backup (*.lifelog, *.sqlite3, *.db)', extensions: ['lifelog', 'sqlite3', 'db'] },
+          { name: 'All Files', extensions: ['*'] }
+        ],
+        properties: ['openFile']
+      });
+      if (res.canceled || !res.filePaths || res.filePaths.length === 0) {
+        return { canceled: true };
+      }
+      sourcePath = res.filePaths[0];
+    }
+    return dbManager.importBackup(sourcePath);
+  } catch (err) {
+    console.error('Database importBackup error:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
 // ---------------- App Lifecycle ----------------
 
 app.whenReady().then(() => {
+  try {
+    const { sqliteFile } = getStoragePaths();
+    dbManager.initDatabase(sqliteFile);
+  } catch (err) {
+    console.error('Failed to pre-init SQLite database:', err);
+  }
+
   createMainWindow();
 
   app.on('activate', () => {

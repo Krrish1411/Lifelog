@@ -3,6 +3,8 @@ import type { SyncMessage, SyncStatus, SyncPeerInfo, PartialStateDelta, Encrypte
 import { encryptSyncMessage, decryptSyncMessage } from "./syncCrypto";
 import { getDeviceKey, decryptText } from "../utils/crypto";
 import { cleanSeedData, isFreshSeedState } from "../utils/cleanSeed";
+import { getOrCreateRecoveryPhrase, setRecoveryPhrase, clearRecoveryPhrase, deriveKeyFromPhrase } from "../security/recoveryPhrase";
+import { cacheMasterKeyOnDevice, clearCachedMasterKey } from "../security/masterKey";
 
 const SYNC_STORAGE_KEY = "lifelog.sync.activeSession";
 
@@ -171,6 +173,21 @@ class WebRTCSyncEngine {
       masterDeviceName,
       timestamp: Date.now(),
     });
+
+    // Securely transmit the 12-word master recovery phrase so secondary adopts the same master key
+    try {
+      const phrase = getOrCreateRecoveryPhrase();
+      if (phrase) {
+        await this.sendMessage({
+          type: "KEY_SYNC",
+          phrase,
+          masterDeviceName,
+          timestamp: Date.now(),
+        });
+      }
+    } catch (e) {
+      console.warn("[Sync] Error sending KEY_SYNC:", e);
+    }
   }
 
   private startHeartbeat(): void {
@@ -711,6 +728,16 @@ class WebRTCSyncEngine {
       this.sendMessage({ type: "PONG", timestamp: Date.now() }).catch(() => {});
     } else if (msg.type === "PONG") {
       // heartbeat timestamp already updated
+    } else if (msg.type === "KEY_SYNC") {
+      try {
+        setRecoveryPhrase(msg.phrase);
+        deriveKeyFromPhrase(msg.phrase).then(async (key) => {
+          await cacheMasterKeyOnDevice(key);
+          console.info("[LifeLog Sync] Adopted Primary device's 12-word master encryption key.");
+        }).catch(console.error);
+      } catch (err) {
+        console.error("[LifeLog Sync] Error adopting master key:", err);
+      }
     } else if (msg.type === "ROLE_SELECTION") {
       const masterName = msg.masterDeviceName || this.connectedPeer?.deviceName || "Primary Device";
       for (const l of this.roleSelectionListeners) {
@@ -814,6 +841,11 @@ class WebRTCSyncEngine {
 
     if (typeof localStorage !== "undefined") {
       try {
+        const isSecondary = localStorage.getItem("lifelog.sync.masterRole") === "secondary";
+        if (isSecondary) {
+          clearRecoveryPhrase();
+          clearCachedMasterKey();
+        }
         localStorage.removeItem(SYNC_STORAGE_KEY);
         localStorage.removeItem("lifelog.sync.masterEstablished");
         localStorage.removeItem("lifelog.sync.masterRole");
