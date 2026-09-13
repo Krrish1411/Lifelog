@@ -36,8 +36,6 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
   const [status, setStatus] = useState<SyncStatus>(syncEngine.getStatus());
   const [peer, setPeer] = useState<SyncPeerInfo | null>(syncEngine.getConnectedPeer());
   
-  // Pairing modes: "pin" (automated 6-digit code) or "airgap" (offline base64 ticket)
-  const [pairingMode, setPairingMode] = useState<"pin" | "airgap">("pin");
   const [activeTab, setActiveTab] = useState<"host" | "join">("host");
   
   const [deviceName, setDeviceName] = useState(
@@ -50,20 +48,11 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
 
   // 6-digit PIN state
   const [pin, setPin] = useState("");
+  const [pinQrUrl, setPinQrUrl] = useState("");
   const [pinInput, setPinInput] = useState("");
   const [pinStatus, setPinStatus] = useState<string | null>(null);
   const [isPinConnecting, setIsPinConnecting] = useState(false);
   const hostStopperRef = useRef<{ stop: () => void } | null>(null);
-
-  // Air-gapped ticket state
-  const [offerTicket, setOfferTicket] = useState<string>("");
-  const [offerQrUrl, setOfferQrUrl] = useState<string>("");
-  const [answerInput, setAnswerInput] = useState<string>("");
-  const [isGeneratingOffer, setIsGeneratingOffer] = useState(false);
-  const [joinTicketInput, setJoinTicketInput] = useState<string>("");
-  const [answerTicket, setAnswerTicket] = useState<string>("");
-  const [answerQrUrl, setAnswerQrUrl] = useState<string>("");
-  const [isGeneratingAnswer, setIsGeneratingAnswer] = useState(false);
 
   // UI state
   const [copied, setCopied] = useState<string | null>(null);
@@ -80,25 +69,29 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
         setPinStatus(null);
         setIsPinConnecting(false);
         triggerHaptic("success");
-      } else if (nextStatus === "idle") {
-        // Reset pairing UI cleanly on peer disconnect or session reset
-        setMasterEstablished(false);
-        setMasterRole("master");
-        setMasterDeviceName("");
-        setPeerSelectedRole(null);
-        setPin("");
-        setOfferQrUrl("");
-        setAnswerQrUrl("");
-        setOfferTicket("");
-        setAnswerTicket("");
-        setAnswerInput("");
-        setJoinTicketInput("");
-        if (typeof localStorage !== "undefined") {
-          localStorage.removeItem("lifelog.sync.masterEstablished");
-          localStorage.removeItem("lifelog.sync.masterRole");
-          localStorage.removeItem("lifelog.sync.masterDeviceName");
-        }
       }
+    });
+    return unsub;
+  }, []);
+
+  // Listen to remote peer disconnect event
+  useEffect(() => {
+    const unsub = syncEngine.onPeerDisconnect(() => {
+      setMasterEstablished(false);
+      setMasterRole("master");
+      setMasterDeviceName("");
+      setPeerSelectedRole(null);
+      setPin("");
+      setPinQrUrl("");
+      setPinStatus(null);
+      setIsPinConnecting(false);
+      if (typeof localStorage !== "undefined") {
+        localStorage.removeItem("lifelog.sync.masterEstablished");
+        localStorage.removeItem("lifelog.sync.masterRole");
+        localStorage.removeItem("lifelog.sync.masterDeviceName");
+      }
+      triggerHaptic("warning");
+      toast("Peer disconnected. Sync session ended.", "ok");
     });
     return unsub;
   }, []);
@@ -135,11 +128,12 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     try {
       setErrorMsg(null);
       setIsPinConnecting(true);
+      setPinStatus("Initializing hosting session...");
       const generatedPin = String(Math.floor(100000 + Math.random() * 900000));
       setPin(generatedPin);
       
       const qr = await generateQr(`lifelog-pin:${generatedPin}`);
-      setOfferQrUrl(qr);
+      setPinQrUrl(qr);
       triggerHaptic("medium");
 
       // Start hosting on relay
@@ -149,10 +143,13 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
         (msg) => setPinStatus(msg)
       );
       hostStopperRef.current = session;
+      setIsPinConnecting(false);
     } catch (err: any) {
       console.error(err);
       setErrorMsg(err.message || "Failed to start hosting session.");
       setIsPinConnecting(false);
+      setPin("");
+      setPinQrUrl("");
       triggerHaptic("warning");
     }
   };
@@ -163,8 +160,8 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     setIsPinConnecting(false);
     setPinStatus(null);
     setPin("");
-    setOfferQrUrl("");
-    syncEngine.disconnect();
+    setPinQrUrl("");
+    syncEngine.disconnect(false).catch(() => {});
   };
 
   const handleJoinPin = async () => {
@@ -192,61 +189,6 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
       setIsPinConnecting(false);
       setPinStatus(null);
       triggerHaptic("warning");
-    }
-  };
-
-  /* ------------------- Air-Gapped Ticket Handlers ------------------- */
-  const handleCreateOffer = async () => {
-    try {
-      setErrorMsg(null);
-      setIsGeneratingOffer(true);
-      const ticket = await syncEngine.createSession(deviceName.trim() || "LifeLog Device");
-      setOfferTicket(ticket);
-      const qr = await generateQr(ticket);
-      setOfferQrUrl(qr);
-      triggerHaptic("medium");
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg(err.message || "Failed to generate session ticket.");
-      triggerHaptic("warning");
-    } finally {
-      setIsGeneratingOffer(false);
-    }
-  };
-
-  const handleAcceptAnswer = async () => {
-    if (!answerInput.trim()) return;
-    try {
-      setErrorMsg(null);
-      await syncEngine.acceptAnswer(answerInput.trim());
-      triggerHaptic("success");
-      toast("Connecting to peer...", "ok");
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg("Failed to accept answer ticket. Please check the code.");
-      triggerHaptic("warning");
-    }
-  };
-
-  const handleJoinSession = async () => {
-    if (!joinTicketInput.trim()) return;
-    try {
-      setErrorMsg(null);
-      setIsGeneratingAnswer(true);
-      const answer = await syncEngine.joinSession(
-        joinTicketInput.trim(),
-        deviceName.trim() || "LifeLog Device"
-      );
-      setAnswerTicket(answer);
-      const qr = await generateQr(answer);
-      setAnswerQrUrl(qr);
-      triggerHaptic("success");
-    } catch (err: any) {
-      console.error(err);
-      setErrorMsg("Invalid pairing code. Please make sure you copied the full ticket.");
-      triggerHaptic("warning");
-    } finally {
-      setIsGeneratingAnswer(false);
     }
   };
 
@@ -387,20 +329,16 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     setMasterRole("master");
     setMasterDeviceName("");
     setPeerSelectedRole(null);
-    setOfferTicket("");
-    setAnswerTicket("");
-    setAnswerInput("");
-    setJoinTicketInput("");
-    setOfferQrUrl("");
-    setAnswerQrUrl("");
+    setPin("");
+    setPinQrUrl("");
     toast("Sync session disconnected.", "ok");
   };
 
-  const copyToClipboard = (text: string, type: "offer" | "answer" | "pin") => {
+  const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
-    setCopied(type);
+    setCopied("pin");
     triggerHaptic("light");
-    toast(type === "pin" ? "PIN copied!" : "Pairing ticket copied to clipboard!", "ok");
+    toast("PIN copied!", "ok");
     setTimeout(() => setCopied(null), 2500);
   };
 
@@ -680,48 +618,6 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
               />
             </div>
 
-            {/* Mode Switcher: 6-Digit PIN vs Air-Gapped */}
-            <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--line)" }}>
-              <div className="flex items-center gap-1 bg-[var(--panel2)] p-1 rounded-xl border border-[var(--line)] text-xs">
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleStopPinHost();
-                    setPairingMode("pin");
-                  }}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer",
-                    pairingMode === "pin"
-                      ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
-                      : "text-[var(--mut)] hover:text-[var(--text)]"
-                  )}
-                >
-                  <KeyRound size={13} />
-                  <span>6-Digit PIN (Easy)</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    handleStopPinHost();
-                    setPairingMode("airgap");
-                  }}
-                  className={cn(
-                    "flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-bold transition-all cursor-pointer",
-                    pairingMode === "airgap"
-                      ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-xs"
-                      : "text-[var(--mut)] hover:text-[var(--text)]"
-                  )}
-                >
-                  <Lock size={13} />
-                  <span>Air-Gapped Ticket</span>
-                </button>
-              </div>
-
-              <div className="text-[11px] font-semibold text-[var(--mut)] hidden sm:block">
-                {pairingMode === "pin" ? "Zero copy-pasting required" : "Offline / airplane mode"}
-              </div>
-            </div>
-
             {/* Role Seg Tabs */}
             <div className="flex justify-center">
               <Seg<"host" | "join">
@@ -738,205 +634,112 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
               />
             </div>
 
-            {/* ===================== MODE 1: 6-DIGIT PIN PAIRING ===================== */}
-            {pairingMode === "pin" && (
-              <div className="space-y-4 pt-1">
-                {activeTab === "host" ? (
-                  !pin ? (
-                    <div className="text-center py-5 space-y-3">
-                      <p className="text-xs text-[var(--mut)] max-w-sm mx-auto">
-                        Generate a secure 6-digit PIN on this device. Device 2 enters the PIN to connect in seconds.
-                      </p>
-                      <Btn
-                        variant="primary"
-                        onClick={handleStartPinHost}
-                        disabled={isPinConnecting}
-                        className="mx-auto"
-                      >
-                        <Radio size={14} /> Generate 6-Digit PIN
-                      </Btn>
-                    </div>
-                  ) : (
-                    <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--panel2)] flex flex-col items-center text-center space-y-3">
-                      <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
-                        Enter this PIN on Device 2
-                      </span>
-
-                      {/* Big formatted PIN display */}
-                      <div className="flex items-center gap-2 font-mono text-3xl font-bold tracking-widest text-[var(--accent)] bg-[var(--bg)] px-6 py-3 rounded-2xl border border-[var(--line)] shadow-sm">
-                        <span>{pin.slice(0, 3)}</span>
-                        <span className="text-[var(--mut)] opacity-50">·</span>
-                        <span>{pin.slice(3, 6)}</span>
-                      </div>
-
-                      {offerQrUrl && (
-                        <div className="p-2.5 rounded-xl bg-white shadow-md inline-block my-1">
-                          <img
-                            src={offerQrUrl}
-                            alt="Pairing PIN QR Code"
-                            className="w-40 h-40 object-contain"
-                          />
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 text-xs text-[var(--mut)]">
-                        <Radio size={14} className="animate-pulse text-[var(--accent)]" />
-                        <span>{pinStatus || "Waiting for Device 2 to enter PIN..."}</span>
-                      </div>
-
-                      <div className="flex items-center gap-2 pt-2">
-                        <Btn variant="soft" size="sm" onClick={() => copyToClipboard(pin, "pin")}>
-                          <Copy size={13} /> Copy PIN
-                        </Btn>
-                        <Btn variant="danger" size="sm" onClick={handleStopPinHost}>
-                          Cancel
-                        </Btn>
-                      </div>
-                    </div>
-                  )
-                ) : (
-                  <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--panel2)] flex flex-col items-center text-center space-y-3">
-                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
-                      Enter the 6-Digit PIN from Device 1
-                    </span>
-
-                    <input
-                      type="text"
-                      inputMode="numeric"
-                      pattern="[0-9]*"
-                      maxLength={6}
-                      value={pinInput}
-                      onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
-                      onKeyDown={(e) => e.key === "Enter" && handleJoinPin()}
-                      placeholder="• • • • • •"
-                      className="inp text-center font-mono text-3xl tracking-[0.25em] font-bold h-14 w-64 max-w-full"
-                    />
-
-                    {pinStatus && (
-                      <div className="flex items-center gap-2 text-xs text-[var(--accent)] animate-pulse">
-                        <RefreshCw size={13} className="animate-spin" />
-                        <span>{pinStatus}</span>
-                      </div>
-                    )}
-
+            <div className="space-y-4 pt-1">
+              {activeTab === "host" ? (
+                !pin ? (
+                  <div className="text-center py-5 space-y-3">
+                    <p className="text-xs text-[var(--mut)] max-w-sm mx-auto">
+                      Generate a secure 6-digit PIN on this device. Device 2 enters the PIN to connect in seconds.
+                    </p>
                     <Btn
                       variant="primary"
-                      onClick={handleJoinPin}
-                      disabled={pinInput.trim().length !== 6 || isPinConnecting}
-                      className="w-48 justify-center"
+                      onClick={handleStartPinHost}
+                      disabled={isPinConnecting}
+                      className="mx-auto"
                     >
                       {isPinConnecting ? (
                         <>
-                          <RefreshCw size={14} className="animate-spin" /> Connecting...
+                          <RefreshCw size={14} className="animate-spin" /> Generating PIN...
                         </>
                       ) : (
                         <>
-                          <ArrowRight size={14} /> Connect Now
+                          <Radio size={14} /> Generate 6-Digit PIN
                         </>
                       )}
                     </Btn>
                   </div>
-                )}
-              </div>
-            )}
-
-            {/* ===================== MODE 2: AIR-GAPPED OFFLINE TICKET ===================== */}
-            {pairingMode === "airgap" && (
-              <div className="space-y-4 pt-1">
-                {activeTab === "host" ? (
-                  !offerTicket ? (
-                    <div className="text-center py-4 space-y-3">
-                      <p className="text-xs text-[var(--mut)]">
-                        Generate an offline ticket and QR code to pair without any internet access.
-                      </p>
-                      <Btn
-                        variant="primary"
-                        onClick={handleCreateOffer}
-                        disabled={isGeneratingOffer}
-                        className="mx-auto"
-                      >
-                        {isGeneratingOffer ? "Generating..." : "Generate Offline Ticket"}
-                      </Btn>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div className="p-3.5 rounded-2xl border border-[var(--line)] bg-[var(--panel2)] flex flex-col items-center text-center space-y-3">
-                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
-                          Step 1 · Scan or Copy Ticket
-                        </span>
-                        {offerQrUrl && (
-                          <div className="p-2.5 rounded-xl bg-white shadow-md inline-block">
-                            <img src={offerQrUrl} alt="Pairing QR Code" className="w-44 h-44 object-contain" />
-                          </div>
-                        )}
-                        <Btn variant="soft" size="sm" onClick={() => copyToClipboard(offerTicket, "offer")}>
-                          {copied === "offer" ? <Check size={13} /> : <Copy size={13} />} Copy Ticket
-                        </Btn>
-                      </div>
-
-                      <div className="p-3.5 rounded-2xl border border-[var(--line)] bg-[var(--panel2)] space-y-2.5">
-                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)] block">
-                          Step 2 · Paste Device 2's Answer
-                        </span>
-                        <div className="flex gap-2">
-                          <TextInput
-                            value={answerInput}
-                            onChange={(e) => setAnswerInput(e.target.value)}
-                            placeholder="Paste answer from Device 2..."
-                            className="text-xs"
-                          />
-                          <Btn variant="primary" onClick={handleAcceptAnswer} disabled={!answerInput.trim()}>
-                            Connect
-                          </Btn>
-                        </div>
-                      </div>
-                    </div>
-                  )
                 ) : (
-                  <div className="space-y-3">
-                    {!answerTicket ? (
-                      <>
-                        <p className="text-xs text-[var(--mut)]">
-                          Paste the ticket code provided by Device 1:
-                        </p>
-                        <textarea
-                          value={joinTicketInput}
-                          onChange={(e) => setJoinTicketInput(e.target.value)}
-                          placeholder="Paste Device 1 ticket code here..."
-                          rows={3}
-                          className="w-full rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-2.5 text-xs text-[var(--text)] focus:outline-none focus:border-[var(--accent)] resize-none"
+                  <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--panel2)] flex flex-col items-center text-center space-y-3">
+                    <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
+                      Enter this PIN on Device 2
+                    </span>
+
+                    {/* Big formatted PIN display */}
+                    <div className="flex items-center gap-2 font-mono text-3xl font-bold tracking-widest text-[var(--accent)] bg-[var(--bg)] px-6 py-3 rounded-2xl border border-[var(--line)] shadow-sm">
+                      <span>{pin.slice(0, 3)}</span>
+                      <span className="text-[var(--mut)] opacity-50">·</span>
+                      <span>{pin.slice(3, 6)}</span>
+                    </div>
+
+                    {pinQrUrl && (
+                      <div className="p-2.5 rounded-xl bg-white shadow-md inline-block my-1">
+                        <img
+                          src={pinQrUrl}
+                          alt="Pairing PIN QR Code"
+                          className="w-40 h-40 object-contain"
                         />
-                        <Btn
-                          variant="primary"
-                          onClick={handleJoinSession}
-                          disabled={!joinTicketInput.trim() || isGeneratingAnswer}
-                          className="w-full justify-center"
-                        >
-                          {isGeneratingAnswer ? "Processing..." : "Generate Answer Ticket"}
-                        </Btn>
-                      </>
-                    ) : (
-                      <div className="p-3.5 rounded-2xl border border-[var(--line)] bg-[var(--panel2)] flex flex-col items-center text-center space-y-3">
-                        <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">
-                          Answer Generated!
-                        </span>
-                        {answerQrUrl && (
-                          <div className="p-2.5 rounded-xl bg-white shadow-md inline-block">
-                            <img src={answerQrUrl} alt="Answer QR Code" className="w-44 h-44 object-contain" />
-                          </div>
-                        )}
-                        <Btn variant="soft" size="sm" onClick={() => copyToClipboard(answerTicket, "answer")}>
-                          {copied === "answer" ? <Check size={13} /> : <Copy size={13} />} Copy Answer Code
-                        </Btn>
-                        <p className="text-[11px] text-[var(--mut)]">
-                          Paste this code into Device 1 to finalize pairing.
-                        </p>
                       </div>
                     )}
+
+                    <div className="flex items-center gap-2 text-xs text-[var(--mut)]">
+                      <Radio size={14} className="animate-pulse text-[var(--accent)]" />
+                      <span>{pinStatus || "Waiting for Device 2 to enter PIN..."}</span>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2">
+                      <Btn variant="soft" size="sm" onClick={() => copyToClipboard(pin)}>
+                        {copied === "pin" ? <Check size={13} /> : <Copy size={13} />} Copy PIN
+                      </Btn>
+                      <Btn variant="danger" size="sm" onClick={handleStopPinHost}>
+                        Cancel
+                      </Btn>
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
+                )
+              ) : (
+                <div className="p-4 rounded-2xl border border-[var(--line)] bg-[var(--panel2)] flex flex-col items-center text-center space-y-3">
+                  <span className="text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
+                    Enter the 6-Digit PIN from Device 1
+                  </span>
+
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    value={pinInput}
+                    onChange={(e) => setPinInput(e.target.value.replace(/\D/g, ""))}
+                    onKeyDown={(e) => e.key === "Enter" && handleJoinPin()}
+                    placeholder="• • • • • •"
+                    className="inp text-center font-mono text-3xl tracking-[0.25em] font-bold h-14 w-64 max-w-full"
+                  />
+
+                  {pinStatus && (
+                    <div className="flex items-center gap-2 text-xs text-[var(--accent)] animate-pulse">
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>{pinStatus}</span>
+                    </div>
+                  )}
+
+                  <Btn
+                    variant="primary"
+                    onClick={handleJoinPin}
+                    disabled={pinInput.trim().length !== 6 || isPinConnecting}
+                    className="w-48 justify-center"
+                  >
+                    {isPinConnecting ? (
+                      <>
+                        <RefreshCw size={14} className="animate-spin" /> Connecting...
+                      </>
+                    ) : (
+                      <>
+                        <ArrowRight size={14} /> Connect Now
+                      </>
+                    )}
+                  </Btn>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

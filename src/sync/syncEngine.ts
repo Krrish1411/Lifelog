@@ -55,6 +55,7 @@ class WebRTCSyncEngine {
   private stateApplyListeners: Set<StateApplyListener> = new Set();
   private masterSetupListeners: Set<(event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void> = new Set();
   private roleSelectionListeners: Set<(event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void> = new Set();
+  private peerDisconnectListeners: Set<() => void> = new Set();
   private heartbeatTimer: any = null;
   private lastHeartbeatReceived: number = Date.now();
 
@@ -155,6 +156,11 @@ class WebRTCSyncEngine {
   public onRoleSelection(listener: (event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void): () => void {
     this.roleSelectionListeners.add(listener);
     return () => this.roleSelectionListeners.delete(listener);
+  }
+
+  public onPeerDisconnect(listener: () => void): () => void {
+    this.peerDisconnectListeners.add(listener);
+    return () => this.peerDisconnectListeners.delete(listener);
   }
 
   public async sendRoleSelection(mode: "clone_to_peer" | "two_way", masterDeviceName: string): Promise<void> {
@@ -280,7 +286,20 @@ class WebRTCSyncEngine {
     deviceName: string,
     onProgress?: (msg: string) => void
   ): Promise<{ stop: () => void }> {
-    await this.disconnect(false);
+    this.stopHeartbeat();
+    if (this.eventSource) {
+      try { this.eventSource.close(); } catch {}
+      this.eventSource = null;
+    }
+    if (this.channel) {
+      try { this.channel.close(); } catch {}
+      this.channel = null;
+    }
+    if (this.pc) {
+      try { this.pc.close(); } catch {}
+      this.pc = null;
+    }
+    this.processedMessageIds.clear();
     this.setStatus("connecting");
     this.isHost = true;
     this.activePin = pin;
@@ -340,7 +359,20 @@ class WebRTCSyncEngine {
     deviceName: string,
     onProgress?: (msg: string) => void
   ): Promise<void> {
-    await this.disconnect(false);
+    this.stopHeartbeat();
+    if (this.eventSource) {
+      try { this.eventSource.close(); } catch {}
+      this.eventSource = null;
+    }
+    if (this.channel) {
+      try { this.channel.close(); } catch {}
+      this.channel = null;
+    }
+    if (this.pc) {
+      try { this.pc.close(); } catch {}
+      this.pc = null;
+    }
+    this.processedMessageIds.clear();
     this.setStatus("connecting");
     this.isHost = false;
     this.activePin = pin;
@@ -739,6 +771,9 @@ class WebRTCSyncEngine {
       this.dispatchStateMerge((local) => mergeDelta(local, msg.delta));
     } else if (msg.type === "DISCONNECT") {
       await this.disconnect(false);
+      for (const l of this.peerDisconnectListeners) {
+        try { l(); } catch {}
+      }
     }
   }
 
