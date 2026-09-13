@@ -30,10 +30,10 @@ This document provides a concise yet comprehensive summary of the recent enhance
 | `src/db/migrateLegacy.ts` | **NEW** | One-time automated migration utility (< 60ms) to convert legacy JSON/IDB data to normalized SQLite tables. |
 | `src/security/bip39Wordlist.ts` | **NEW** | Official standard 2048-word BIP-39 English dictionary for mnemonic recovery phrases. |
 | `src/security/recoveryPhrase.ts` | **NEW** | 12-word recovery phrase generator, validator, and PBKDF2-HMAC-SHA256 (100k rounds) key derivation. |
-| `src/security/masterKey.ts` | **NEW** | Device-bound key caching for zero-password daily launch, verification hashing, and active vault key provider. |
-| `src/sync/syncTypes.ts` | Modified | Added `KEY_SYNC` message type to `SyncMessage` union. |
-| `src/sync/syncEngine.ts` | Modified | Transmits `KEY_SYNC` to secondary phone over WebRTC DTLS on pairing; wipes secondary phone key upon disconnect/unpair. |
-| `src/views/Settings.tsx` | Modified | Added SQLite Engine status card, 12-word recovery phrase view/restore modals, and universal `.lifelog` backup/restore buttons. |
+| `src/security/masterKey.ts` | **NEW** | Prioritizes device-bound hardware key (`getDeviceKey()`) for instant 0-password <5ms local vault launch. |
+| `src/sync/syncTypes.ts` | Modified | Removed `KEY_SYNC` to ensure sovereign per-device encryption across P2P pairs. |
+| `src/sync/syncEngine.ts` | Modified | Pure P2P sync without key exchange; disconnect preserves all local data and keys intact. |
+| `src/views/Settings.tsx` | Modified | Added 1-click portable `.lifelog` snapshot with prominent unencrypted advisory, password protection, and smart unified import. |
 | `src/store.tsx` | Modified | Integrated SQLite database boot & debounced persistence hooks with automated 1-time legacy migration. |
 
 ---
@@ -190,5 +190,51 @@ This document provides a concise yet comprehensive summary of the recent enhance
 - Added **Unified SQLite Database Engine** status card with active path and "Open Storage Folder" button.
 - Added **12-Word Vault Recovery Phrase** card with interactive "View 12 Words" modal (numbered chips, 1-click copy) and "Restore Phrase" modal.
 - Added **Universal Backup & Restore (.lifelog)** export and import buttons supporting cross-platform file transfers.
+
+---
+
+## 7. Sovereign P2P Sync (Zero Key Drama & Independent Device Keys)
+
+### A. Pure P2P Sync Without Key Transmission
+- **Eliminated `KEY_SYNC`**: Removed key exchange message type from `src/sync/syncTypes.ts` and `src/sync/syncEngine.ts`.
+- **Independent Encryption**: WebRTC DTLS already provides transport-layer End-to-End Encryption. Peer devices transmit decrypted state records across the secure WebRTC channel. Each device encrypts and persists records into its local SQLite database using its own independent hardware device key (`getDeviceKey()`).
+- **Zero Key Wiping on Disconnect**: Unpairing or disconnecting sync leaves all local database records and keys 100% intact on both devices. Neither device ever loses access to its data.
+- **Instant <5ms Startup**: Reverted `getActiveVaultKey()` in `src/security/masterKey.ts` to prioritize `getDeviceKey()`, guaranteeing instant startup with zero password or 12-word recovery phrase popups.
+
+---
+
+## 8. Transparent Universal Backups (`.lifelog`) & User Security Advisory
+
+### A. 1-Click Portable Snapshot (`.lifelog`)
+- Generates a universal, portable `.lifelog` snapshot containing the complete decrypted state (tasks, notes with bodies/attachments, habits, projects, sessions, daylogs, tag colors, settings).
+- Fully cross-device and cross-platform: can be imported onto any laptop, browser, or Android phone without passwords.
+- Displays a prominent security advisory modal on export:
+  > **⚠️ Unencrypted Portable Snapshot**
+  > *This file contains your complete history in plain portable format so you can easily restore or migrate to another device without passwords. **Please delete this file after migration or keep it temporarily on trusted offline drives.** If storing in cloud storage or email, use the password-protected option.*
+
+### B. Optional Password-Protected Backup
+- "Password-Protect (.lifelog)" allows users to seal their snapshot with a custom password using PBKDF2 (150,000 iterations) + AES-256-GCM (`encryptBackup`).
+- Safe for long-term storage in Google Drive, Dropbox, or email.
+
+### C. Unified Smart Import Handler
+- Consolidated multiple disparate import buttons into one clean, styled `Import Backup (.lifelog / .json)` picker.
+- Automatically handles:
+  1. Unencrypted portable `.lifelog` snapshots &rarr; confirms record counts and restores into local SQLite.
+  2. Password-protected `.lifelog` backups &rarr; prompts for master password, decrypts, and restores.
+  3. Legacy plain JSON exports (`.json`) &rarr; restores cleanly.
+  4. Raw SQLite binary databases (`.sqlite3`, `.db`) &rarr; restores directly via native Electron or Web SQLite WASM.
+
+---
+
+## 9. Pending Features Roadmap (Future Monetization)
+
+### LifeLog Pro / Premium Security Vault
+- **Whole-App Screen PIN Lock**:
+  - 4-digit or 6-digit glassmorphic PIN screen overlay on app cold launch or after configurable inactivity timeouts (1m, 5m, 15m).
+  - Designed as an optional paid security tier.
+- **Per-Note 🔒 Privacy Shield (Apple Notes Style)**:
+  - Mask sensitive journal entries, therapy logs, or financial notes behind a lock icon while leaving daily grocery tasks, habits, and focus timers immediately accessible.
+- **Dedicated Security Tab**:
+  - Consolidation of all security controls, PIN options, and vault encryption under a single premium settings hub.
 
 

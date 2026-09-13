@@ -160,8 +160,11 @@ export function SettingsView() {
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
 
-  const [pw1, setPw1] = useState("");
-  const [pw2, setPw2] = useState("");
+  const [showUnencryptedWarningModal, setShowUnencryptedWarningModal] = useState(false);
+  const [exportPwOpen, setExportPwOpen] = useState(false);
+  const [exportPw1, setExportPw1] = useState("");
+  const [exportPw2, setExportPw2] = useState("");
+  const [exportPwErr, setExportPwErr] = useState("");
   const [importPwOpen, setImportPwOpen] = useState(false);
   const [importPw, setImportPw] = useState("");
   const [importPayload, setImportPayload] = useState<string | null>(null);
@@ -215,35 +218,6 @@ export function SettingsView() {
     }
   };
 
-  const handleExportLifelog = async () => {
-    try {
-      const res = await exportVaultBackup();
-      if (res.success) {
-        toast("Portable SQLite vault backup exported successfully!", "ok");
-      } else if (!res.canceled) {
-        toast("Export failed", "err");
-      }
-    } catch (e) {
-      toast("Export error: " + String(e), "err");
-    }
-  };
-
-  const handleImportLifelog = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const f = e.target.files?.[0];
-    e.target.value = "";
-    if (!f && typeof window !== "undefined" && !window.electronAPI) return;
-    try {
-      const res = await importVaultBackupFromFile(f!);
-      if (res.success) {
-        toast("Vault backup restored successfully! Reloading...", "ok");
-        setTimeout(() => window.location.reload(), 600);
-      } else if (res.error && res.error !== "Cancelled") {
-        toast(res.error, "err");
-      }
-    } catch (e) {
-      toast("Import error: " + String(e), "err");
-    }
-  };
 
   const [quotesDraft, setQuotesDraft] = useState(s.customQuotes.join("\n"));
   useEffect(() => setQuotesDraft(s.customQuotes.join("\n")), [s.customQuotes]);
@@ -353,8 +327,8 @@ export function SettingsView() {
     );
   };
 
-  /* ---------------- data ---------------- */
-  const exportPlain = async () => {
+  /* ---------------- data & backup exports ---------------- */
+  const handleExportLifelogSnapshot = async () => {
     try {
       const key = await getDeviceKey();
       const decryptedNotes = await Promise.all(
@@ -379,41 +353,85 @@ export function SettingsView() {
           }
         })
       );
-      const plainExport = {
-        ...state,
-        notes: decryptedNotes,
-        tasks: decryptedTasks,
+      const snapshot = {
+        lifelog_format: "portable_snapshot",
+        version: 1,
+        exportedAt: Date.now(),
+        encryption: "none",
+        warning: "UNENCRYPTED PORTABLE SNAPSHOT — For temporary migration or trusted offline drives only. Delete after use.",
+        data: {
+          ...state,
+          notes: decryptedNotes,
+          tasks: decryptedTasks,
+        },
       };
-      download(`lifelog-export-${todayIso()}.json`, JSON.stringify(plainExport, null, 2));
-      toast("Plain JSON exported — readable history included", "ok");
-    } catch {
-      download(`lifelog-export-${todayIso()}.json`, JSON.stringify(state, null, 2));
-      toast("Plain JSON exported", "ok");
+      download(`lifelog_snapshot_${todayIso()}.lifelog`, JSON.stringify(snapshot, null, 2));
+      setShowUnencryptedWarningModal(true);
+    } catch (e) {
+      toast("Export error: " + String(e), "err");
     }
   };
 
-  const makeBackup = async () => {
-    if (pw1.length < 4) return toast("Master password needs at least 4 characters", "err");
-    if (pw1 !== pw2) return toast("Passwords do not match", "err");
-    const payload = await encryptBackup(pw1, state);
-    download(`lifelog-backup-${todayIso()}.lifelog`, payload);
-    setPw1(""); setPw2("");
-    toast("Encrypted backup downloaded — the password is the only way back in", "ok");
+  const handleExportPasswordProtected = async () => {
+    if (exportPw1.length < 4) {
+      setExportPwErr("Password must be at least 4 characters");
+      return;
+    }
+    if (exportPw1 !== exportPw2) {
+      setExportPwErr("Passwords do not match");
+      return;
+    }
+    try {
+      const payload = await encryptBackup(exportPw1, state);
+      download(`lifelog_protected_backup_${todayIso()}.lifelog`, payload);
+      setExportPwOpen(false);
+      setExportPw1("");
+      setExportPw2("");
+      setExportPwErr("");
+      toast("Password-protected backup downloaded! Safe to store in cloud or email.", "ok");
+    } catch (err) {
+      setExportPwErr("Encryption failed: " + String(err));
+    }
+  };
+
+  const exportPlain = async () => {
+    try {
+      download(`lifelog-export-${todayIso()}.json`, JSON.stringify(state, null, 2));
+      toast("Plain JSON history exported", "ok");
+    } catch (e) {
+      toast("Export failed: " + String(e), "err");
+    }
   };
 
   const runImport = async (text: string, password: string | null): Promise<State> => {
     let data: State | null = null;
     try {
-      const env = JSON.parse(text) as { kind?: string; d?: string };
-      if (env?.kind === "backup") data = await decryptBackup<State>(password ?? "", text);
-      else if (env?.kind === "device") data = await decryptEnvelope<State>(await getDeviceKey(), text);
-      else if (env?.kind === "plain") data = JSON.parse(env.d ?? "{}") as State;
-      else data = env as unknown as State;
+      const env = JSON.parse(text) as {
+        kind?: string;
+        lifelog_format?: string;
+        data?: State;
+        d?: string;
+      };
+      if (env?.kind === "backup") {
+        data = await decryptBackup<State>(password ?? "", text);
+      } else if (env?.lifelog_format === "portable_snapshot" && env.data) {
+        data = env.data;
+      } else if (env?.kind === "device") {
+        data = await decryptEnvelope<State>(await getDeviceKey(), text);
+      } else if (env?.kind === "plain") {
+        data = JSON.parse(env.d ?? "{}") as State;
+      } else {
+        data = env as unknown as State;
+      }
     } catch (e) {
-      throw new Error(e instanceof Error && /password/i.test(e.message) ? e.message : "Could not read that file — wrong password or not a LifeLog file");
+      throw new Error(
+        e instanceof Error && /password/i.test(e.message)
+          ? e.message
+          : "Could not read that file — wrong password or not a LifeLog file"
+      );
     }
     if (!data || !Array.isArray(data.tasks) || !Array.isArray(data.projects) || !Array.isArray(data.sessions)) {
-      throw new Error("File has the wrong shape — not a LifeLog export");
+      throw new Error("File has the wrong shape — not a valid LifeLog export");
     }
     return data;
   };
@@ -422,26 +440,36 @@ export function SettingsView() {
     try {
       const data = await runImport(text, password);
       const ok = await confirm({
-        title: "Replace everything with this import?",
-        body: `The file contains ${data.tasks.length} tasks, ${data.sessions.length} sessions, ${data.notes.length} notes and ${data.habits.length} habits. Your current local data will be overwritten.`,
-        confirmLabel: "Import & replace", danger: true,
+        title: "Restore backup and replace current data?",
+        body: `The file contains ${data.tasks.length} tasks, ${data.sessions.length} sessions, ${data.notes.length} notes, and ${data.habits.length} habits. Your current local data will be replaced and re-encrypted with this device's key.`,
+        confirmLabel: "Import & replace",
+        danger: true,
       });
       if (!ok) return;
       set(() => ({
         version: STATE_VERSION,
-        projects: data.projects, tasks: data.tasks, habits: data.habits ?? [], folders: data.folders ?? [],
-        notes: data.notes ?? [], sessions: data.sessions, dayLogs: data.dayLogs ?? {}, tagColors: data.tagColors ?? {},
+        projects: data.projects,
+        tasks: data.tasks,
+        habits: data.habits ?? [],
+        folders: data.folders ?? [],
+        notes: data.notes ?? [],
+        sessions: data.sessions,
+        dayLogs: data.dayLogs ?? {},
+        tagColors: data.tagColors ?? {},
         settings: {
-          ...DEFAULT_SETTINGS, ...(data.settings ?? {}),
+          ...DEFAULT_SETTINGS,
+          ...(data.settings ?? {}),
           reportWidgets: { ...DEFAULT_SETTINGS.reportWidgets, ...(data.settings?.reportWidgets ?? {}) },
           shortcuts: { ...DEFAULT_SETTINGS.shortcuts, ...(data.settings?.shortcuts ?? {}) },
-          tokens: data.settings?.tokens ?? {}, customQuotes: data.settings?.customQuotes ?? [],
+          tokens: data.settings?.tokens ?? {},
+          customQuotes: data.settings?.customQuotes ?? [],
           zenPanels: { ...DEFAULT_SETTINGS.zenPanels, ...(data.settings?.zenPanels ?? {}) },
         },
         meta: { createdAt: data.meta?.createdAt ?? Date.now(), lastGreetingDay: data.meta?.lastGreetingDay ?? null },
       }));
-      toast("Import complete — history restored", "ok");
-      setImportPwOpen(false); setImportPayload(null);
+      toast("Import complete — vault successfully restored!", "ok");
+      setImportPwOpen(false);
+      setImportPayload(null);
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Import failed";
       if (password !== null) setImportErr(msg);
@@ -449,10 +477,30 @@ export function SettingsView() {
     }
   };
 
+  const handleImportSqlite = async (f: File) => {
+    try {
+      const res = await importVaultBackupFromFile(f);
+      if (res.success) {
+        toast("SQLite database restored successfully! Reloading...", "ok");
+        setTimeout(() => window.location.reload(), 600);
+      } else if (res.error && res.error !== "Cancelled") {
+        toast("SQLite import error: " + res.error, "err");
+      }
+    } catch (err) {
+      toast("SQLite import failed: " + String(err), "err");
+    }
+  };
+
   const onImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];
     e.target.value = "";
     if (!f) return;
+
+    if (f.name.endsWith(".sqlite3") || f.name.endsWith(".db")) {
+      handleImportSqlite(f);
+      return;
+    }
+
     const reader = new FileReader();
     reader.onerror = () => {
       toast("Error reading the selected file from your device", "err");
@@ -460,13 +508,20 @@ export function SettingsView() {
     reader.onload = async () => {
       const text = String(reader.result ?? "").trim();
       try {
-        const env = JSON.parse(text) as { kind?: string };
+        const env = JSON.parse(text) as { kind?: string; lifelog_format?: string };
         if (env?.kind === "backup") {
-          setImportPayload(text); setImportPw(""); setImportErr(""); setImportPwOpen(true);
+          setImportPayload(text);
+          setImportPw("");
+          setImportErr("");
+          setImportPwOpen(true);
           return;
         }
         await finishImport(text, null);
       } catch {
+        if (text.startsWith("SQLite format 3")) {
+          handleImportSqlite(f);
+          return;
+        }
         toast("Could not read that file — not valid LifeLog or JSON data", "err");
       }
     };
@@ -1528,62 +1583,20 @@ export function SettingsView() {
 
             {/* Backups & Export */}
             {section(
-              "Encrypted Vault & Backups",
-              "Everything lives locally on this device. High-performance SQLite database with row-level AES-256-GCM encryption and zero passwords needed in daily use.",
+              "Local Vault & Backups",
+              "Everything is encrypted at rest in high-performance SQLite using your local device key with zero passwords needed in daily use.",
               (
                 <div className="flex flex-col gap-3">
-                  <div className="flex flex-wrap gap-2">
-                    <Btn variant="soft" onClick={exportPlain}>
-                      <Download size={13} /> Export JSON (full history)
-                    </Btn>
-                    <label
-                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-[10px] border px-3 py-[7px] text-[13px] font-bold transition-all hover:opacity-85"
-                      style={{
-                        background: "var(--panel2)",
-                        borderColor: "var(--line)",
-                        color: "var(--text)",
-                      }}
-                    >
-                      <Upload size={13} /> Import file (.lifelog / .json)
-                      <input
-                        type="file"
-                        accept="*/*,.json,.lifelog,application/json,text/plain,application/octet-stream"
-                        className="hidden"
-                        onChange={onImportFile}
-                      />
-                    </label>
-
-                    <Btn
-                      variant="soft"
-                      onClick={() => {
-                        const pasted = prompt("Paste your LifeLog backup or export JSON here:");
-                        if (!pasted || !pasted.trim()) return;
-                        try {
-                          const env = JSON.parse(pasted.trim()) as { kind?: string };
-                          if (env?.kind === "backup") {
-                            setImportPayload(pasted.trim()); setImportPw(""); setImportErr(""); setImportPwOpen(true);
-                            return;
-                          }
-                          finishImport(pasted.trim(), null);
-                        } catch {
-                          toast("Invalid data — must be valid LifeLog JSON", "err");
-                        }
-                      }}
-                    >
-                      <FileText size={13} /> Paste backup
-                    </Btn>
-                  </div>
-
                   {/* 1. SQLite Database Engine Status */}
                   <div className="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-1.5 text-[12px] font-bold text-emerald-400">
                         <Database size={13} />
                         <span>Unified SQLite Database Engine</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono">1ms WAL · E2EE</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-mono">1ms WAL · Device-Bound AES-256</span>
                       </div>
                       <div className="text-[11px] font-mono text-[var(--mut)] truncate" title={electronStorage?.sqliteFile || electronStorage?.file || "In-Memory / OPFS SQLite (Browser)"}>
-                        Database: {electronStorage?.sqliteFile || electronStorage?.file || "IndexedDB / OPFS SQLite WASM Engine"}
+                        Storage: {electronStorage?.sqliteFile || electronStorage?.file || "IndexedDB / OPFS SQLite WASM Engine"}
                       </div>
                       {electronStorage?.attachmentsDir && (
                         <div className="text-[11px] font-mono text-cyan-400/80 truncate" title={electronStorage.attachmentsDir}>
@@ -1606,22 +1619,107 @@ export function SettingsView() {
                     )}
                   </div>
 
-                  {/* 2. 12-Word Recovery Phrase */}
+                  {/* 2. Universal Snapshot & Migration Card */}
+                  <div className="rounded-xl border p-3.5 flex flex-col gap-3" style={{ borderColor: "var(--line)", background: "var(--panel)" }}>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="space-y-1 min-w-0">
+                        <div className="flex items-center gap-2 font-bold text-[13px] text-[var(--text)]">
+                          <Download size={15} style={{ color: "var(--accent)" }} />
+                          <span>Universal Backup & Migration (.lifelog)</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/15 text-indigo-400 font-mono">PC ↔ Phone</span>
+                        </div>
+                        <div className="text-[11.5px] text-[var(--mut)]">
+                          Complete portable database snapshot with all notes, tasks, habits, and attachments. 100% compatible across Desktop, Android, and Web.
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t" style={{ borderColor: "var(--line)" }}>
+                      <Btn
+                        variant="primary"
+                        onClick={handleExportLifelogSnapshot}
+                        className="gap-1.5 text-xs font-bold cursor-pointer shadow-sm"
+                      >
+                        <Download size={13} /> Export Portable Snapshot (.lifelog)
+                      </Btn>
+
+                      <Btn
+                        variant="outline"
+                        onClick={() => {
+                          setExportPw1("");
+                          setExportPw2("");
+                          setExportPwErr("");
+                          setExportPwOpen(true);
+                        }}
+                        className="gap-1.5 text-xs font-bold cursor-pointer"
+                      >
+                        <Lock size={12} /> Password-Protect (.lifelog)
+                      </Btn>
+
+                      <label
+                        className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all hover:opacity-85 shadow-sm active:scale-95"
+                        style={{
+                          background: "var(--panel2)",
+                          borderColor: "var(--line)",
+                          color: "var(--text)",
+                        }}
+                      >
+                        <Upload size={12} /> Import Backup (.lifelog / .json)
+                        <input
+                          type="file"
+                          accept="*/*,.lifelog,.json,.sqlite3,.db,application/json,text/plain"
+                          className="hidden"
+                          onChange={onImportFile}
+                        />
+                      </label>
+
+                      <Btn
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const pasted = prompt("Paste your LifeLog backup or export JSON here:");
+                          if (!pasted || !pasted.trim()) return;
+                          try {
+                            const env = JSON.parse(pasted.trim()) as { kind?: string };
+                            if (env?.kind === "backup") {
+                              setImportPayload(pasted.trim()); setImportPw(""); setImportErr(""); setImportPwOpen(true);
+                              return;
+                            }
+                            finishImport(pasted.trim(), null);
+                          } catch {
+                            toast("Invalid data — must be valid LifeLog JSON", "err");
+                          }
+                        }}
+                        className="gap-1.5 text-xs font-semibold cursor-pointer"
+                      >
+                        <FileText size={12} /> Paste JSON
+                      </Btn>
+                    </div>
+
+                    <div className="text-[11px] text-[var(--mut)] bg-amber-500/10 border border-amber-500/20 rounded-lg px-2.5 py-1.5 flex items-start gap-1.5">
+                      <AlertCircle size={13} className="text-amber-400 shrink-0 mt-0.5" />
+                      <span>
+                        <strong>Security Tip:</strong> Unencrypted portable snapshots are intended for easy migration or trusted offline drives. Delete snapshot files after use or use password protection if uploading to cloud storage.
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* 3. 12-Word Recovery Phrase */}
                   <div className="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
                     <div className="space-y-1 min-w-0">
                       <div className="flex items-center gap-1.5 text-[12px] font-bold text-amber-400">
                         <Key size={13} />
-                        <span>12-Word Vault Recovery Phrase</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-mono">Zero Passwords</span>
+                        <span>12-Word Hardware Recovery Phrase</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/10 text-amber-400 font-mono">Optional</span>
                       </div>
                       <div className="text-[11px] font-semibold text-[var(--mut)]">
-                        Bound to your device hardware. Save these 12 words to restore your vault or unlock backups on another device.
+                        Emergency recovery words generated on this device. Useful if migrating to another device manually.
                       </div>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Btn
                         size="sm"
-                        variant="primary"
+                        variant="soft"
                         onClick={handleOpenPhraseModal}
                         className="gap-1.5 text-xs font-bold cursor-pointer"
                       >
@@ -1635,46 +1733,6 @@ export function SettingsView() {
                       >
                         <Upload size={12} /> Restore Phrase
                       </Btn>
-                    </div>
-                  </div>
-
-                  {/* 3. Universal Cross-Platform Backup (.lifelog) */}
-                  <div className="rounded-xl border p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-1.5 text-[12px] font-bold" style={{ color: "var(--accent)" }}>
-                        <Download size={13} />
-                        <span>Universal Backup & Restore (.lifelog)</span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/10 text-indigo-400 font-mono">PC ↔ Phone</span>
-                      </div>
-                      <div className="text-[11px] font-semibold text-[var(--mut)]">
-                        Complete encrypted SQLite database snapshot with all notes, habits, and attachments. 100% cross-device compatible.
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Btn
-                        size="sm"
-                        variant="primary"
-                        onClick={handleExportLifelog}
-                        className="gap-1.5 text-xs font-bold cursor-pointer"
-                      >
-                        <Download size={12} /> Export Vault
-                      </Btn>
-                      <label
-                        className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all hover:opacity-85 shadow-sm active:scale-95"
-                        style={{
-                          background: "var(--panel2)",
-                          borderColor: "var(--line)",
-                          color: "var(--text)",
-                        }}
-                      >
-                        <Upload size={12} /> Import Vault
-                        <input
-                          type="file"
-                          accept="*/*,.lifelog,.sqlite3,.db"
-                          className="hidden"
-                          onChange={handleImportLifelog}
-                        />
-                      </label>
                     </div>
                   </div>
                 </div>
@@ -2122,6 +2180,106 @@ export function SettingsView() {
           value={restorePhraseInput}
           onChange={(e) => setRestorePhraseInput(e.target.value)}
         />
+      </Modal>
+
+      {/* Unencrypted Snapshot Export Advisory Modal */}
+      <Modal
+        open={showUnencryptedWarningModal}
+        onClose={() => setShowUnencryptedWarningModal(false)}
+        title="⚠️ Unencrypted Portable Snapshot Exported"
+        width={480}
+        footer={
+          <Btn variant="primary" onClick={() => setShowUnencryptedWarningModal(false)} className="font-bold">
+            Got it, I understand
+          </Btn>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-[13px] text-[var(--text)] font-semibold">
+            Your complete LifeLog database snapshot has been exported to your downloads as a portable <code className="px-1.5 py-0.5 rounded bg-[var(--panel2)] font-mono text-xs">.lifelog</code> file.
+          </p>
+
+          <div className="p-3.5 rounded-xl border border-amber-500/30 bg-amber-500/10 space-y-2 text-xs text-[var(--text)]">
+            <div className="flex items-center gap-2 font-bold text-amber-400">
+              <AlertCircle size={15} />
+              <span>Important Security & Privacy Advice</span>
+            </div>
+            <ul className="space-y-1.5 list-disc list-inside text-[var(--mut)] font-medium leading-relaxed">
+              <li><strong className="text-[var(--text)]">Unencrypted by Design:</strong> This file is not password-protected so you can freely restore or migrate across devices with 0 passwords.</li>
+              <li><strong className="text-[var(--text)]">Delete After Use:</strong> Once you import this file on your target device, permanently delete this snapshot from your computer or downloads folder.</li>
+              <li><strong className="text-[var(--text)]">Trusted Storage Only:</strong> Keep it temporarily on trusted offline drives or USB sticks. Do <em>not</em> upload to public clouds or email.</li>
+              <li><strong className="text-[var(--text)]">For Cloud Storage:</strong> If you want to backup to Google Drive or Dropbox, use the <strong className="text-[var(--text)]">Password-Protect (.lifelog)</strong> option instead.</li>
+            </ul>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Password-Protect Backup Modal */}
+      <Modal
+        open={exportPwOpen}
+        onClose={() => {
+          setExportPwOpen(false);
+          setExportPw1("");
+          setExportPw2("");
+          setExportPwErr("");
+        }}
+        title="🔒 Password-Protect Backup (.lifelog)"
+        width={440}
+        footer={
+          <>
+            <Btn
+              variant="ghost"
+              onClick={() => {
+                setExportPwOpen(false);
+                setExportPw1("");
+                setExportPw2("");
+                setExportPwErr("");
+              }}
+            >
+              Cancel
+            </Btn>
+            <Btn
+              variant="primary"
+              disabled={!exportPw1 || !exportPw2}
+              onClick={handleExportPasswordProtected}
+              className="gap-1.5 font-bold"
+            >
+              <Lock size={12} /> Encrypt & Export
+            </Btn>
+          </>
+        }
+      >
+        <p className="text-[12.5px] font-semibold text-[var(--mut)] mb-3">
+          Create a sealed AES-256-GCM encrypted backup. Safe to upload to Google Drive, Dropbox, or send via email.
+        </p>
+        <div className="space-y-2.5">
+          <input
+            type="password"
+            className="inp w-full text-xs"
+            placeholder="Master password (min 4 characters)"
+            value={exportPw1}
+            onChange={(e) => {
+              setExportPw1(e.target.value);
+              setExportPwErr("");
+            }}
+          />
+          <input
+            type="password"
+            className="inp w-full text-xs"
+            placeholder="Confirm master password"
+            value={exportPw2}
+            onChange={(e) => {
+              setExportPw2(e.target.value);
+              setExportPwErr("");
+            }}
+            onKeyDown={(e) => e.key === "Enter" && handleExportPasswordProtected()}
+          />
+        </div>
+        {exportPwErr && (
+          <div className="mt-2 text-[12px] font-bold text-red-400">
+            {exportPwErr}
+          </div>
+        )}
       </Modal>
     </div>
   );

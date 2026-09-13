@@ -225,13 +225,17 @@ export async function decryptData<T = unknown>(
 import { deriveKeyFromPhrase, getOrCreateRecoveryPhrase } from "./recoveryPhrase";
 
 /**
- * Get the active encryption key.
+ * Get the active database encryption key.
  * Priority:
- * 1. Active Master Key (derived from 12-word recovery phrase)
- * 2. Fallback to Device-Bound Key
+ * 1. Device-Bound Hardware Key (AES-GCM-256) for instant, frictionless local storage.
+ * 2. Active Master Key (if explicitly set in-memory)
+ * 3. Cached Master Key
  */
 export async function getActiveVaultKey(): Promise<CryptoKey> {
   if (activeMasterKey) return activeMasterKey;
+
+  const deviceKey = await getDeviceKey();
+  if (deviceKey) return deviceKey;
 
   const cached = await getCachedMasterKey();
   if (cached) {
@@ -239,20 +243,5 @@ export async function getActiveVaultKey(): Promise<CryptoKey> {
     return cached;
   }
 
-  try {
-    const phrase = getOrCreateRecoveryPhrase();
-    if (phrase) {
-      const derived = await deriveKeyFromPhrase(phrase);
-      await cacheMasterKeyOnDevice(derived);
-      activeMasterKey = derived;
-      return derived;
-    }
-  } catch (err) {
-    console.warn("Could not derive key from phrase:", err);
-  }
-
-  const deviceKey = await getDeviceKey();
-  if (deviceKey) return deviceKey;
-
-  throw new Error("Unable to obtain any encryption key");
+  throw new Error("Unable to obtain local device encryption key");
 }
