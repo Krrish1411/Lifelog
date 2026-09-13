@@ -1659,7 +1659,14 @@ export function SettingsView() {
                       >
                         <Download size={12} /> Export Vault
                       </Btn>
-                      <label className="btn btn-outline btn-sm gap-1.5 text-xs font-bold cursor-pointer">
+                      <label
+                        className="inline-flex cursor-pointer items-center justify-center gap-1.5 rounded-xl border px-3 py-1.5 text-xs font-bold transition-all hover:opacity-85 shadow-sm active:scale-95"
+                        style={{
+                          background: "var(--panel2)",
+                          borderColor: "var(--line)",
+                          color: "var(--text)",
+                        }}
+                      >
                         <Upload size={12} /> Import Vault
                         <input
                           type="file"

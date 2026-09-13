@@ -269,8 +269,8 @@ export function webLoadAllData(): SqliteAllData {
   };
 }
 
-export function webExportDatabase(): Uint8Array {
-  const db = getWebDb();
+export async function webExportDatabase(): Promise<Uint8Array> {
+  const db = await initWebDatabase();
   return db.export();
 }
 

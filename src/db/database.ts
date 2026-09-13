@@ -439,8 +439,10 @@ export async function exportVaultBackup(): Promise<{ success: boolean; path?: st
 
   // Web / Mobile: Export SQLite WASM binary buffer as downloadable .lifelog file
   try {
-    const bytes = webExportDatabase();
-    const blob = new Blob([bytes.buffer as ArrayBuffer], { type: "application/octet-stream" });
+    await initDb();
+    const bytes = await webExportDatabase();
+    const arrayBuffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
+    const blob = new Blob([arrayBuffer], { type: "application/octet-stream" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     const now = new Date().toISOString().slice(0, 10);
@@ -449,7 +451,7 @@ export async function exportVaultBackup(): Promise<{ success: boolean; path?: st
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
     return { success: true, path: a.download };
   } catch (err) {
     console.error("Export backup error:", err);
