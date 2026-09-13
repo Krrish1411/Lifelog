@@ -80,6 +80,24 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
         setPinStatus(null);
         setIsPinConnecting(false);
         triggerHaptic("success");
+      } else if (nextStatus === "idle") {
+        // Reset pairing UI cleanly on peer disconnect or session reset
+        setMasterEstablished(false);
+        setMasterRole("master");
+        setMasterDeviceName("");
+        setPeerSelectedRole(null);
+        setPin("");
+        setOfferQrUrl("");
+        setAnswerQrUrl("");
+        setOfferTicket("");
+        setAnswerTicket("");
+        setAnswerInput("");
+        setJoinTicketInput("");
+        if (typeof localStorage !== "undefined") {
+          localStorage.removeItem("lifelog.sync.masterEstablished");
+          localStorage.removeItem("lifelog.sync.masterRole");
+          localStorage.removeItem("lifelog.sync.masterDeviceName");
+        }
       }
     });
     return unsub;
@@ -249,12 +267,14 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     return localStorage.getItem(MASTER_DEVICE_KEY) || "";
   });
   const [syncDirection, setSyncDirection] = useState<"clone_to_peer" | "two_way">("clone_to_peer");
+  const [peerSelectedRole, setPeerSelectedRole] = useState<{ mode: "clone_to_peer" | "two_way"; masterDeviceName: string } | null>(null);
   const [isApplyingSync, setIsApplyingSync] = useState(false);
 
   // Listen to remote peer establishing master setup
   useEffect(() => {
     const unsub = syncEngine.onMasterSetup((event) => {
       setMasterEstablished(true);
+      setPeerSelectedRole(null);
       const role = event.mode === "clone_to_peer" ? "secondary" : "two_way";
       setMasterRole(role);
       setMasterDeviceName(event.masterDeviceName);
@@ -267,6 +287,28 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     });
     return unsub;
   }, []);
+
+  // Listen to live role selection by peer (first-connection dynamic reaction)
+  useEffect(() => {
+    const unsub = syncEngine.onRoleSelection((event) => {
+      setPeerSelectedRole(event);
+      triggerHaptic("medium");
+      toast(
+        event.mode === "clone_to_peer"
+          ? `👑 ${event.masterDeviceName} claimed Primary Control!`
+          : `🔄 ${event.masterDeviceName} selected Two-Way Merge!`,
+        "ok"
+      );
+    });
+    return unsub;
+  }, []);
+
+  const handleSelectDirection = (dir: "clone_to_peer" | "two_way") => {
+    setSyncDirection(dir);
+    setPeerSelectedRole(null);
+    const myDevice = deviceName.trim() || "LifeLog Device";
+    syncEngine.sendRoleSelection(dir, myDevice).catch(() => {});
+  };
 
   const demoTasksCount = state?.tasks ? state.tasks.filter(isSeedTask).length : 0;
   const isConnectedOrSyncing = status === "connected" || status === "syncing";
@@ -332,10 +374,10 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     }
   };
 
-  const handleDisconnect = () => {
+  const handleDisconnect = async () => {
     triggerHaptic("warning");
     handleStopPinHost();
-    syncEngine.disconnect();
+    await syncEngine.disconnect(true);
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem(MASTER_KEY);
       localStorage.removeItem(MASTER_ROLE_KEY);
@@ -344,6 +386,7 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
     setMasterEstablished(false);
     setMasterRole("master");
     setMasterDeviceName("");
+    setPeerSelectedRole(null);
     setOfferTicket("");
     setAnswerTicket("");
     setAnswerInput("");
@@ -444,79 +487,109 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
 
             {/* Sync Direction & Device Role Selector (1st Connection Setup or Active Status) */}
             {!masterEstablished ? (
-              <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--panel)] space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-display font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
-                    <ArrowLeftRight size={14} className="text-[var(--accent)]" /> 1st Connection: Device In Control Setup
-                  </span>
-                  <span className="text-[10px] font-mono text-[var(--accent)] px-2 py-0.5 rounded-md bg-[var(--accent-soft)]">
-                    Action Required
-                  </span>
-                </div>
-                <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
-                  To guarantee zero sync errors or leftover sample demo entries, select which device is in control for this initial connection. 
-                  Choosing <b>This Device as Master</b> will wipe data on the peer and mirror your local data starting from 0.
-                </p>
-
-                <div className="grid grid-cols-1 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setSyncDirection("clone_to_peer")}
-                    className={cn(
-                      "flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer",
-                      syncDirection === "clone_to_peer"
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
-                        : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
-                    )}
-                  >
-                    <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
-                      {syncDirection === "clone_to_peer" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+              peerSelectedRole && peerSelectedRole.mode === "clone_to_peer" ? (
+                <div className="p-4 rounded-xl border border-[var(--accent)]/40 bg-[var(--accent-soft)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-display font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
+                      <span>👑</span> Primary Control Claimed by {peerSelectedRole.masterDeviceName}
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
-                        <span>👑 Make THIS Device Primary (Wipe Peer &amp; Start from 0)</span>
-                        <span className="chip !py-0 !px-1.5 text-[9px] font-bold text-emerald-500 border-emerald-500/30">Recommended</span>
-                      </div>
-                      <p className="text-[11px] text-[var(--mut)] mt-1 leading-snug">
-                        This device is in control. Peer device data is completely cleared to 0 and replaced with your local tasks, notes, and habits. Guaranteed zero sync conflicts.
-                      </p>
-                    </div>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setSyncDirection("two_way")}
-                    className={cn(
-                      "flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer",
-                      syncDirection === "two_way"
-                        ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
-                        : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
-                    )}
-                  >
-                    <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
-                      {syncDirection === "two_way" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                    <span className="text-[10px] font-mono text-[var(--accent)] px-2 py-0.5 rounded-md bg-[var(--panel)] border border-[var(--line)]">
+                      Secondary Replica
                     </span>
-                    <div className="min-w-0 flex-1">
-                      <div className="font-bold text-xs text-[var(--text)]">
-                        🔄 Smart Two-Way Merge (Keep Both Devices)
-                      </div>
-                      <p className="text-[11px] text-[var(--mut)] mt-1 leading-snug">
-                        Retains data on both devices and exchanges new entries bidirectionally while automatically filtering out fresh demo tasks.
-                      </p>
+                  </div>
+                  <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                    <strong>{peerSelectedRole.masterDeviceName}</strong> has been selected as the Primary Device. 
+                    This device is configured as a secondary replica and will mirror all records starting from 0.
+                  </p>
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center gap-2 text-xs text-[var(--text)] font-mono">
+                      <RefreshCw size={13} className="animate-spin text-[var(--accent)]" />
+                      <span>Waiting for {peerSelectedRole.masterDeviceName} to initiate sync...</span>
                     </div>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectDirection("clone_to_peer")}
+                      className="text-[11px] text-[var(--accent)] hover:underline font-semibold cursor-pointer"
+                    >
+                      Make This Device Primary Instead
+                    </button>
+                  </div>
                 </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-[var(--line)] bg-[var(--panel)] space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-display font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
+                      <ArrowLeftRight size={14} className="text-[var(--accent)]" /> 1st Connection: Device In Control Setup
+                    </span>
+                    <span className="text-[10px] font-mono text-[var(--accent)] px-2 py-0.5 rounded-md bg-[var(--accent-soft)]">
+                      Action Required
+                    </span>
+                  </div>
+                  <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                    To guarantee zero sync errors or leftover sample demo entries, select which device is in control for this initial connection. 
+                    Choosing <b>This Device as Master</b> will wipe data on the peer and mirror your local data starting from 0.
+                  </p>
 
-                <Btn
-                  variant="primary"
-                  className="w-full justify-center gap-1.5 py-2.5 text-xs font-bold"
-                  onClick={handleExecuteSync}
-                  disabled={isApplyingSync}
-                >
-                  {isApplyingSync ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
-                  <span>{isApplyingSync ? "Setting Up Initial Sync..." : syncDirection === "clone_to_peer" ? `Establish Master: Wipe ${peer?.deviceName || "Peer"} & Mirror from 0` : "Establish Two-Way Synchronized Link"}</span>
-                </Btn>
-              </div>
+                  <div className="grid grid-cols-1 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectDirection("clone_to_peer")}
+                      className={cn(
+                        "flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer",
+                        syncDirection === "clone_to_peer"
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
+                          : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
+                      )}
+                    >
+                      <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
+                        {syncDirection === "clone_to_peer" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-xs text-[var(--text)] flex items-center gap-1.5">
+                          <span>👑 Make THIS Device Primary (Wipe Peer &amp; Start from 0)</span>
+                          <span className="chip !py-0 !px-1.5 text-[9px] font-bold text-emerald-500 border-emerald-500/30">Recommended</span>
+                        </div>
+                        <p className="text-[11px] text-[var(--mut)] mt-1 leading-snug">
+                          This device is in control. Peer device data is completely cleared to 0 and replaced with your local tasks, notes, and habits. Guaranteed zero sync conflicts.
+                        </p>
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleSelectDirection("two_way")}
+                      className={cn(
+                        "flex items-start gap-2.5 p-3 rounded-xl border text-left transition-all cursor-pointer",
+                        syncDirection === "two_way"
+                          ? "border-[var(--accent)] bg-[var(--accent-soft)] ring-1 ring-[var(--accent)]"
+                          : "border-[var(--line)] bg-[var(--panel2)] hover:border-[var(--line-hi)]"
+                      )}
+                    >
+                      <span className="mt-0.5 h-4 w-4 rounded-full border border-[var(--line)] flex items-center justify-center shrink-0">
+                        {syncDirection === "two_way" && <span className="h-2 w-2 rounded-full bg-[var(--accent)]" />}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-xs text-[var(--text)]">
+                          🔄 Smart Two-Way Merge (Keep Both Devices)
+                        </div>
+                        <p className="text-[11px] text-[var(--mut)] mt-1 leading-snug">
+                          Retains data on both devices and exchanges new entries bidirectionally while automatically filtering out fresh demo tasks.
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+
+                  <Btn
+                    variant="primary"
+                    className="w-full justify-center gap-1.5 py-2.5 text-xs font-bold"
+                    onClick={handleExecuteSync}
+                    disabled={isApplyingSync}
+                  >
+                    {isApplyingSync ? <RefreshCw size={14} className="animate-spin" /> : <RefreshCw size={14} />}
+                    <span>{isApplyingSync ? "Setting Up Initial Sync..." : syncDirection === "clone_to_peer" ? `Establish Master: Wipe ${peer?.deviceName || "Peer"} & Mirror from 0` : "Establish Two-Way Synchronized Link"}</span>
+                  </Btn>
+                </div>
+              )
             ) : (
               <div className="p-3.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 space-y-2.5">
                 <div className="flex items-center justify-between">

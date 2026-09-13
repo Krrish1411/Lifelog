@@ -5,11 +5,9 @@ const fs = require('fs');
 let mainWindow = null;
 let popoutWindow = null;
 
-// Optimize Chromium memory, GPU render targets & V8 garbage collection footprint
-app.commandLine.appendSwitch('enable-low-end-device-mode');
-app.commandLine.appendSwitch('js-flags', '--max-old-space-size=128');
+// Optimize Chromium memory and V8 garbage collection footprint without degrading display quality
+app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
 app.commandLine.appendSwitch('renderer-process-limit', '1');
-app.commandLine.appendSwitch('disable-gpu-memory-buffer-compositor-resources');
 
 // Ensure persistent local storage directory and encrypted attachments folder
 function getStoragePaths() {

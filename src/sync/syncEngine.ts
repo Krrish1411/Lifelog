@@ -54,6 +54,9 @@ class WebRTCSyncEngine {
   private statusListeners: Set<SyncStatusListener> = new Set();
   private stateApplyListeners: Set<StateApplyListener> = new Set();
   private masterSetupListeners: Set<(event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void> = new Set();
+  private roleSelectionListeners: Set<(event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void> = new Set();
+  private heartbeatTimer: any = null;
+  private lastHeartbeatReceived: number = Date.now();
 
   // Relay SSE / streaming state
   private eventSource: EventSource | null = null;
@@ -149,20 +152,63 @@ class WebRTCSyncEngine {
     });
   }
 
+  public onRoleSelection(listener: (event: { mode: "clone_to_peer" | "two_way"; masterDeviceName: string }) => void): () => void {
+    this.roleSelectionListeners.add(listener);
+    return () => this.roleSelectionListeners.delete(listener);
+  }
+
+  public async sendRoleSelection(mode: "clone_to_peer" | "two_way", masterDeviceName: string): Promise<void> {
+    if (this.status !== "connected") return;
+    await this.sendMessage({
+      type: "ROLE_SELECTION",
+      mode,
+      masterDeviceName,
+      timestamp: Date.now(),
+    });
+  }
+
+  private startHeartbeat(): void {
+    this.stopHeartbeat();
+    this.lastHeartbeatReceived = Date.now();
+    this.heartbeatTimer = setInterval(() => {
+      if (this.status !== "connected") {
+        this.stopHeartbeat();
+        return;
+      }
+      this.sendMessage({ type: "PING", timestamp: Date.now() }).catch(() => {});
+      if (Date.now() - this.lastHeartbeatReceived > 26000) {
+        console.warn("[Sync] Heartbeat timeout: peer silent for >26s. Resetting.");
+        this.disconnect(false).catch(() => {});
+      }
+    }, 10000);
+  }
+
+  private stopHeartbeat(): void {
+    if (this.heartbeatTimer) {
+      clearInterval(this.heartbeatTimer);
+      this.heartbeatTimer = null;
+    }
+  }
+
   private setStatus(status: SyncStatus, peer?: SyncPeerInfo | null) {
     this.status = status;
     if (peer !== undefined) this.connectedPeer = peer;
-    if (status === "connected" && this.activePin && this.sharedSecret && typeof localStorage !== "undefined") {
-      try {
-        const saved: SavedSyncSession = {
-          pin: this.activePin,
-          secret: this.sharedSecret,
-          role: this.isHost ? "host" : "joiner",
-          deviceName: this.connectedPeer?.deviceName || "Peer",
-          peer: this.connectedPeer,
-        };
-        localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(saved));
-      } catch {}
+    if (status === "connected") {
+      this.startHeartbeat();
+      if (this.activePin && this.sharedSecret && typeof localStorage !== "undefined") {
+        try {
+          const saved: SavedSyncSession = {
+            pin: this.activePin,
+            secret: this.sharedSecret,
+            role: this.isHost ? "host" : "joiner",
+            deviceName: this.connectedPeer?.deviceName || "Peer",
+            peer: this.connectedPeer,
+          };
+          localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(saved));
+        } catch {}
+      }
+    } else {
+      this.stopHeartbeat();
     }
     for (const l of this.statusListeners) {
       l(this.status, this.connectedPeer ?? undefined);
@@ -234,7 +280,7 @@ class WebRTCSyncEngine {
     deviceName: string,
     onProgress?: (msg: string) => void
   ): Promise<{ stop: () => void }> {
-    this.disconnect();
+    await this.disconnect(false);
     this.setStatus("connecting");
     this.isHost = true;
     this.activePin = pin;
@@ -279,7 +325,7 @@ class WebRTCSyncEngine {
     return {
       stop: () => {
         if (this.status !== "connected") {
-          this.disconnect();
+          this.disconnect(false).catch(() => {});
         }
       },
     };
@@ -294,7 +340,7 @@ class WebRTCSyncEngine {
     deviceName: string,
     onProgress?: (msg: string) => void
   ): Promise<void> {
-    this.disconnect();
+    await this.disconnect(false);
     this.setStatus("connecting");
     this.isHost = false;
     this.activePin = pin;
@@ -400,7 +446,7 @@ class WebRTCSyncEngine {
   }
 
   public async createSession(deviceName: string): Promise<string> {
-    this.disconnect();
+    await this.disconnect(false);
     this.setStatus("connecting");
     this.transportType = "webrtc";
 
@@ -427,7 +473,7 @@ class WebRTCSyncEngine {
   }
 
   public async joinSession(rawTicket: string, deviceName: string): Promise<string> {
-    this.disconnect();
+    await this.disconnect(false);
     this.setStatus("connecting");
     this.transportType = "webrtc";
 
@@ -627,7 +673,18 @@ class WebRTCSyncEngine {
   }
 
   private async handleIncomingMessage(msg: SyncMessage, selfPeer?: SyncPeerInfo) {
-    if (msg.type === "HANDSHAKE") {
+    this.lastHeartbeatReceived = Date.now();
+
+    if (msg.type === "PING") {
+      this.sendMessage({ type: "PONG", timestamp: Date.now() }).catch(() => {});
+    } else if (msg.type === "PONG") {
+      // heartbeat timestamp already updated
+    } else if (msg.type === "ROLE_SELECTION") {
+      const masterName = msg.masterDeviceName || this.connectedPeer?.deviceName || "Primary Device";
+      for (const l of this.roleSelectionListeners) {
+        l({ mode: msg.mode, masterDeviceName: masterName });
+      }
+    } else if (msg.type === "HANDSHAKE") {
       this.connectedPeer = msg.peer;
       this.setStatus("connected", msg.peer);
 
@@ -681,7 +738,7 @@ class WebRTCSyncEngine {
     } else if (msg.type === "DELTA_STATE") {
       this.dispatchStateMerge((local) => mergeDelta(local, msg.delta));
     } else if (msg.type === "DISCONNECT") {
-      this.disconnect();
+      await this.disconnect(false);
     }
   }
 
@@ -691,12 +748,20 @@ class WebRTCSyncEngine {
     }
   }
 
-  public disconnect(): void {
-    if (this.status === "connected" && this.outgoingTopic && this.sharedSecret) {
-      this.sendMessage({
-        type: "DISCONNECT",
-        timestamp: Date.now(),
-      }).catch(() => {});
+  public async disconnect(notifyPeer: boolean = true): Promise<void> {
+    this.stopHeartbeat();
+
+    if (notifyPeer && (this.status === "connected" || this.status === "syncing") && this.outgoingTopic && this.sharedSecret) {
+      try {
+        await this.sendMessage({
+          type: "DISCONNECT",
+          timestamp: Date.now(),
+        });
+        // Brief 120ms buffer to ensure packet flushes out of network stack
+        await new Promise((r) => setTimeout(r, 120));
+      } catch (err) {
+        console.warn("[Sync] Error dispatching disconnect packet:", err);
+      }
     }
 
     if (this.eventSource) {
@@ -713,7 +778,12 @@ class WebRTCSyncEngine {
     }
 
     if (typeof localStorage !== "undefined") {
-      localStorage.removeItem(SYNC_STORAGE_KEY);
+      try {
+        localStorage.removeItem(SYNC_STORAGE_KEY);
+        localStorage.removeItem("lifelog.sync.masterEstablished");
+        localStorage.removeItem("lifelog.sync.masterRole");
+        localStorage.removeItem("lifelog.sync.masterDeviceName");
+      } catch {}
     }
 
     this.outgoingTopic = "";
