@@ -775,11 +775,18 @@ export function TasksView({
   const activeTag =
     typeof sel === "object" && "tag" in sel ? sel.tag : null;
 
+  const isGlass = state.settings.layout === "glass";
+
   return (
     <div className="flex w-full max-w-full items-start gap-4">
       {/* Desktop Docked Sidebar (hidden on mobile, visible on lg+) */}
       <aside
-        className="hidden lg:flex w-[240px] xl:w-[260px] shrink-0 flex-col sticky top-[calc(68px+var(--safe-top,0px))] h-[calc(100vh-84px-var(--safe-top,0px)-var(--safe-bottom,0px))] rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-xs select-none overflow-hidden"
+        className={cn(
+          "hidden lg:flex w-[240px] xl:w-[260px] shrink-0 self-start flex-col sticky rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-xs select-none overflow-hidden",
+          isGlass
+            ? "top-[calc(72px+var(--safe-top,0px))] h-[calc(100vh-92px-var(--safe-top,0px)-var(--safe-bottom,0px))]"
+            : "top-[calc(20px+var(--safe-top,0px))] h-[calc(100vh-40px-var(--safe-top,0px)-var(--safe-bottom,0px))]"
+        )}
       >
         <div className="flex-1 overflow-y-auto overscroll-contain p-3 space-y-3.5 pr-2">
           {/* Smart Views */}

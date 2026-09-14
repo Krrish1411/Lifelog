@@ -179,6 +179,7 @@ export function NotesView() {
         loadedFor.current = selId;
         dirty.current = false;
         setDraft({ title: fmtNoteName(dayIso), text: "" });
+        setPreview("write");
         return;
       }
       if (!note) return;
@@ -188,6 +189,9 @@ export function NotesView() {
       setDraft({ title: note.title, text: "" });
       getDeviceKey().then((k) => decryptText(k, note.blob)).then((text) => {
         setDraft((d) => (loadedFor.current === selId ? { ...d, text } : d));
+        if (loadedFor.current === selId && isSwitching) {
+          setPreview(text.trim().length === 0 ? "write" : "preview");
+        }
       });
     }
   }, [selId, state.notes]);
@@ -262,6 +266,7 @@ export function NotesView() {
     const folderId = folderSel !== "all" ? folderSel : state.folders.find((f) => f.id !== "f-daily")?.id ?? "f-daily";
     set((s) => ({ ...s, notes: [{ id, title: "Untitled note", folderId, createdAt: Date.now(), updatedAt: Date.now(), blob: { plain: "" }, daily: false, day: null }, ...s.notes] }));
     loadedFor.current = null;
+    setPreview("write");
     setSelId(id);
     setDrawerOpen(false);
     toast("Note created — encrypted as you type", "ok");
@@ -555,6 +560,7 @@ export function NotesView() {
     }));
     setExpandedFolders((prev) => ({ ...prev, [actualFolder]: true }));
     loadedFor.current = null;
+    setPreview("write");
     setSelId(id);
     setDrawerOpen(false);
     toast("Note created — encrypted as you type", "ok");
@@ -1057,7 +1063,7 @@ export function NotesView() {
                   </>
                 ) : (
                   <div
-                    className="note-page flex-1 min-h-[320px] w-full overflow-y-auto rounded-2xl border border-[var(--line)] bg-[var(--bg)]/40 p-5 mt-4 leading-relaxed pb-28"
+                    className="note-page flex-1 min-h-[320px] w-full rounded-2xl border border-[var(--line)] bg-[var(--bg)]/40 p-5 mt-4 leading-relaxed pb-28"
                     onClick={(e) => {
                       const target = e.target as HTMLElement;
                       const chip = target.closest<HTMLElement>("[data-wiki-type]");

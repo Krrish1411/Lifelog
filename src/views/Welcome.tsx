@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   ArrowRight,
   BarChart3,
@@ -83,11 +83,23 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
     }
   };
 
+  const containerRef = useRef<HTMLDivElement>(null);
+
   // Smooth scroll helper that takes sticky header offset into account
   const scrollToSection = (e: React.MouseEvent, id: string) => {
     e.preventDefault();
     const el = document.getElementById(id);
-    if (el) {
+    if (el && containerRef.current) {
+      const headerHeight = 76;
+      const elRect = el.getBoundingClientRect();
+      const containerRect = containerRef.current.getBoundingClientRect();
+      const targetScrollTop =
+        containerRef.current.scrollTop + (elRect.top - containerRect.top) - headerHeight;
+      containerRef.current.scrollTo({
+        top: Math.max(0, targetScrollTop),
+        behavior: "smooth",
+      });
+    } else if (el) {
       el.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   };
@@ -269,6 +281,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
   return (
     <div
+      ref={containerRef}
       className="fixed inset-0 h-screen w-full overflow-y-auto scroll-smooth bg-[var(--bg)] text-[var(--text)] select-text z-50 overscroll-y-auto cursor-default transition-colors duration-200"
       style={{
         paddingBottom: "max(calc(var(--safe-bottom, 12px) + 32px), 64px)",
@@ -306,12 +319,12 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
         />
       </div>
 
-      {/* Top Header Navigation Bar (Refined & Balanced) */}
+      {/* Top Header Navigation Bar (Refined & Balanced Full Width) */}
       <header
-        className="sticky top-0 z-50 border-b border-[var(--line)] bg-[var(--panel)]/95 backdrop-blur-xl select-none transition-colors shadow-xs"
+        className="sticky top-0 z-50 w-full border-b border-[var(--line)] bg-[var(--panel)]/95 backdrop-blur-xl select-none transition-colors shadow-xs"
         style={{ paddingTop: "var(--safe-top, 0px)" }}
       >
-        <div className="mx-auto flex max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8 py-3">
+        <div className="w-full flex items-center justify-between px-4 sm:px-8 md:px-12 py-3">
           {/* Brand Logo & Version Badge */}
           <div className="flex items-center gap-2.5">
             <div className="relative flex items-center justify-center">

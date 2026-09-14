@@ -1,14 +1,7 @@
-import type { Habit, Note, Project, Session, State, Task, TimerMode } from "../types";
+import type { Habit, Note, Project, Session, State, Task } from "../types";
 import { DEFAULT_SETTINGS, STATE_VERSION } from "../types";
 import { getDeviceKey, encryptText } from "../utils/crypto";
-import { addDaysIso, fmtNoteName, isoDate, todayIso, uid } from "../utils/core";
-
-/* Deterministic PRNG so first-run data is stable */
-let seedNum = 987654321;
-function rnd(): number {
-  seedNum = (seedNum * 1664525 + 1013904223) % 4294967296;
-  return seedNum / 4294967296;
-}
+import { fmtNoteName, todayIso, uid } from "../utils/core";
 
 function mkTask(p: Partial<Task> & { projectId: string; title: string }): Task {
   return {
@@ -24,38 +17,12 @@ function mkTask(p: Partial<Task> & { projectId: string; title: string }): Task {
     snoozedUntil: null,
     done: false,
     doneAt: null,
-    createdAt: Date.now() - 20 * 86400000,
+    createdAt: Date.now() - 2 * 86400000,
     subtasks: [],
     recurrence: null,
     completions: [],
     privateNote: null,
     ...p,
-  };
-}
-
-function mkSession(
-  taskId: string | null,
-  startedAt: number,
-  minutes: number,
-  mode: TimerMode | "break",
-  plannedMin: number | null,
-  withPause = false,
-): Session {
-  const pauses =
-    withPause && mode !== "break"
-      ? [{ at: startedAt + 10 * 60000, resumeAt: startedAt + 12 * 60000 }]
-      : [];
-  const pauseMs = pauses.reduce((a, p) => a + ((p.resumeAt ?? startedAt) - p.at), 0);
-  return {
-    id: uid(),
-    taskId,
-    subtaskId: null,
-    mode,
-    startedAt,
-    endedAt: startedAt + minutes * 60000 + pauseMs,
-    plannedMin,
-    pauses,
-    status: "done",
   };
 }
 
@@ -84,7 +51,7 @@ export async function buildSeedState(): Promise<State> {
     durationMin: 30,
     notes: "Welcome! LifeLog is designed to be calm, local-first, and distraction-free. Don't worry about using every feature at once — start by exploring at your own pace.",
     subtasks: [
-      { id: uid(), title: "Explore today's agenda on the Cockpit dashboard", done: true, doneAt: now - 1 * day },
+      { id: uid(), title: "Explore today's agenda on the Cockpit dashboard", done: false, doneAt: null },
       { id: uid(), title: "Check off your first task or subtask", done: false, doneAt: null },
       { id: uid(), title: "Press Ctrl+K (or Cmd+K) to open the Universal Command Palette", done: false, doneAt: null },
       { id: uid(), title: "Head to Settings to pick your favorite theme and layout engine", done: false, doneAt: null },
@@ -159,92 +126,17 @@ export async function buildSeedState(): Promise<State> {
     ],
   });
 
-  const tGoals = mkTask({
-    projectId: "p-work",
-    title: "Draft weekly project sprint goals",
-    emoji: "🎯",
-    priority: "medium",
-    tags: ["planning"],
-    estimateMin: 30,
-    due: today,
-  });
+  /* Starter routine guiding tasks only — no mock completed tasks */
+  const tasks = [tWelcome, tNotes, tFocus, tCalendar, tSync];
 
-  const tDesign = mkTask({
-    projectId: "p-work",
-    title: "Review client design deliverables",
-    emoji: "🎨",
-    priority: "high",
-    tags: ["design"],
-    estimateMin: 45,
-    due: addDaysIso(today, 1),
-  });
-
-  const tWalk = mkTask({
-    projectId: "p-life",
-    title: "Afternoon 20-minute walk & recharge",
-    emoji: "🚶",
-    priority: "medium",
-    tags: ["wellness"],
-    estimateMin: 20,
-    due: today,
-  });
-
-  const tRead = mkTask({
-    projectId: "p-life",
-    title: "Read 15 pages of non-fiction",
-    emoji: "📖",
-    priority: "low",
-    tags: ["reading"],
-    estimateMin: 20,
-    due: today,
-  });
-
-  const done = (t: Task, daysAgo: number): Task => ({ ...t, done: true, doneAt: now - daysAgo * day });
-  const cInstall = done(mkTask({ projectId: "p-onboarding", title: "Installed LifeLog v1.0.0 Sovereign Edition", emoji: "✨", tags: ["setup"], estimateMin: 5, createdAt: now - 3 * day }), 2);
-  const cVault = done(mkTask({ projectId: "p-onboarding", title: "Configured local encrypted vault", emoji: "🔒", tags: ["security"], estimateMin: 10, createdAt: now - 2 * day }), 1);
-  const cLayout = done(mkTask({ projectId: "p-onboarding", title: "Explored 5 visual layout engines", emoji: "🎨", tags: ["appearance"], estimateMin: 15, createdAt: now - 1 * day }), 1);
-
-  const tasks = [tWelcome, tNotes, tFocus, tCalendar, tSync, tGoals, tDesign, tWalk, tRead, cInstall, cVault, cLayout];
-
-  /* ------- sessions: realistic history across ~5 weeks ------- */
+  /* Clean focus slate — 0 focus sessions, 0 past hours */
   const sessions: Session[] = [];
-  const pool = [tWelcome, tNotes, tFocus, tGoals, tDesign, cVault, cLayout];
-  for (let back = 31; back >= 1; back--) {
-    if (back <= 21 && rnd() < 0.22) continue; // some rest days
-    const iso = addDaysIso(today, -back);
-    const count = back <= 21 ? 2 + Math.floor(rnd() * 3) : 1 + Math.floor(rnd() * 2);
-    let hour = 8 + Math.floor(rnd() * 2);
-    for (let i = 0; i < count; i++) {
-      const task = pool[Math.floor(rnd() * pool.length)];
-      const minute = rnd() < 0.5 ? 0 : 30;
-      const start = new Date(iso + "T00:00:00").getTime() + hour * 3600000 + minute * 60000;
-      const roll = rnd();
-      if (roll < 0.45) {
-        sessions.push(mkSession(task.id, start, 25, "pomodoro", 25, rnd() < 0.25));
-        if (rnd() < 0.6) sessions.push(mkSession(null, start + 27 * 60000, 5, "break", 5));
-      } else if (roll < 0.75) {
-        sessions.push(mkSession(task.id, start, 40 + Math.floor(rnd() * 15), "countdown", 50));
-      } else {
-        sessions.push(mkSession(task.id, start, 30 + Math.floor(rnd() * 55), "flow", null));
-      }
-      hour += 1 + Math.floor(rnd() * 3);
-      if (hour > 19) hour = 9;
-    }
-  }
-  sessions.push(mkSession(cInstall.id, now - 2 * day + 10 * 3600000, 45, "flow", null));
-  sessions.sort((a, b) => a.startedAt - b.startedAt);
 
-  /* ------- habits ------- */
-  const hReadDates: string[] = [];
-  for (let back = 30; back >= 1; back--) if (rnd() < 0.78) hReadDates.push(addDaysIso(today, -back));
-  const hRunDates: string[] = [];
-  for (let back = 45; back >= 1; back--) if (rnd() < 0.42) hRunDates.push(addDaysIso(today, -back));
-  const hMedDates: string[] = [];
-  for (let back = 12; back >= 1; back--) hMedDates.push(addDaysIso(today, -back));
+  /* Fresh habits — 0 mock completions */
   const habits: Habit[] = [
-    { id: "h-read", name: "Read 20 pages", emoji: "📖", color: "#6fbf8e", createdAt: now - 31 * day, completions: hReadDates },
-    { id: "h-run", name: "Morning run", emoji: "🏃", color: "#4fa3a5", createdAt: now - 46 * day, completions: hRunDates },
-    { id: "h-med", name: "Meditate 10 min", emoji: "🧘", color: "#e8a33d", createdAt: now - 13 * day, completions: hMedDates },
+    { id: "h-read", name: "Read 20 pages", emoji: "📖", color: "#6fbf8e", createdAt: now - 3 * day, completions: [] },
+    { id: "h-run", name: "Morning run", emoji: "🏃", color: "#4fa3a5", createdAt: now - 3 * day, completions: [] },
+    { id: "h-med", name: "Meditate 10 min", emoji: "🧘", color: "#e8a33d", createdAt: now - 3 * day, completions: [] },
   ];
 
   /* ------- notes (encrypted) ------- */
@@ -369,25 +261,8 @@ Your data is yours — forever.`;
     await mkNote("App ideas", "f-ideas", "• Weekly review template with 3 reflection questions\n• Offline voice memo attachments\n• Quick capture hotkey from anywhere in OS", false, null, 4),
   ];
 
-  /* ------- day logs ------- */
-  const moods = [
-    "Steady. Deep morning block felt effortless.",
-    "A bit restless — too many tabs, too little plan.",
-    "Good momentum after the run.",
-    "Low energy after lunch; recovered with a walk.",
-    "Proud — cleared the admin pile.",
-    "Calm, focused, ended early.",
-  ];
-  const moodEmojis = ["🙂", "😐", "😄", "🙂", "😕", "😄", "🤩", "😐"];
+  /* ------- day logs: clean slate ------- */
   const dayLogs: State["dayLogs"] = {};
-  for (let back = 16; back >= 1; back--) {
-    dayLogs[addDaysIso(today, -back)] = {
-      energy: 2 + Math.floor(rnd() * 4),
-      moodEmoji: moodEmojis[(back + 1) % moodEmojis.length],
-      mood: moods[(back + 1) % moods.length],
-      updatedAt: now - back * day + 20 * 3600000,
-    };
-  }
 
   return {
     version: STATE_VERSION,
