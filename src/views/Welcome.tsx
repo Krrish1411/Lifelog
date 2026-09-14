@@ -44,6 +44,7 @@ import {
   Fingerprint,
   Copy,
   ShieldAlert,
+  X,
 } from "lucide-react";
 import { Btn, cn } from "../components/ui";
 import { APP_VERSION } from "../types";
@@ -139,10 +140,27 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
   };
 
   // PWA Install Prompt & APK Security Proof Handlers
+  const [activeDownloadDetail, setActiveDownloadDetail] = useState<"ios" | "android" | null>(null);
   const [copiedSha, setCopiedSha] = useState(false);
   const [pwaPrompt, setPwaPrompt] = useState<any>(() =>
     typeof window !== "undefined" ? (window as any).__pwaInstallPrompt || null : null
   );
+
+  const handleToggleDetail = (tab: "ios" | "android") => {
+    setActiveDownloadDetail((prev) => {
+      const next = prev === tab ? null : tab;
+      if (next) {
+        setTimeout(() => {
+          const id = next === "ios" ? "ios-guide" : "apk-security";
+          const el = document.getElementById(id);
+          if (el) {
+            el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+          }
+        }, 60);
+      }
+      return next;
+    });
+  };
 
   useEffect(() => {
     const handlePwaPrompt = () => {
@@ -320,10 +338,10 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
       type: "Native Arm64 APK Release",
       ext: ".apk",
       size: "6.8 MB",
-      href: "https://github.com/Krrish1411/Lifelog-Releases/releases/latest",
+      href: "#apk-security",
       badge: "0/70 Clean Scan",
       note: "Offline SQLite with local P2P sync across your devices",
-      action: "download",
+      action: "toggle-android",
     },
     {
       os: "iOS / iPadOS",
@@ -334,7 +352,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
       href: "#ios-guide",
       badge: "Safari PWA",
       note: "Safari > Share > Add to Home Screen for native feel",
-      action: "ios-guide",
+      action: "toggle-ios",
     },
     {
       os: "Web Browser",
@@ -989,12 +1007,20 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {platforms.map((pl, idx) => {
               const Icon = pl.icon;
-              const isIos = pl.action === "ios-guide";
+              const isIos = pl.action === "toggle-ios";
+              const isAndroid = pl.action === "toggle-android";
               const isWeb = pl.action === "launch-web";
+              const isIosOpen = activeDownloadDetail === "ios" && isIos;
+              const isAndroidOpen = activeDownloadDetail === "android" && isAndroid;
+              const isOpen = isIosOpen || isAndroidOpen;
 
               const handleClick = (e: React.MouseEvent) => {
                 if (isIos) {
-                  scrollToSection(e, "ios-guide");
+                  e.preventDefault();
+                  handleToggleDetail("ios");
+                } else if (isAndroid) {
+                  e.preventDefault();
+                  handleToggleDetail("android");
                 } else if (isWeb) {
                   e.preventDefault();
                   onEnter();
@@ -1004,19 +1030,38 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               return (
                 <a
                   key={idx}
-                  href={pl.href}
+                  href={isIos ? "#ios-guide" : isAndroid ? "#apk-security" : pl.href}
                   onClick={handleClick}
-                  target={isIos || isWeb ? undefined : "_blank"}
-                  rel={isIos || isWeb ? undefined : "noopener noreferrer"}
-                  className="flex flex-col justify-between p-5 rounded-2xl border border-[var(--line)] bg-[var(--panel)] shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-md group cursor-pointer"
+                  target={isIos || isAndroid || isWeb ? undefined : "_blank"}
+                  rel={isIos || isAndroid || isWeb ? undefined : "noopener noreferrer"}
+                  className={cn(
+                    "flex flex-col justify-between p-5 rounded-2xl border shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md group cursor-pointer",
+                    isOpen
+                      ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/25 bg-[var(--panel2)]"
+                      : "border-[var(--line)] bg-[var(--panel)] hover:border-[var(--accent)]"
+                  )}
                 >
                   <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                      <div className="h-11 w-11 rounded-xl flex items-center justify-center border border-[var(--line)] bg-[var(--panel2)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-white transition-all">
+                      <div
+                        className={cn(
+                          "h-11 w-11 rounded-xl flex items-center justify-center border transition-all",
+                          isOpen
+                            ? "bg-[var(--accent)] text-white border-transparent"
+                            : "border-[var(--line)] bg-[var(--panel2)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-white"
+                        )}
+                      >
                         <Icon size={22} />
                       </div>
-                      <span className="rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2 py-0.5 text-[11px] font-mono font-bold text-[var(--text)]">
-                        {pl.badge}
+                      <span
+                        className={cn(
+                          "rounded-full border px-2 py-0.5 text-[11px] font-mono font-bold transition-colors",
+                          isOpen
+                            ? "border-[var(--accent)] bg-[var(--accent-soft)] text-[var(--accent)]"
+                            : "border-[var(--line)] bg-[var(--panel2)] text-[var(--text)]"
+                        )}
+                      >
+                        {isOpen ? "Expanded" : pl.badge}
                       </span>
                     </div>
 
@@ -1028,8 +1073,28 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                   </div>
 
                   <div className="mt-5 pt-3.5 border-t border-[var(--line)] flex items-center justify-between text-xs sm:text-sm font-bold text-[var(--accent)]">
-                    <span>{isIos ? "View Safari Guide" : isWeb ? "Launch Web App" : `Download ${pl.ext}`}</span>
-                    {isIos || isWeb ? (
+                    <span>
+                      {isIos
+                        ? isIosOpen
+                          ? "Hide Safari Guide"
+                          : "View Safari Guide"
+                        : isAndroid
+                        ? isAndroidOpen
+                          ? "Hide Safety & APK"
+                          : "Safety Proof & Download"
+                        : isWeb
+                        ? "Launch Web App"
+                        : `Download ${pl.ext}`}
+                    </span>
+                    {isIos || isAndroid ? (
+                      <ChevronRight
+                        size={15}
+                        className={cn(
+                          "transition-transform duration-200",
+                          isOpen ? "-rotate-90 text-[var(--accent)]" : "rotate-90"
+                        )}
+                      />
+                    ) : isWeb ? (
                       <ArrowRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
                     ) : (
                       <Download size={15} className="group-hover:translate-y-0.5 transition-transform" />
@@ -1040,254 +1105,291 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
             })}
           </div>
 
-          {/* DEDICATED SECTION A: iOS / iPadOS Safari PWA Guide */}
-          <div id="ios-guide" className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-6 sm:p-8 shadow-sm space-y-6 scroll-mt-24">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--line)] pb-5">
-              <div className="flex items-center gap-3">
-                <div className="p-3 rounded-2xl bg-[var(--panel2)] border border-[var(--line)] text-[var(--text)] shrink-0">
-                  <Apple size={26} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-display text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
-                      iOS & iPadOS Installation Guide
-                    </h3>
-                    <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-bold text-emerald-500">
-                      Zero App Store Fees
-                    </span>
+          {/* DEDICATED SECTION A: iOS / iPadOS Safari PWA Guide (Opens conditionally on click) */}
+          {activeDownloadDetail === "ios" && (
+            <div
+              id="ios-guide"
+              className="rounded-3xl border border-[var(--accent)]/50 bg-[var(--panel)] p-6 sm:p-8 shadow-md space-y-6 scroll-mt-24 transition-all animate-in fade-in zoom-in-95 duration-200"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--line)] pb-5">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-[var(--panel2)] border border-[var(--line)] text-[var(--text)] shrink-0">
+                    <Apple size={26} />
                   </div>
-                  <p className="text-xs sm:text-sm font-medium text-[var(--text)]/75 mt-0.5">
-                    Apple restricts independent APK sideloading, but LifeLog runs as a first-class native Progressive Web App on iPhone and iPad with zero App Store restrictions or fees.
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={onEnter}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all shrink-0 cursor-pointer shadow-sm"
-              >
-                <span>Launch Web App</span>
-                <ArrowRight size={15} />
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">1</span>
-                  <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step One</span>
-                </div>
-                <div className="font-display text-base font-bold text-[var(--text)]">Open in Safari</div>
-                <p className="text-xs text-[var(--text)]/75 leading-relaxed">
-                  Launch the official LifeLog URL (<code className="font-mono text-[var(--accent)]">https://krrish1411.github.io/Lifelog-Releases/</code>) inside Apple Safari on your iPhone or iPad.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">2</span>
-                  <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step Two</span>
-                </div>
-                <div className="font-display text-base font-bold text-[var(--text)]">Tap the Share Icon</div>
-                <p className="text-xs text-[var(--text)]/75 leading-relaxed">
-                  Tap the <strong>Share</strong> button at the bottom of Safari (the square icon with an upward arrow <span className="font-bold text-[var(--accent)]">⎋ / 📤</span>).
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
-                <div className="flex items-center justify-between">
-                  <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">3</span>
-                  <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step Three</span>
-                </div>
-                <div className="font-display text-base font-bold text-[var(--text)]">Tap "Add to Home Screen"</div>
-                <p className="text-xs text-[var(--text)]/75 leading-relaxed">
-                  Scroll down the share sheet, tap <strong>"Add to Home Screen"</strong> (➕), and tap <strong>"Add"</strong> in the top-right corner.
-                </p>
-              </div>
-            </div>
-
-            <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm text-[var(--text)]">
-              <div className="flex items-start sm:items-center gap-2.5">
-                <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5 sm:mt-0" />
-                <span>
-                  <strong>Native Standalone Experience:</strong> Launches with zero Safari address bars, fluid 120Hz scrolling, and local encrypted SQLite database persistence right on your iOS device.
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* DEDICATED SECTION B: Android APK Security, Malware Proof & PWA Fallback */}
-          <div id="apk-security" className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-6 sm:p-8 shadow-sm space-y-6 scroll-mt-24">
-            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-[var(--line)] pb-5">
-              <div className="flex items-start gap-3.5">
-                <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 shrink-0">
-                  <ShieldCheck size={28} />
-                </div>
-                <div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <h3 className="font-display text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
-                      Android APK Safety & Anti-Malware Proof
-                    </h3>
-                    <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-0.5 text-xs font-mono font-bold text-emerald-500">
-                      0/70 Clean Scan • 100% Malware-Free
-                    </span>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-display text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
+                        iOS & iPadOS Installation Guide
+                      </h3>
+                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-bold text-emerald-500">
+                        Zero App Store Fees
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-[var(--text)]/75 mt-0.5">
+                      Apple restricts independent APK sideloading, but LifeLog runs as a first-class native Progressive Web App on iPhone and iPad with zero App Store restrictions or fees.
+                    </p>
                   </div>
-                  <p className="text-xs sm:text-sm font-medium text-[var(--text)]/75 mt-1 max-w-3xl leading-relaxed">
-                    When downloading APKs directly from GitHub releases, Android displays a default generic security warning (<em>"File might be harmful"</em>) because the file was compiled outside Google Play. We believe in radical transparency: don't just take our word for it — here is undeniable mathematical, cryptographic, and zero-telemetry proof:
-                  </p>
                 </div>
-              </div>
-            </div>
-
-            {/* 4 Pillars of Proof */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Proof 1: VirusTotal 0/70 Clean Scan */}
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
-                    <CheckCircle2 size={15} />
-                    Multi-Engine Antivirus Audit
-                  </span>
-                  <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-emerald-500">
-                    0/70 Clean
-                  </span>
-                </div>
-                <div className="font-display text-base font-bold text-[var(--text)]">
-                  VirusTotal 70+ Security Vendor Verification
-                </div>
-                <p className="text-xs text-[var(--text)]/75 leading-relaxed">
-                  Every released APK is audited against 70+ industry-leading security engines including <strong>Kaspersky, Bitdefender, Microsoft Defender, Google, Avast, and ESET</strong>. Zero malware, zero adware, zero tracking backdoors.
-                </p>
-                <a
-                  href="https://www.virustotal.com/gui/home/upload"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-1"
-                >
-                  <span>Verify APK on VirusTotal</span>
-                  <ExternalLink size={12} />
-                </a>
-              </div>
-
-              {/* Proof 2: Cryptographic SHA-256 Checksum */}
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
-                    <Fingerprint size={15} />
-                    Cryptographic Integrity
-                  </span>
-                  <span className="rounded bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-mono font-bold text-[var(--accent)]">
-                    SHA-256
-                  </span>
-                </div>
-                <div className="font-display text-base font-bold text-[var(--text)]">
-                  Immutable Hash Verification
-                </div>
-                <p className="text-xs text-[var(--text)]/75 leading-relaxed">
-                  Verify that the APK you downloaded is bit-for-bit identical to the compiled source and has not been intercepted, tampered with, or modified:
-                </p>
-                <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-[11px] text-[var(--text)]/90">
-                  <code>sha256sum LifeLog-1.0.0.apk</code>
+                <div className="flex items-center gap-2.5 shrink-0">
                   <button
-                    onClick={handleCopySha}
-                    className="ml-2 p-1 text-[var(--accent)] hover:opacity-80 cursor-pointer"
-                    title="Copy Verification Command"
+                    onClick={onEnter}
+                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all cursor-pointer shadow-sm"
                   >
-                    {copiedSha ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                    <span>Launch Web App</span>
+                    <ArrowRight size={15} />
+                  </button>
+                  <button
+                    onClick={() => setActiveDownloadDetail(null)}
+                    className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-[var(--text)]/70 hover:text-[var(--text)] hover:bg-[var(--line)] transition-all cursor-pointer"
+                    title="Close Guide"
+                  >
+                    <X size={18} />
                   </button>
                 </div>
               </div>
 
-              {/* Proof 3: Zero Invasive Permissions */}
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
-                    <Lock size={15} />
-                    Zero Invasive Permissions
-                  </span>
-                  <span className="rounded bg-blue-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-500">
-                    Strict Sandbox
-                  </span>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">1</span>
+                    <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step One</span>
+                  </div>
+                  <div className="font-display text-base font-bold text-[var(--text)]">Open in Safari</div>
+                  <p className="text-xs text-[var(--text)]/75 leading-relaxed">
+                    Launch the official LifeLog URL (<code className="font-mono text-[var(--accent)]">https://krrish1411.github.io/Lifelog-Releases/</code>) inside Apple Safari on your iPhone or iPad.
+                  </p>
                 </div>
-                <div className="font-display text-base font-bold text-[var(--text)]">
-                  Transparent Android Manifest Audit
+
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">2</span>
+                    <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step Two</span>
+                  </div>
+                  <div className="font-display text-base font-bold text-[var(--text)]">Tap the Share Icon</div>
+                  <p className="text-xs text-[var(--text)]/75 leading-relaxed">
+                    Tap the <strong>Share</strong> button at the bottom of Safari (the square icon with an upward arrow <span className="font-bold text-[var(--accent)]">⎋ / 📤</span>).
+                  </p>
                 </div>
-                <div className="space-y-1.5 text-xs text-[var(--text)]/75">
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-500 font-bold">✕</span>
-                    <span><strong>No Camera</strong> or Video access</span>
+
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
+                  <div className="flex items-center justify-between">
+                    <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">3</span>
+                    <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step Three</span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-500 font-bold">✕</span>
-                    <span><strong>No Microphone</strong> or Audio recording</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-500 font-bold">✕</span>
-                    <span><strong>No GPS / Location</strong> tracking</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-500 font-bold">✕</span>
-                    <span><strong>No Contacts, Phone, or SMS</strong> inspection</span>
-                  </div>
-                  <div className="flex items-center gap-2 text-emerald-500 font-semibold pt-1 border-t border-[var(--line)]">
-                    <CheckCircle2 size={13} />
-                    <span>Only Local Alarms & Peer-to-Peer Wi-Fi Sync</span>
-                  </div>
+                  <div className="font-display text-base font-bold text-[var(--text)]">Tap "Add to Home Screen"</div>
+                  <p className="text-xs text-[var(--text)]/75 leading-relaxed">
+                    Scroll down the share sheet, tap <strong>"Add to Home Screen"</strong> (➕), and tap <strong>"Add"</strong> in the top-right corner.
+                  </p>
                 </div>
               </div>
 
-              {/* Proof 4: Zero Outbound Telemetry (Network Inspected) */}
-              <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                    <Radio size={15} />
-                    Zero Telemetry
-                  </span>
-                  <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-amber-500">
-                    Network Verified
+              <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm text-[var(--text)]">
+                <div className="flex items-start sm:items-center gap-2.5">
+                  <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5 sm:mt-0" />
+                  <span>
+                    <strong>Native Standalone Experience:</strong> Launches with zero Safari address bars, fluid 120Hz scrolling, and local encrypted SQLite database persistence right on your iOS device.
                   </span>
                 </div>
-                <div className="font-display text-base font-bold text-[var(--text)]">
-                  Zero Spyware & Zero Tracking Network Proof
-                </div>
-                <p className="text-xs text-[var(--text)]/75 leading-relaxed">
-                  Malware exists to steal or exfiltrate private data. LifeLog contains zero tracking SDKs, zero advertising networks, and zero analytics pixels. You can verify this independently by monitoring device traffic with Wireshark, Proxyman, or Little Snitch: <strong>zero outbound packets on startup</strong>.
-                </p>
-                <a
-                  href="https://github.com/Krrish1411/Lifelog-Releases#-zero-cloud-sovereignty-guarantee"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-1"
-                >
-                  <span>Review Sovereignty Guarantee</span>
-                  <ExternalLink size={12} />
-                </a>
               </div>
             </div>
+          )}
 
-            {/* THE PWA FALLBACK (Direct User Request) */}
-            <div className="rounded-2xl border border-[var(--accent)]/40 bg-[var(--accent-soft)] p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div className="space-y-1 max-w-2xl">
-                <div className="flex items-center gap-2">
-                  <Globe size={18} className="text-[var(--accent)] shrink-0" />
-                  <span className="font-display text-sm sm:text-base font-black text-[var(--text)]">
-                    Hesitant about installing APKs? Use the 1-Tap Sandboxed PWA Option!
-                  </span>
+          {/* DEDICATED SECTION B: Android APK Security, Malware Proof & PWA Fallback (Opens conditionally on click) */}
+          {activeDownloadDetail === "android" && (
+            <div
+              id="apk-security"
+              className="rounded-3xl border border-emerald-500/40 bg-[var(--panel)] p-6 sm:p-8 shadow-md space-y-6 scroll-mt-24 transition-all animate-in fade-in zoom-in-95 duration-200"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-[var(--line)] pb-5">
+                <div className="flex items-start gap-3.5">
+                  <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 shrink-0">
+                    <ShieldCheck size={28} />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-display text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
+                        Android APK Safety & Verification Center
+                      </h3>
+                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-0.5 text-xs font-mono font-bold text-emerald-500">
+                        0/70 Clean Scan • 100% Malware-Free
+                      </span>
+                    </div>
+                    <p className="text-xs sm:text-sm font-medium text-[var(--text)]/75 mt-1 max-w-3xl leading-relaxed">
+                      When downloading APKs directly from GitHub releases, Android displays a default generic security warning (<em>"File might be harmful"</em>) because the file was compiled outside Google Play. We believe in radical transparency: don't just take our word for it — here is undeniable mathematical, cryptographic, and zero-telemetry proof:
+                    </p>
+                  </div>
                 </div>
-                <p className="text-xs sm:text-sm text-[var(--text)]/80 leading-relaxed">
-                  If you prefer not to sideload an APK or enable "Install unknown apps", you don't have to! You can run LifeLog directly inside your mobile browser (Chrome, Brave, Firefox) or install it as a PWA in 1 tap. It runs inside the browser's hardware-isolated OS sandbox with zero device file access, yet gives you the exact same offline SQLite database, instant sub-5ms boot, and full-screen experience.
-                </p>
+                <div className="flex items-center gap-2 shrink-0">
+                  <a
+                    href="https://github.com/Krrish1411/Lifelog-Releases/releases/latest"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all cursor-pointer"
+                  >
+                    <Download size={15} />
+                    <span>Download .apk</span>
+                  </a>
+                  <button
+                    onClick={() => setActiveDownloadDetail(null)}
+                    className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-[var(--text)]/70 hover:text-[var(--text)] hover:bg-[var(--line)] transition-all cursor-pointer"
+                    title="Close Proof"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
               </div>
-              <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
-                <button
-                  onClick={handleInstallPwa}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all cursor-pointer shadow-sm"
-                >
-                  <span>{pwaPrompt ? "Install PWA App" : "Open Sovereign Web App"}</span>
-                  <ArrowRight size={15} />
-                </button>
+
+              {/* 4 Pillars of Proof */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Proof 1: VirusTotal 0/70 Clean Scan */}
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                      <CheckCircle2 size={15} />
+                      Multi-Engine Antivirus Audit
+                    </span>
+                    <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-emerald-500">
+                      0/70 Clean
+                    </span>
+                  </div>
+                  <div className="font-display text-base font-bold text-[var(--text)]">
+                    VirusTotal 70+ Security Vendor Verification
+                  </div>
+                  <p className="text-xs text-[var(--text)]/75 leading-relaxed">
+                    Every released APK is audited against 70+ industry-leading security engines including <strong>Kaspersky, Bitdefender, Microsoft Defender, Google, Avast, and ESET</strong>. Zero malware, zero adware, zero tracking backdoors.
+                  </p>
+                  <a
+                    href="https://www.virustotal.com/gui/home/upload"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-1"
+                  >
+                    <span>Verify APK on VirusTotal</span>
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+
+                {/* Proof 2: Cryptographic SHA-256 Checksum */}
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
+                      <Fingerprint size={15} />
+                      Cryptographic Integrity
+                    </span>
+                    <span className="rounded bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-mono font-bold text-[var(--accent)]">
+                      SHA-256
+                    </span>
+                  </div>
+                  <div className="font-display text-base font-bold text-[var(--text)]">
+                    Immutable Hash Verification
+                  </div>
+                  <p className="text-xs text-[var(--text)]/75 leading-relaxed">
+                    Verify that the APK you downloaded is bit-for-bit identical to the compiled source and has not been intercepted, tampered with, or modified:
+                  </p>
+                  <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-[11px] text-[var(--text)]/90">
+                    <code>sha256sum LifeLog-1.0.0.apk</code>
+                    <button
+                      onClick={handleCopySha}
+                      className="ml-2 p-1 text-[var(--accent)] hover:opacity-80 cursor-pointer"
+                      title="Copy Verification Command"
+                    >
+                      {copiedSha ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                    </button>
+                  </div>
+                </div>
+
+                {/* Proof 3: Zero Invasive Permissions */}
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
+                      <Lock size={15} />
+                      Zero Invasive Permissions
+                    </span>
+                    <span className="rounded bg-blue-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-500">
+                      Strict Sandbox
+                    </span>
+                  </div>
+                  <div className="font-display text-base font-bold text-[var(--text)]">
+                    Transparent Android Manifest Audit
+                  </div>
+                  <div className="space-y-1.5 text-xs text-[var(--text)]/75">
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-500 font-bold">✕</span>
+                      <span><strong>No Camera</strong> or Video access</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-500 font-bold">✕</span>
+                      <span><strong>No Microphone</strong> or Audio recording</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-500 font-bold">✕</span>
+                      <span><strong>No GPS / Location</strong> tracking</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-red-500 font-bold">✕</span>
+                      <span><strong>No Contacts, Phone, or SMS</strong> inspection</span>
+                    </div>
+                    <div className="flex items-center gap-2 text-emerald-500 font-semibold pt-1 border-t border-[var(--line)]">
+                      <CheckCircle2 size={13} />
+                      <span>Only Local Alarms & Peer-to-Peer Wi-Fi Sync</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Proof 4: Zero Outbound Telemetry (Network Inspected) */}
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                      <Radio size={15} />
+                      Zero Telemetry
+                    </span>
+                    <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-amber-500">
+                      Network Verified
+                    </span>
+                  </div>
+                  <div className="font-display text-base font-bold text-[var(--text)]">
+                    Zero Spyware & Zero Tracking Network Proof
+                  </div>
+                  <p className="text-xs text-[var(--text)]/75 leading-relaxed">
+                    Malware exists to steal or exfiltrate private data. LifeLog contains zero tracking SDKs, zero advertising networks, and zero analytics pixels. You can verify this independently by monitoring device traffic with Wireshark, Proxyman, or Little Snitch: <strong>zero outbound packets on startup</strong>.
+                  </p>
+                  <a
+                    href="https://github.com/Krrish1411/Lifelog-Releases#-zero-cloud-sovereignty-guarantee"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-1"
+                  >
+                    <span>Review Sovereignty Guarantee</span>
+                    <ExternalLink size={12} />
+                  </a>
+                </div>
+              </div>
+
+              {/* THE PWA FALLBACK (Direct User Request) */}
+              <div className="rounded-2xl border border-[var(--accent)]/40 bg-[var(--accent-soft)] p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="space-y-1 max-w-2xl">
+                  <div className="flex items-center gap-2">
+                    <Globe size={18} className="text-[var(--accent)] shrink-0" />
+                    <span className="font-display text-sm sm:text-base font-black text-[var(--text)]">
+                      Hesitant about installing APKs? Use the 1-Tap Sandboxed PWA Option!
+                    </span>
+                  </div>
+                  <p className="text-xs sm:text-sm text-[var(--text)]/80 leading-relaxed">
+                    If you prefer not to sideload an APK or enable "Install unknown apps", you don't have to! You can run LifeLog directly inside your mobile browser (Chrome, Brave, Firefox) or install it as a PWA in 1 tap. It runs inside the browser's hardware-isolated OS sandbox with zero device file access, yet gives you the exact same offline SQLite database, instant sub-5ms boot, and full-screen experience.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
+                  <button
+                    onClick={handleInstallPwa}
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all cursor-pointer shadow-sm"
+                  >
+                    <span>{pwaPrompt ? "Install PWA App" : "Open Sovereign Web App"}</span>
+                    <ArrowRight size={15} />
+                  </button>
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           <div className="text-center text-xs sm:text-sm text-[var(--text)]/75 font-semibold">
             All releases include verified SHA-256 checksums. Review releases on the{" "}
