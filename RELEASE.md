@@ -1,16 +1,49 @@
-# LifeLog v1.0.0 Sovereign Edition — Initial Public Launch 🚀
+# LifeLog Release Notes & Changelog 🚀
 
 > **"Your day, remembered. Your data, sovereign."**
 
-Welcome to the official **v1.0.0 Sovereign Edition** launch of **LifeLog** — an offline-first, zero-cloud personal operating system engineered to unify your tasks, encrypted second brain notes, habit cadences, and deep work into a single high-performance cockpit. 
-
-No subscriptions. No tracking pixels. No AI data scraping. 100% free and sovereign software.
+Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
 ---
 
-## 🔥 Why Shift to LifeLog? (LifeLog vs. Big Tech Cloud SaaS)
+## 🌟 v1.0.1 — Sovereign Polish & Stream Control Update (2026-09-14)
 
-If you are currently paying \$8 to \$25 every month for tools like Notion, Todoist, Evernote, or Obsidian Sync, here is why switching to LifeLog gives you complete peace of mind:
+### 🌊 1. Dynamic LifeLog Stream & Routine Control
+- **Full UI Toggle in Settings:** Introduced the **🌊 Enable LifeLog Stream Project** toggle under *Settings > LifeLog Stream & Project*.
+- **Distraction-Free Work Separation:** Easily separate everyday lifestyle routines (sleep, reading, vibe coding, meals, YouTube) from high-leverage professional tasks.
+- **Dynamic View Sanitization:** When toggled off, the built-in "Life Log" project and its routine timeline are seamlessly hidden from:
+  - **Day Log:** Routine entries and the 24-hour balance bar card are cleanly removed.
+  - **Reports & Daily Review:** Focus breakdowns exclude passive lifestyle tracking.
+  - **Time-Grid Calendar:** Routine time blocks are hidden to surface deep work tasks.
+  - **Tasks & Project Selectors:** Life Log project is excluded from active task queues.
+- **Zero-Loss Guarantee:** All historical routine data remains 100% encrypted in your local SQLite WAL database at rest. Enabling the toggle instantly restores every historical entry.
+
+### 📱 2. Mobile Ergonomics & Theme Cards
+- **Descriptive Theme Cards:** Redesigned mobile theme selection with visual card badges and descriptive summaries (*e.g., "Signature crimson on dark slate", "Warm sepia with low blue light", "Calming botanical green"*).
+- **Hidden Keyboard Hints on Touch Devices:** Automatically hides desktop keyboard shortcuts (<kbd>⌘K</kbd>, <kbd>N</kbd>, <kbd>T</kbd>) on touch screens and mobile viewports to keep interfaces clean and spacious.
+
+### 🖥️ 3. Desk Suite Workstation Solid Panels
+- **Zero Bleed-Through:** Applied solid panel background tokens (`var(--panel-solid)`) across the Desk layout sidebar, header, and split views, preventing text and background overlay bleed-through during intense multitasking.
+- **Workstation Contrast:** Sharper contrast borders and high-visibility active tab rails for long desktop coding sessions.
+
+### 🍱 4. Minimalist Bento Dashboard Defaults
+- **Cleaner First Impression:** Out-of-the-box Bento grid defaults set to a minimalist focus layout (`dailyNote: false`, `upcomingSchedule: false`), allowing users to opt into dense widget layouts when ready.
+
+### 🛡️ 5. P2P Sync Transparency & Community Covenant
+- **Explicit `*` Mark:** Added standard `*` indicators to all Peer-to-Peer Sync references across the Welcome page and documentation.
+- **Infrastructure Cost Transparency:** Added a community notice explaining the ongoing server and bandwidth costs required for encrypted WebRTC STUN/TURN signaling relays.
+- **Sovereign Covenant:** P2P sync remains completely zero-cloud and free thanks to voluntary community backing via [Buy Me a Coffee](https://buymeacoffee.com/Krrish1411).
+
+### ⚡ 6. Instant Service Worker Cache Invalidation (v1.0.1)
+- **Automatic Cache Purge:** Updated PWA cache key to `lifelog-pwa-v1.0.1`, ensuring all visiting browsers and installed PWAs automatically purge stale caches and fetch the latest build immediately upon launch.
+
+---
+
+## 🚀 v1.0.0 — Sovereign Edition Initial Public Launch (2026-09-14)
+
+### 🔥 Why Shift to LifeLog? (LifeLog vs. Big Tech Cloud SaaS)
+
+If you are paying \$8 to \$25/month for Notion, Todoist, Evernote, or Obsidian Sync, LifeLog provides complete sovereignty:
 
 | Feature / Philosophy | Big Tech Cloud SaaS (Notion, Todoist) | LifeLog Sovereign OS |
 |---|---|---|
@@ -25,9 +58,7 @@ If you are currently paying \$8 to \$25 every month for tools like Notion, Todoi
 
 ---
 
-## ⚡ The 7 Core Pillars of LifeLog
-
-LifeLog replaces 5 fragmented productivity apps with one unified, cohesive operating system:
+### ⚡ The 7 Core Pillars of LifeLog
 
 ```mermaid
 graph LR
@@ -78,7 +109,7 @@ graph LR
 
 ---
 
-## 🎨 5 Adaptive Layout Engines & 6 Free Core Themes
+### 🎨 5 Adaptive Layout Engines & 6 Free Core Themes
 
 - **5 Ergonomic Workspaces:**
   - **Liquid Glass:** Frosted acrylic glassmorphism with ambient depth layering.
@@ -95,7 +126,7 @@ graph LR
 
 ---
 
-## 📦 Official Binaries & Packages (v1.0.0 Sovereign Edition)
+### 📦 Official Binaries & Packages
 
 | Platform | Format | Package Type | Direct Download Link |
 |---|---|---|---|
@@ -109,9 +140,7 @@ graph LR
 
 ---
 
-## 🛡️ Android APK Safety & Anti-Malware Proof
-
-When downloading APKs directly, Android displays a default generic security warning (*"File might be harmful"*). We provide radical transparency and empirical proof:
+### 🛡️ Android APK Safety & Anti-Malware Proof
 
 1. **VirusTotal 0/70 Clean Scan:** Audited across 70+ cybersecurity engines (Kaspersky, Bitdefender, Microsoft Defender, Google, Avast, ESET). Zero malware, zero adware, zero spyware.
 2. **SHA-256 Checksum Verification:** Verify byte-for-byte authenticity using `sha256sum LifeLog-1.0.0.apk`.
@@ -121,21 +150,7 @@ When downloading APKs directly, Android displays a default generic security warn
 
 ---
 
-## 🔐 Cryptographic Binary Verification (SHA-256)
-
-To verify the integrity of your downloaded package before execution:
-
-```bash
-# On Linux / macOS
-sha256sum -c SHA256SUMS.txt
-
-# On Windows (PowerShell)
-Get-FileHash .\LifeLog-Setup-1.0.0.exe -Algorithm SHA256
-```
-
----
-
-## ☕ Support Independent Sovereign Software
+### ☕ Support Independent Sovereign Software
 
 LifeLog is 100% free, private sovereign software with zero ads, zero telemetry, zero venture capital interference, and zero recurring paywalls. If LifeLog brings peace and clarity to your daily rhythm, please consider fueling future R&D:
 

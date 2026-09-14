@@ -1,16 +1,15 @@
 {
-  "version": "1.0.0",
+  "version": "1.0.1",
   "releaseDate": "2026-09-14",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "Native SQLite WAL database engine with sub-millisecond query performance",
-    "Hardware device-bound AES-256-GCM authenticated row-level encryption",
-    "Pure Sovereign P2P sync over WebRTC DTLS data channels (Zero Central Cloud)",
-    "Dynamic mention autocompletion for Tasks (@), Projects (#), and Notes ([[)",
-    "Calendar habit slotting and drag-to-tray unscheduling",
-    "High-contrast exact-color PDF export engine with Executive Summary modes",
-    "Portal-mounted visual 3-way sync conflict resolver",
-    "Comprehensive guided onboarding tour and Second Brain starter notes"
+    "🌊 Dynamic LifeLog Stream & Routine Control: Toggle lifestyle routines from Day Log, Calendar, Reports, and Review without data loss",
+    "📱 Mobile theme card layout with descriptive palette summaries and touch optimization",
+    "⌨️ Automatically hidden desktop keyboard hints on touch devices for a cleaner interface",
+    "🖥️ Desk Suite layout solid panel backgrounds (var(--panel-solid)) preventing background bleed-through",
+    "🍱 Minimalist Bento dashboard defaults for a clean out-of-the-box experience",
+    "🛡️ P2P Sync transparency notice and community support covenant on Welcome page",
+    "⚡ PWA Service Worker cache invalidation (v1.0.1) for instant updates across browsers and mobile"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Setup-1.0.0.exe",
