@@ -10,7 +10,7 @@ const config: CapacitorConfig = {
   android: {
     backgroundColor: "#080b09",
     allowMixedContent: false,
-    webContentsDebuggingEnabled: true,
+    webContentsDebuggingEnabled: false,
   },
   plugins: {
     StatusBar: {

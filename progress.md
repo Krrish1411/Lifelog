@@ -27,12 +27,18 @@ This document provides a complete, authoritative, and chronological record of th
 | `src/components/DiffConflictModal.tsx` | Overhauled | Rebuilt as a portal-mounted, scroll-free (~410px) pop-up with a unified side-by-side device comparison strip and 3 clean merge options. |
 | `src/components/SyncDialog.tsx` | Modified | Moved `DiffConflictModal` outside the parent `<Modal>` to eliminate CSS filter/backdrop clipping; removed commercial Pro cloud banners. |
 | `src/components/Shell.tsx` | Modified | Removed "Buy Me a Coffee" button from all 5 engine layouts to preserve distraction-free navigation. |
-| `src/views/Welcome.tsx` | Modified | Relocated "Buy Me a Coffee" to the top bar; resolved mouse wheel scrolling lock via root container CSS. |
+| `src/views/Welcome.tsx` | Overhauled | Transformed into full product showcase landing page with Zero-Cloud Guarantee badge, 7 core feature pillars, cross-platform downloads hub, and creator philosophy. |
 | `src/views/Reports.tsx` | Modified | Added zero-lag PDF export configuration modal; resolved missing CSS progress bars and unconstrained print heights. |
 | `src/components/ui.tsx` | Modified | Updated `BarRow` with explicit border tracks and inline `print-color-adjust: exact`. |
 | `src/index.css` | Modified | Configured `@media print` universal exact color adjustment, light-mode palette variables, and unclipped container overrides. |
+| `src/components/SupportCoffeeModal.tsx` | **NEW** | Milestone-driven supporter prompt (`completedTasks >= 10 || focusMinutes >= 300`) with 7-day snooze and permanent opt-out. |
+| `public/version.json` | **NEW** | Canonical update-checking schema queried on-demand by client apps. |
+| `scripts/deploy-release-web.sh` | **NEW** | Automated zero-leak deployment script pushing compiled, obfuscated `dist/` directly to `Krrish1411/Lifelog-Releases` (gh-pages). |
+| `features.md` | **NEW** | Comprehensive 220+ line technical specification documenting all 8 primary views, 5 layout engines, shortcuts, SQLite WAL architecture, and P2P sync. |
+| `RELEASE_PLAYBOOK.md` | **NEW** | Master production binary release playbook covering build commands for Windows, Linux, macOS, Android, and GitHub release tagging. |
 | `src/security/recoveryPhrase.ts` | **DELETED** | Removed 12-word recovery phrase generator and PBKDF2 phrase key derivation to eliminate unnecessary onboarding friction. |
 | `src/security/bip39Wordlist.ts` | **DELETED** | Removed 2048-word BIP-39 dictionary. |
+
 
 ---
 
