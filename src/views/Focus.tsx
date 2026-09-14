@@ -572,7 +572,7 @@ export function FocusView() {
 
   /* ================= normal focus view ================= */
   return (
-    <div className="flex flex-col gap-4 min-h-[calc(100vh-140px)] md:h-[calc(100vh-140px)]">
+    <div className="flex flex-col gap-4 w-full min-h-full pb-16 lg:pb-0 lg:h-[calc(100vh-140px)]">
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="font-display text-[24px] font-bold tracking-tight">Focus</h1>
@@ -670,14 +670,14 @@ export function FocusView() {
 
       <div className="grid flex-1 gap-4 lg:grid-cols-[310px_1fr_290px] min-h-0 items-stretch">
         {/* task picker */}
-        <div className="card engine-panel flex h-full min-h-[420px] flex-col p-3 overflow-hidden">
+        <div className="order-2 lg:order-1 card engine-panel flex flex-col p-3 overflow-hidden h-auto lg:h-full max-h-[380px] lg:max-h-none min-h-[260px] lg:min-h-[420px]">
           <SearchInput
             value={query}
             onChange={setQuery}
             placeholder="Find a task…"
             width="100%"
           />
-          <div className="mt-2 flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto overscroll-contain pr-1">
+          <div className="mt-2 flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto pr-1">
             {tasks.length === 0 && (
               <div className="px-2 py-4 text-center text-[12px]" style={{ color: "var(--mut)" }}>
                 No open tasks match.
@@ -804,7 +804,7 @@ export function FocusView() {
         </div>
 
         {/* timer main card */}
-        <div className="card engine-panel relative flex h-full min-h-[420px] flex-col items-center justify-center p-6 lg:p-8 overflow-y-auto">
+        <div className="order-1 lg:order-2 card engine-panel relative flex flex-col items-center justify-center p-5 sm:p-6 lg:p-8 min-h-[380px] lg:min-h-[420px] lg:h-full lg:overflow-y-auto">
           <Seg
             options={[
               { value: "pomodoro", label: `Pomodoro · ${settings.pomodoroMin}m` },
@@ -936,14 +936,14 @@ export function FocusView() {
         </div>
 
         {/* today history */}
-        <div className="card engine-panel flex h-full min-h-[420px] flex-col p-4 overflow-hidden">
+        <div className="order-3 lg:order-3 card engine-panel flex flex-col p-4 overflow-hidden h-auto lg:h-full max-h-[380px] lg:max-h-none min-h-[220px] lg:min-h-[420px]">
           <div className="flex items-baseline justify-between shrink-0">
             <span className="font-display text-[14.5px] font-bold">Today</span>
             <span className="font-mono text-[15px] font-bold tnum" style={{ color: "var(--accent)" }}>
               {fmtDur(todayTotal)}
             </span>
           </div>
-          <div className="mt-2 flex flex-1 min-h-0 flex-col gap-1.5 overflow-y-auto overscroll-contain pr-1">
+          <div className="mt-2 flex flex-1 min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
             {todaySessions.length === 0 && (
               <EmptyState
                 icon={Target}

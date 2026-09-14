@@ -109,7 +109,10 @@ body {
 /* GPU-accelerated momentum scrolling across all engines */
 .overflow-y-auto, .overflow-y-scroll, main, aside, [data-scroll] {
   -webkit-overflow-scrolling: touch;
-  scroll-behavior: smooth;
+}
+
+/* Restrict overscroll containment to actual modal overlays and drawers to prevent Android page lock */
+.modal, [role="dialog"], .drawer, .overscroll-contain {
   overscroll-behavior-y: contain;
 }
 

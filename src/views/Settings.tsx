@@ -208,6 +208,19 @@ export function SettingsView() {
     errorMsg?: string;
   }>({ status: "idle" });
   const [showUpdateModal, setShowUpdateModal] = useState(false);
+  const [currentAppVersion, setCurrentAppVersion] = useState<string>(APP_VERSION);
+
+  // Auto-fetch active web version if in browser
+  useEffect(() => {
+    if (isBrowser) {
+      fetch("./version.json", { cache: "no-cache" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => {
+          if (d?.version) setCurrentAppVersion(d.version);
+        })
+        .catch(() => {});
+    }
+  }, [isBrowser]);
 
   const isNewerVersion = (remote: string, current: string): boolean => {
     const rParts = remote.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
@@ -2164,7 +2177,7 @@ export function SettingsView() {
                             {isBrowser ? "LifeLog Web Edition" : "LifeLog Desktop & Mobile"}
                           </span>
                           <span className="chip !py-0.5 text-[10.5px] font-mono" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
-                            {isBrowser ? `v${APP_VERSION} · Always Up to Date` : `v${APP_VERSION} Sovereign`}
+                            {isBrowser ? `v${currentAppVersion} · Always Up to Date` : `v${currentAppVersion} Sovereign`}
                           </span>
                         </div>
                         <div className="text-[11px] font-semibold mt-0.5" style={{ color: "var(--mut)" }}>
@@ -2228,14 +2241,14 @@ export function SettingsView() {
                   {isBrowser && (
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-bold" style={{ borderColor: "var(--ok)", background: "rgba(16, 185, 129, 0.08)", color: "var(--ok)" }}>
                       <CheckCircle2 size={15} />
-                      You are running the latest sovereign web build (v{APP_VERSION}). Refreshing the browser automatically loads latest updates.
+                      You are running the latest sovereign web build (v{currentAppVersion}). Refreshing the browser automatically loads latest updates.
                     </div>
                   )}
 
                   {!isBrowser && updateResult.status === "latest" && (
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-bold" style={{ borderColor: "var(--ok)", background: "rgba(16, 185, 129, 0.08)", color: "var(--ok)" }}>
                       <CheckCircle2 size={15} />
-                      You are running the latest sovereign build (v{APP_VERSION}). Zero updates pending.
+                      You are running the latest sovereign build (v{currentAppVersion}). Zero updates pending.
                     </div>
                   )}
 
@@ -2273,8 +2286,8 @@ export function SettingsView() {
               (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <a
-                    href={`mailto:getlifelog@proton.me?subject=${encodeURIComponent(`LifeLog Feedback & Diagnostics [v${APP_VERSION}]`)}&body=${encodeURIComponent(
-                      `Hi LifeLog Team,\n\n[Describe your feedback, bug report, or idea here]\n\n---\nSystem Diagnostics (No personal, habit, or task data included):\n- App Version: v${APP_VERSION}\n- Platform: ${isNativeMobile ? "Android" : isLinuxDesktop ? "Linux Desktop" : isLinux ? "Linux" : "Desktop/Web"}\n- User Agent: ${typeof navigator !== "undefined" ? navigator.userAgent : "Unknown"}\n`
+                    href={`mailto:getlifelog@proton.me?subject=${encodeURIComponent(`LifeLog Feedback & Diagnostics [v${currentAppVersion}]`)}&body=${encodeURIComponent(
+                      `Hi LifeLog Team,\n\n[Describe your feedback, bug report, or idea here]\n\n---\\nSystem Diagnostics (No personal, habit, or task data included):\n- App Version: v${currentAppVersion}\n- Platform: ${isNativeMobile ? "Android" : isLinuxDesktop ? "Linux Desktop" : isLinux ? "Linux" : "Desktop/Web"}\n- User Agent: ${typeof navigator !== "undefined" ? navigator.userAgent : "Unknown"}\n`
                     )}`}
                     className="flex flex-col justify-between p-3.5 rounded-xl border transition-all hover:scale-[1.01] hover:border-[var(--accent)]"
                     style={{ borderColor: "var(--line)", background: "var(--bg)" }}
@@ -2339,7 +2352,7 @@ export function SettingsView() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="chip text-[11px] font-mono">v{APP_VERSION} Sovereign</span>
+                      <span className="chip text-[11px] font-mono">v{currentAppVersion} Sovereign</span>
                     </div>
                   </div>
                   <div className="text-[11px] font-medium" style={{ color: "var(--mut)" }}>

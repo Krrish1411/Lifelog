@@ -6,6 +6,28 @@ Official release documentation and changelogs for **LifeLog** — the offline-fi
 
 ---
 
+## 🌟 v1.0.2 — Mobile Scroll Architecture, Version Dynamic Sync & Cloud Automation (2026-09-14)
+
+### 📱 1. Mobile Touch Architecture & Focus Page Fluid Scrolling
+- **Mobile-First Priority:** Reordered the Focus page layout on mobile screens (`< 1024px`). The **Timer Card is now positioned right at the top** (`order-1`), followed by the Task Selector (`order-2`) and Today's History (`order-3`). Users on Android and mobile viewports can immediately start, pause, or switch modes without having to scroll past 420px of task lists.
+- **Universal Mobile Touch Scroll Fix:** Removed the aggressive global `overscroll-behavior-y: contain` property on `.overflow-y-auto` and `main` in `index.css`. Previously, touching any element on Android with an internal scroll container would completely freeze outer page scrolling. Overscroll containment is now strictly scoped to actual dialogs and drawers (`.modal, [role="dialog"], .drawer`).
+- **Fluid Viewport Heights:** Replaced rigid `min-h-[calc(100vh-140px)]` on mobile with fluid responsive heights (`min-h-full pb-16 lg:h-[calc(100vh-140px)]`), eliminating clipped controls and viewport locking on mobile devices.
+
+### 🔄 2. Dynamic Version Synchronization
+- **Single Source of Truth:** Connected `package.json` (`v1.0.2`) directly to Vite's build-time define system (`__APP_VERSION__`), guaranteeing that the UI never displays outdated version strings.
+- **Live In-Browser Version Verification:** `Settings` view now dynamically auto-queries `./version.json` in web mode, instantly reflecting active deployed versions without requiring manual hardcode edits.
+- **Android Gradle Version Alignment:** Synced `versionCode 5` and `versionName "1.0.2"` in `android/app/build.gradle`.
+
+### ⚡ 3. Instant PWA Service Worker Cache Invalidation (v1.0.2)
+- **Automatic Cache Purge:** Updated PWA cache key to `lifelog-pwa-v1.0.2`. Browsers and installed PWAs automatically purge stale caches and fetch the fresh mobile-scroll build upon opening.
+
+### 🚀 4. Zero-Bandwidth Cloud Release Pipeline (GitHub Actions)
+- **Automated Cloud Compiles:** Updated `.github/workflows/build-apk.yml` and `.github/workflows/build-electron.yml` to trigger automatically on git release tags (`v*`).
+- **Direct GitHub Release Asset Attachment:** GitHub's cloud runners now compile Android APKs, Linux AppImage/deb, Windows executables, and macOS packages in Microsoft's multi-gigabit cloud and attach them directly to the GitHub Release.
+- **Zero Local Data Consumption:** You no longer need to spend gigabytes downloading or re-uploading large binaries locally; a single ~2 KB `git push origin v1.0.2` triggers the entire cloud release process.
+
+---
+
 ## 🌟 v1.0.1 — Sovereign Polish & Stream Control Update (2026-09-14)
 
 ### 🌊 1. Dynamic LifeLog Stream & Routine Control

@@ -90,7 +90,8 @@ git config user.email "Tablenovo1411@gmail.com"
 
 git add -A
 COMMIT_TIME=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
-git commit -m "deploy(web): LifeLog v1.0.0 sovereign web release ($COMMIT_TIME) [skip ci]" -q
+APP_VER=$(node -p "require('$REPO_ROOT/package.json').version" 2>/dev/null || echo "1.0.2")
+git commit -m "deploy(web): LifeLog v$APP_VER sovereign web release ($COMMIT_TIME) [skip ci]" -q
 
 echo "📡 Pushing to $TARGET_REPO ($TARGET_BRANCH)..."
 git remote add origin "$TARGET_REPO"

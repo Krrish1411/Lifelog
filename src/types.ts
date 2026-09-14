@@ -368,7 +368,8 @@ export const DEFAULT_SETTINGS: Settings = {
   lastSupportPromptShownAt: 0,
 };
 
-export const APP_VERSION = "1.0.0";
+declare const __APP_VERSION__: string | undefined;
+export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.0.2";
 
 export interface AppVersionInfo {
   version: string;

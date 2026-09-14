@@ -1,15 +1,13 @@
 {
-  "version": "1.0.1",
+  "version": "1.0.2",
   "releaseDate": "2026-09-14",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "🌊 Dynamic LifeLog Stream & Routine Control: Toggle lifestyle routines from Day Log, Calendar, Reports, and Review without data loss",
-    "📱 Mobile theme card layout with descriptive palette summaries and touch optimization",
-    "⌨️ Automatically hidden desktop keyboard hints on touch devices for a cleaner interface",
-    "🖥️ Desk Suite layout solid panel backgrounds (var(--panel-solid)) preventing background bleed-through",
-    "🍱 Minimalist Bento dashboard defaults for a clean out-of-the-box experience",
-    "🛡️ P2P Sync transparency notice and community support covenant on Welcome page",
-    "⚡ PWA Service Worker cache invalidation (v1.0.1) for instant updates across browsers and mobile"
+    "📱 Mobile-First Focus Layout: Timer positioned at top on mobile devices with smooth natural scrolling",
+    "📜 Universal Touch Scrolling Architecture: Scoped overscroll-behavior to prevent touch-trapping and screen lock on Android",
+    "🔄 Dynamic Version Synchronization: Unified build-time injection and live version auto-detection in browser",
+    "⚡ Instant PWA Service Worker Cache Invalidation (v1.0.2) for automatic refresh across all mobile & web clients",
+    "🚀 Zero-Bandwidth Cloud Release Pipeline: Automated build and release asset attachment via GitHub Actions"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Setup-1.0.0.exe",
