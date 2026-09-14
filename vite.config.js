@@ -36,10 +36,42 @@ const enableObfuscation = process.env.OBFUSCATE === "true";
 
 export default defineConfig({
   plugins: [react(), tailwindcss(), ...(enableObfuscation ? [obfuscatorPlugin()] : [])],
-  base: './',
+  base: "./",
   build: {
-    outDir: 'dist',
-    assetsDir: 'assets'
+    outDir: "dist",
+    assetsDir: "assets",
+    sourcemap: false,
+    minify: "terser",
+    terserOptions: {
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
+        pure_funcs: [
+          "console.log",
+          "console.info",
+          "console.debug",
+          "console.trace",
+          "console.warn",
+        ],
+        passes: 2,
+        dead_code: true,
+      },
+      mangle: {
+        toplevel: true,
+        safari10: true,
+      },
+      format: {
+        comments: false,
+      },
+    },
+    rollupOptions: {
+      output: {
+        chunkFileNames: "assets/ll-[hash].js",
+        entryFileNames: "assets/ll-[hash].js",
+        assetFileNames: "assets/ll-[hash][extname]",
+      },
+    },
+    chunkSizeWarningLimit: 1200,
   },
   server: {
     host: "0.0.0.0",

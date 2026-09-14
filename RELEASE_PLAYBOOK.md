@@ -213,4 +213,43 @@ git push origin main
    - Opens `https://github.com/Krrish1411/Lifelog-Releases/issues`.
 
 ---
+
+## 8. Anti-Theft Code Hardening & Public Web Deployment (GitHub Pages)
+
+LifeLog enforces a multi-layer anti-theft and code obfuscation architecture to protect proprietary logic while guaranteeing 60 FPS UI performance and instant transactions:
+
+### A. Layer 1: Web Bundler (`vite.config.js`)
+- **Terser Minification**:
+  - `sourcemap: false`: Zero source maps emitted. Original TypeScript files and comments never leave your local environment.
+  - `drop_console: true` & `drop_debugger: true`: Strips all `console.log`, `info`, `debug`, `trace`, and `warn` calls so internal memory state cannot be viewed in browser DevTools.
+  - `passes: 2`: Two deep dead-code removal passes.
+  - `mangle.toplevel: true`: Scrambles all top-level symbols, classes, and function names into single-character identifiers (`a, b, c, e, n`).
+  - `output.chunkFileNames`: Prefixed with sanitized hashes (`assets/ll-[hash].js`), stripping all internal library names.
+
+### B. Layer 2: Desktop Hardening (`electron/main.cjs`)
+- **DevTools Lockout**:
+  - Sets `devTools: isDev` in `webPreferences`.
+  - Blocks `F12`, `Ctrl+Shift+I` / `Cmd+Option+I`, `Ctrl+Shift+J` / `Cmd+Option+J`, and `Ctrl+U` (View Source) in production builds.
+  - Disables the right-click context menu "Inspect Element".
+  - Strips remote debugging switches (`--remote-debugging-port`, `--inspect`, `--inspect-brk`).
+
+### C. Layer 3: Android Native Hardening (`MainActivity.java`)
+- Disables remote Chrome WebContents inspection in production APKs via `WebView.setWebContentsDebuggingEnabled(false)`.
+- R8 / ProGuard shrinking and minification active in `android/app/build.gradle`.
+
+### D. Zero-Leak Web Deployment to GitHub Pages (`npm run deploy:web`)
+To deploy the live web application to `https://krrish1411.github.io/Lifelog-Releases/`:
+
+```bash
+# 1-Click build, audit, and zero-leak deployment
+npm run deploy:web
+```
+
+The script:
+1. Audits types and compiles the production bundle with Terser code hardening into `dist/`.
+2. Verifies that 0 source maps and 0 `console.log` statements exist.
+3. Injects `dist/.nojekyll` and `dist/404.html` (for client-side SPA routing).
+4. Commits **only** the compiled `dist/` directory into the `gh-pages` branch of `Krrish1411/Lifelog-Releases`. Zero source files (`.ts`, `.tsx`, `.cjs`, `.env`) are ever transferred.
+
+---
 *Runbook verified for LifeLog v1.0.0 Production Release.*

@@ -325,3 +325,33 @@ This document provides a complete, authoritative, and chronological record of th
 - **Production Bundle**: `npm run build` (`vite build`) &rarr; **built cleanly in 2.66s**.
 - **Network Audit**: Zero unsolicited background network queries on boot; update checker is strictly manual with a 5-second timeout.
 
+---
+
+## 11. Production Code Hardening (Anti-Theft Obfuscation) & Public Web Deployment
+
+### A. Layer 1: Web Bundler Hardening (`vite.config.js`)
+- **Terser Minification Engine**:
+  - `sourcemap: false`: Completely disables all source maps. Original TypeScript source files and comments are 100% excluded from production bundles.
+  - `drop_console: true` & `drop_debugger: true`: Automatically strips every `console.log`, `info`, `debug`, `trace`, and `warn` call.
+  - `passes: 2`: Two deep passes of dead-code elimination.
+  - `mangle.toplevel: true`: Scrambles all top-level functions, classes, and variables into random single-letter identifiers (`a, b, c, e, n`).
+  - `output.chunkFileNames`: Sanitized prefix `assets/ll-[hash].js`, stripping internal library identifiers.
+
+### B. Layer 2: Desktop Hardening (`electron/main.cjs`)
+- **Production DevTools Lockout**:
+  - `webPreferences.devTools = isDev`: Native DevTools disabled in packaged production builds.
+  - Blocks `F12`, `Ctrl+Shift+I` / `Cmd+Option+I`, `Ctrl+Shift+J` / `Cmd+Option+J`, and `Ctrl+U` (View Source).
+  - Intercepts and suppresses right-click context menu "Inspect Element".
+  - Strips remote debugging command line switches (`--remote-debugging-port`, `--inspect`, `--inspect-brk`).
+
+### C. Layer 3: Android Native Hardening (`MainActivity.java`)
+- Disabled remote Chrome WebContents inspection in production builds via `WebView.setWebContentsDebuggingEnabled(false)` in `android/app/src/main/java/com/lifelog/app/MainActivity.java` and `Lifelog-Android`.
+- ProGuard / R8 code shrinking and resource minification enabled in `android/app/build.gradle`.
+
+### D. Zero-Leak Web Deployment Pipeline (`scripts/deploy-release-web.sh`)
+- **1-Click Deployment Script**: `npm run deploy:web` / `bash scripts/deploy-release-web.sh`.
+- **Zero Source Leak**: Commits **only** the compiled, mangled `dist/` directory into the `gh-pages` branch of `Krrish1411/Lifelog-Releases`. Zero `.ts`, `.tsx`, `.cjs`, or git history is transferred.
+- **GitHub Pages Optimization**: Automatically generates `.nojekyll` and `404.html` (for SPA client-side routing).
+- **CI Workflow Integration**: Updated `.github/workflows/deploy.yml` to automatically push to `Krrish1411/Lifelog-Releases` on push to `main` when `RELEASES_TOKEN` is configured.
+
+

@@ -32,7 +32,22 @@ jobs:
         run: npm ci
 
       - name: Build Web Production Assets
-        run: npm run build
+        run: |
+          npm run build
+          touch dist/.nojekyll
+          cp dist/index.html dist/404.html
+
+      - name: Deploy to Public Lifelog-Releases Repo (gh-pages)
+        if: env.RELEASES_TOKEN != ''
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          personal_token: ${{ secrets.RELEASES_TOKEN }}
+          external_repository: Krrish1411/Lifelog-Releases
+          publish_branch: gh-pages
+          publish_dir: ./dist
+          force_orphan: false
+        env:
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
 
       - name: Upload Pages Artifact
         uses: actions/upload-pages-artifact@v3

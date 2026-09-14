@@ -10,6 +10,13 @@ let popoutWindow = null;
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
 app.commandLine.appendSwitch('renderer-process-limit', '1');
 
+// Anti-theft: Disable remote debugging ports in production builds
+if (app.isPackaged || process.env.NODE_ENV === 'production') {
+  app.commandLine.removeSwitch('remote-debugging-port');
+  app.commandLine.removeSwitch('inspect');
+  app.commandLine.removeSwitch('inspect-brk');
+}
+
 // Ensure persistent local storage directory and encrypted attachments folder
 function getStoragePaths() {
   const userData = app.getPath('userData');
@@ -44,8 +51,26 @@ function createMainWindow() {
       sandbox: false,
       backgroundThrottling: true,
       spellcheck: false,
+      devTools: isDev,
     },
   });
+
+  // Anti-theft: Lock out DevTools, View Source, and Inspect Element in production
+  if (!isDev) {
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      if (
+        input.key === 'F12' ||
+        ((input.control || input.meta) && input.shift && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j')) ||
+        ((input.control || input.meta) && input.key.toLowerCase() === 'u')
+      ) {
+        event.preventDefault();
+      }
+    });
+
+    mainWindow.webContents.on('context-menu', (e) => {
+      e.preventDefault();
+    });
+  }
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
@@ -117,8 +142,25 @@ function createTimerPopoutWindow() {
       sandbox: false,
       backgroundThrottling: true,
       spellcheck: false,
+      devTools: isDev,
     },
   });
+
+  if (!isDev) {
+    popoutWindow.webContents.on('before-input-event', (event, input) => {
+      if (
+        input.key === 'F12' ||
+        ((input.control || input.meta) && input.shift && (input.key.toLowerCase() === 'i' || input.key.toLowerCase() === 'j')) ||
+        ((input.control || input.meta) && input.key.toLowerCase() === 'u')
+      ) {
+        event.preventDefault();
+      }
+    });
+
+    popoutWindow.webContents.on('context-menu', (e) => {
+      e.preventDefault();
+    });
+  }
 
   if (isDev && process.env.VITE_DEV_SERVER_URL) {
     popoutWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#timer-popout`);
