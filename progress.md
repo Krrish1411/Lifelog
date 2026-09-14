@@ -360,4 +360,29 @@ This document provides a complete, authoritative, and chronological record of th
 - **GitHub Pages Optimization**: Automatically generates `.nojekyll` and `404.html` (for SPA client-side routing).
 - **CI Workflow Integration**: Updated `.github/workflows/deploy.yml` to automatically push to `Krrish1411/Lifelog-Releases` on push to `main` when `RELEASES_TOKEN` is configured.
 
+---
 
+## 12. Public Releases Repository Overhaul & Android CI Build Resolution
+
+### A. Android APK CI Compilation Fix
+- **Issue**: AGP 8+ builds failed on GitHub Actions runner because `BuildConfig.DEBUG` was unresolved in `MainActivity.java` due to AGP 8 disabling `BuildConfig` generation by default.
+- **Resolution**:
+  - Replaced `BuildConfig.DEBUG` with native Android SDK flag check: `(getApplicationInfo().flags & ApplicationInfo.FLAG_DEBUGGABLE) != 0`.
+  - Added `buildFeatures { buildConfig true }` into `android/app/build.gradle`.
+  - Configured `android.webContentsDebuggingEnabled: false` in `capacitor.config.ts`.
+  - Updated `.github/workflows/build-apk.yml` artifact glob path to `android/app/build/outputs/apk/release/*.apk` with `if-no-files-found: warn`.
+
+### B. CI Web Deploy Workflow Streamlining (`.github/workflows/deploy.yml`)
+- Removed the private repo GitHub Pages deployment job (which threw 404s due to GitHub private repository restrictions).
+- Replaced with a zero-leak build job that compiles hardened static assets and syncs directly to `Krrish1411/Lifelog-Releases` via `RELEASES_TOKEN` if present, while allowing instant local manual deployment via `npm run deploy:web`.
+
+### C. Public Repository Polish (`Krrish1411/Lifelog-Releases`)
+- **Repository**: `https://github.com/Krrish1411/Lifelog-Releases`
+- **Main Branch Assets Added**:
+  - `README.md`: Complete showcase featuring official download tables (Windows `.exe`, macOS `.dmg`, Linux `.AppImage`, Android `.apk`, Web App), Zero-Cloud trust badges, 7 Core Pillars breakdown, SHA-256 verification instructions, creator note, and support links.
+  - `version.json`: Release descriptor consumed by the client app update checker.
+  - `icon.png`: Official high-resolution brand asset.
+  - `.github/ISSUE_TEMPLATE/`: Production GitHub issue templates for `bug_report.md` and `feature_request.md`.
+- **Pages Branch (`gh-pages`)**:
+  - Contains 100% compiled, hardened, obfuscated static web assets (`dist/index.html`, `404.html`, `.nojekyll`, `sql-wasm.wasm`, `version.json`, `assets/`).
+  - Zero private source code, zero TypeScript files, zero commit history leaks.
