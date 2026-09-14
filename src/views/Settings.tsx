@@ -612,9 +612,16 @@ export function SettingsView() {
     toast(lines.length ? `${lines.length} personal line(s) saved — mixed into the greeting` : "Personal quotes cleared", "ok");
   };
 
-  const section = (title: string, sub: string, body: React.ReactNode, span = false, className?: string) => (
+  const section = (title: string, sub: string, body: React.ReactNode, span = false, className?: string, isPro?: boolean) => (
     <div className={cn("card card-hover p-4 w-full min-w-0 overflow-hidden", span && "lg:col-span-2", className)}>
-      <div className="font-display text-[15px] font-bold tracking-tight">{title}</div>
+      <div className="flex items-center justify-between gap-2">
+        <div className="font-display text-[15px] font-bold tracking-tight">{title}</div>
+        {isPro && (
+          <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30 shrink-0">
+            PRO
+          </span>
+        )}
+      </div>
       <div className="mb-3 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>{sub}</div>
       {body}
     </div>
@@ -816,7 +823,7 @@ export function SettingsView() {
             {/* Mode & Accent Presets */}
             {section(
               "Theme Mode & Accent Color",
-              "Every generated colour is WCAG-checked against the background.",
+              "Every generated colour is WCAG-checked against the background. (Pro Feature · Free in Beta)",
               (
                 <div className="flex flex-col gap-3.5">
                   <div className="flex flex-wrap items-center gap-3">
@@ -868,7 +875,7 @@ export function SettingsView() {
                     </div>
                   </div>
 
-                  <Labeled label="Custom Accent Hex" hint="custom hex always available">
+                  <Labeled label="Custom Accent Hex" hint="Pro Beta · custom hex">
                     <div className="flex items-center gap-2">
                       <ColorPicker value={s.accent} onChange={(hex) => patch({ accent: hex })} />
                       {s.accent.toLowerCase() !== DEFAULT_SETTINGS.accent.toLowerCase() && (
@@ -888,7 +895,7 @@ export function SettingsView() {
                   </Labeled>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Labeled label="Background — dark mode">
+                    <Labeled label="Background — dark mode" hint="Pro Beta">
                       <div className="flex items-center gap-2">
                         <ColorPicker value={s.bgDark} onChange={(hex) => patch({ bgDark: hex })} />
                         {s.bgDark.toLowerCase() !== DEFAULT_SETTINGS.bgDark.toLowerCase() && (
@@ -906,7 +913,7 @@ export function SettingsView() {
                         )}
                       </div>
                     </Labeled>
-                    <Labeled label="Background — light mode">
+                    <Labeled label="Background — light mode" hint="Pro Beta">
                       <div className="flex items-center gap-2">
                         <ColorPicker value={s.bgLight} onChange={(hex) => patch({ bgLight: hex })} />
                         {s.bgLight.toLowerCase() !== DEFAULT_SETTINGS.bgLight.toLowerCase() && (
@@ -926,13 +933,16 @@ export function SettingsView() {
                     </Labeled>
                   </div>
                 </div>
-              )
+              ),
+              false,
+              undefined,
+              true
             )}
 
             {/* Token Customizer */}
             {section(
               "Custom Theme Tokens",
-              "Override any token. Contrast guards keep text readable; “Auto” returns to the generated default.",
+              "Override any token. Contrast guards keep text readable; “Auto” returns to default. (Pro Feature · Free in Beta)",
               (
                 <div className="flex flex-col gap-2">
                   {TOKEN_ROWS.map((r) => {
@@ -985,7 +995,10 @@ export function SettingsView() {
                     <RotateCcw size={12} /> Reset all colours
                   </Btn>
                 </div>
-              )
+              ),
+              false,
+              undefined,
+              true
             )}
 
             {/* Mobile Interface Engine (Phones & Small Screens) */}
