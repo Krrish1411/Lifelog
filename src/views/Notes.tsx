@@ -1182,7 +1182,12 @@ export function NotesView() {
             </div>
 
             {/* Formatting & Media Toolbar */}
-            <div className="border-t border-[var(--line)] w-full min-w-0 shrink-0 glass-regular rounded-b-2xl">
+            <div
+              className={cn(
+                "border-t border-[var(--line)] w-full min-w-0 shrink-0 rounded-b-2xl",
+                state.settings.layout === "glass" ? "glass-regular" : "bg-[var(--panel)]"
+              )}
+            >
               {formattingToolbar}
             </div>
           </>

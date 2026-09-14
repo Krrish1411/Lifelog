@@ -30,7 +30,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { Priority, TokenKey, ViewId } from "../types";
-import { FONT_PAIRS, QUOTES, SHORTCUT_ACTIONS } from "../types";
+import { FONT_PAIRS, LIFE_LOG_PROJECT_ID, QUOTES, SHORTCUT_ACTIONS } from "../types";
 import { useApp } from "../store";
 import { syncEngine } from "../sync/syncEngine";
 import {
@@ -771,7 +771,7 @@ export function Shell() {
         {mobileBar}
         {mobileDrawer}
         <aside
-          className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r p-4 md:flex select-none glass-regular overflow-y-auto overflow-x-hidden scrollbar-none"
+          className="fixed inset-y-0 left-0 z-40 hidden w-[236px] flex-col border-r p-4 md:flex select-none bg-[var(--panel)] overflow-y-auto overflow-x-hidden scrollbar-none"
           style={{ borderColor: "var(--line)" }}
         >
           <div className="flex items-center justify-between">
@@ -1092,11 +1092,17 @@ function ZenHome() {
   const dueTasks = useMemo(
     () =>
       state.tasks
-        .filter((t) => !t.done && t.due && t.due <= today && (!t.snoozedUntil || t.snoozedUntil <= Date.now()))
+        .filter((t) => {
+          if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) return false;
+          return !t.done && t.due && t.due <= today && (!t.snoozedUntil || t.snoozedUntil <= Date.now());
+        })
         .sort((a, b) => (a.dueTime ? 0 : 1) - (b.dueTime ? 0 : 1) || (a.due ?? "").localeCompare(b.due ?? "")),
-    [state.tasks, today]
+    [state.tasks, today, state.settings.showLifeLogProject]
   );
-  const doneToday = state.tasks.filter((t) => t.done && t.doneAt && todayIsoOf(t.doneAt) === today).length;
+  const doneToday = state.tasks.filter((t) => {
+    if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) return false;
+    return t.done && t.doneAt && todayIsoOf(t.doneAt) === today;
+  }).length;
   const running = state.sessions.find((s) => s.status === "running");
   const log = state.dayLogs[today];
   const [energy, setEnergy] = useState(log?.energy ?? 3);
@@ -1393,7 +1399,7 @@ function StatusBarDesk({
 
   return (
     <div
-      className="fixed bottom-0 right-0 z-40 hidden h-[52px] items-center gap-4 border-l border-t px-5 glass-regular md:flex select-none"
+      className="fixed bottom-0 right-0 z-40 hidden h-[52px] items-center gap-4 border-l border-t px-5 bg-[var(--panel)] md:flex select-none"
       style={{
         borderColor: "var(--line)",
         left: "236px",

@@ -3,6 +3,7 @@ import {
   AlertCircle,
   Bell,
   Check,
+  ChevronDown,
   Compass,
   Download,
   FileText,
@@ -32,6 +33,8 @@ import {
   CheckCircle2,
   Mail,
   RefreshCw,
+  Search,
+  X,
 } from "lucide-react";
 import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey, AppVersionInfo } from "../types";
 import {
@@ -155,6 +158,37 @@ export function SettingsView() {
   const s = state.settings;
 
   const [activeTab, setActiveTab] = useState<SettingsTab>("appearance");
+
+  // Accordion & Anti-Overwhelm View Mode (Default: Classic Open)
+  const [viewMode, setViewMode] = useState<"accordion" | "expanded">(() => {
+    return (localStorage.getItem("lifelog.settings.viewMode") as "accordion" | "expanded") || "expanded";
+  });
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
+  const [settingsSearch, setSettingsSearch] = useState("");
+
+  const toggleSection = (key: string) => {
+    triggerHaptic("light");
+    setExpandedSections((prev) => {
+      const current = prev[key] !== undefined ? prev[key] : (viewMode === "expanded");
+      return {
+        ...prev,
+        [key]: !current,
+      };
+    });
+  };
+
+  const expandAll = (expand: boolean) => {
+    triggerHaptic("medium");
+    if (expand) {
+      setViewMode("expanded");
+      localStorage.setItem("lifelog.settings.viewMode", "expanded");
+      setExpandedSections({});
+    } else {
+      setViewMode("accordion");
+      localStorage.setItem("lifelog.settings.viewMode", "accordion");
+      setExpandedSections({});
+    }
+  };
 
   const [showUnencryptedWarningModal, setShowUnencryptedWarningModal] = useState(false);
   const [exportPwOpen, setExportPwOpen] = useState(false);
@@ -612,20 +646,84 @@ export function SettingsView() {
     toast(lines.length ? `${lines.length} personal line(s) saved — mixed into the greeting` : "Personal quotes cleared", "ok");
   };
 
-  const section = (title: string, sub: string, body: React.ReactNode, span = false, className?: string, isPro?: boolean) => (
-    <div className={cn("card card-hover p-4 w-full min-w-0 overflow-hidden", span && "lg:col-span-2", className)}>
-      <div className="flex items-center justify-between gap-2">
-        <div className="font-display text-[15px] font-bold tracking-tight">{title}</div>
-        {isPro && (
-          <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30 shrink-0">
-            PRO
-          </span>
+  const section = (
+    title: string,
+    sub: string,
+    body: React.ReactNode,
+    span = false,
+    className?: string,
+    isPro?: boolean,
+    previewBadge?: string
+  ) => {
+    const isSearchActive = settingsSearch.trim().length > 0;
+    const q = settingsSearch.trim().toLowerCase();
+    const matchesSearch =
+      !isSearchActive ||
+      title.toLowerCase().includes(q) ||
+      sub.toLowerCase().includes(q) ||
+      (previewBadge ? previewBadge.toLowerCase().includes(q) : false);
+
+    if (!matchesSearch) return null;
+
+    const isExpanded = isSearchActive
+      ? true
+      : expandedSections[title] !== undefined
+      ? expandedSections[title]
+      : viewMode === "expanded";
+
+    return (
+      <div
+        className={cn(
+          "card card-hover w-full min-w-0 overflow-hidden transition-all",
+          span && "lg:col-span-2",
+          className
+        )}
+      >
+        <button
+          type="button"
+          onClick={() => toggleSection(title)}
+          className="w-full p-4 flex items-center justify-between gap-3 text-left cursor-pointer hover:bg-[var(--panel2)]/60 transition-colors select-none"
+          aria-expanded={isExpanded}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="font-display text-[15px] font-bold tracking-tight text-[var(--text)]">
+                {title}
+              </span>
+              {previewBadge && (
+                <span className="chip !py-0.2 !px-2 text-[10px] font-bold text-[var(--accent)] border-[var(--accent)]/30 bg-[var(--accent-soft)] shrink-0">
+                  {previewBadge}
+                </span>
+              )}
+              {isPro && (
+                <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30 shrink-0">
+                  PRO
+                </span>
+              )}
+            </div>
+            <div className="mt-0.5 text-[11.5px] font-semibold text-[var(--mut)] truncate">
+              {sub}
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0 pl-1">
+            <ChevronDown
+              size={17}
+              className={cn(
+                "text-[var(--mut)] transition-transform duration-200",
+                isExpanded && "rotate-180 text-[var(--accent)]"
+              )}
+            />
+          </div>
+        </button>
+
+        {isExpanded && (
+          <div className="p-4 pt-1 border-t border-[var(--line)] animate-in fade-in duration-200">
+            {body}
+          </div>
         )}
       </div>
-      <div className="mb-3 text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>{sub}</div>
-      {body}
-    </div>
-  );
+    );
+  };
 
   return (
     <div className="flex flex-col gap-4">
@@ -662,6 +760,52 @@ export function SettingsView() {
             </button>
           );
         })}
+      </div>
+
+      {/* Settings Search & Accordion Controls */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2 rounded-2xl border border-[var(--line)] bg-[var(--panel)]">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--mut)]" />
+          <input
+            type="text"
+            value={settingsSearch}
+            onChange={(e) => setSettingsSearch(e.target.value)}
+            placeholder="Search settings (e.g. theme, font, alarm, p2p, lifelog)..."
+            className="w-full pl-9 pr-8 py-1.5 text-xs bg-transparent border-none text-[var(--text)] placeholder:text-[var(--mut)] focus:outline-none"
+          />
+          {settingsSearch && (
+            <button
+              onClick={() => setSettingsSearch("")}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--mut)] hover:text-[var(--text)] p-0.5 rounded cursor-pointer"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        <div className="flex items-center gap-1.5 shrink-0 justify-end">
+          <button
+            type="button"
+            onClick={() => expandAll(viewMode !== "expanded")}
+            className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-[var(--line)] bg-[var(--panel2)] hover:bg-[var(--panel)] text-[var(--text)] transition-all cursor-pointer"
+          >
+            {viewMode === "expanded" ? "Collapse All" : "Expand All"}
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = viewMode === "accordion" ? "expanded" : "accordion";
+              setViewMode(next);
+              setExpandedSections({});
+              localStorage.setItem("lifelog.settings.viewMode", next);
+              triggerHaptic("light");
+            }}
+            className="px-2.5 py-1 text-[11px] font-bold rounded-lg border border-[var(--line)] bg-[var(--panel2)] hover:bg-[var(--panel)] text-[var(--accent)] transition-all cursor-pointer"
+            title="Switch between accordion and all-open classic view"
+          >
+            {viewMode === "accordion" ? "Mode: Accordion" : "Mode: Classic Open"}
+          </button>
+        </div>
       </div>
 
       {/* Tab Panels */}
@@ -713,7 +857,7 @@ export function SettingsView() {
               "Dark Mode Themes",
               "Curated rich night palettes. Pro themes are unlocked during beta preview; core LifeLog themes are permanently free.",
               (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {DARK_THEMES.map((th) => {
                     const isCurrent = s.themeMode === "dark" && s.designerTheme === th.id;
                     return (
@@ -722,46 +866,58 @@ export function SettingsView() {
                         type="button"
                         onClick={() => applyDesignerTheme(th)}
                         className={cn(
-                          "flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all cursor-pointer relative",
+                          "flex flex-col gap-2 rounded-2xl border p-3 text-left transition-all cursor-pointer relative",
                           isCurrent
-                            ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)]"
+                            ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)] shadow-sm"
                             : "border-[var(--line)] bg-[var(--bg)] hover:bg-[var(--panel2)]"
                         )}
                       >
-                        <div
-                          className="h-7 w-7 rounded-lg shrink-0 flex items-center justify-center shadow-xs border border-white/10"
-                          style={{ background: th.previewBg }}
-                        >
-                          <span className="h-3.5 w-3.5 rounded-full" style={{ background: th.previewAccent }} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-display text-[12px] font-bold tracking-tight truncate">
-                              {th.name}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {th.isPro && (
-                                <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                                  PRO
-                                </span>
-                              )}
-                              {isCurrent && (
-                                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
-                                  <Check size={8} />
-                                </span>
-                              )}
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className="h-8 w-8 rounded-xl shrink-0 flex items-center justify-center shadow-xs border border-white/10"
+                              style={{ background: th.previewBg }}
+                            >
+                              <span className="h-4 w-4 rounded-full shadow-xs" style={{ background: th.previewAccent }} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-display text-[13px] font-bold tracking-tight truncate text-[var(--text)]">
+                                {th.name}
+                              </div>
+                              <div className="text-[10px] font-bold text-[var(--accent)] truncate">
+                                {th.tag}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-[9.5px] font-semibold text-[var(--accent)] truncate">
-                            {th.tag}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {th.isPro ? (
+                              <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                                PRO
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                                FREE
+                              </span>
+                            )}
+                            {isCurrent && (
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-bold shrink-0">
+                                <Check size={10} />
+                              </span>
+                            )}
                           </div>
+                        </div>
+                        <div className="text-[11px] font-medium leading-relaxed text-[var(--mut)] line-clamp-2">
+                          {th.desc}
                         </div>
                       </button>
                     );
                   })}
                 </div>
               ),
-              true
+              true,
+              undefined,
+              false,
+              s.themeMode === "dark" ? DARK_THEMES.find((t) => t.id === s.designerTheme)?.name : undefined
             )}
 
             {/* Light Mode Themes (Curated Light Palettes) */}
@@ -769,7 +925,7 @@ export function SettingsView() {
               "Light Mode Themes",
               "Clean daylight palettes. Pro themes are unlocked during beta preview; core LifeLog themes are permanently free.",
               (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
                   {LIGHT_THEMES.map((th) => {
                     const isCurrent = s.themeMode === "light" && s.designerTheme === th.id;
                     return (
@@ -778,46 +934,58 @@ export function SettingsView() {
                         type="button"
                         onClick={() => applyDesignerTheme(th)}
                         className={cn(
-                          "flex items-center gap-2.5 rounded-xl border p-2 text-left transition-all cursor-pointer relative",
+                          "flex flex-col gap-2 rounded-2xl border p-3 text-left transition-all cursor-pointer relative",
                           isCurrent
-                            ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)]"
+                            ? "ring-2 ring-[var(--accent)] border-transparent bg-[var(--accent-soft)] shadow-sm"
                             : "border-[var(--line)] bg-[var(--bg)] hover:bg-[var(--panel2)]"
                         )}
                       >
-                        <div
-                          className="h-7 w-7 rounded-lg shrink-0 flex items-center justify-center shadow-xs border border-black/10"
-                          style={{ background: th.previewBg }}
-                        >
-                          <span className="h-3.5 w-3.5 rounded-full" style={{ background: th.previewAccent }} />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-1">
-                            <span className="font-display text-[12px] font-bold tracking-tight truncate">
-                              {th.name}
-                            </span>
-                            <div className="flex items-center gap-1 shrink-0">
-                              {th.isPro && (
-                                <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
-                                  PRO
-                                </span>
-                              )}
-                              {isCurrent && (
-                                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
-                                  <Check size={8} />
-                                </span>
-                              )}
+                        <div className="flex items-center justify-between gap-2 w-full">
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div
+                              className="h-8 w-8 rounded-xl shrink-0 flex items-center justify-center shadow-xs border border-black/10"
+                              style={{ background: th.previewBg }}
+                            >
+                              <span className="h-4 w-4 rounded-full shadow-xs" style={{ background: th.previewAccent }} />
+                            </div>
+                            <div className="min-w-0">
+                              <div className="font-display text-[13px] font-bold tracking-tight truncate text-[var(--text)]">
+                                {th.name}
+                              </div>
+                              <div className="text-[10px] font-bold text-[var(--accent)] truncate">
+                                {th.tag}
+                              </div>
                             </div>
                           </div>
-                          <div className="text-[9.5px] font-semibold text-[var(--accent)] truncate">
-                            {th.tag}
+                          <div className="flex items-center gap-1 shrink-0">
+                            {th.isPro ? (
+                              <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                                PRO
+                              </span>
+                            ) : (
+                              <span className="px-1.5 py-0.5 rounded text-[8.5px] font-black uppercase tracking-wider bg-emerald-500/15 text-emerald-500 border border-emerald-500/25">
+                                FREE
+                              </span>
+                            )}
+                            {isCurrent && (
+                              <span className="flex h-4 w-4 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[9px] font-bold shrink-0">
+                                <Check size={10} />
+                              </span>
+                            )}
                           </div>
+                        </div>
+                        <div className="text-[11px] font-medium leading-relaxed text-[var(--mut)] line-clamp-2">
+                          {th.desc}
                         </div>
                       </button>
                     );
                   })}
                 </div>
               ),
-              true
+              true,
+              undefined,
+              false,
+              s.themeMode === "light" ? LIGHT_THEMES.find((t) => t.id === s.designerTheme)?.name : undefined
             )}
 
             {/* Mode & Accent Presets */}
@@ -1776,6 +1944,45 @@ export function SettingsView() {
               )
             )}
 
+            {/* LifeLog Routine Stream & Project */}
+            {section(
+              "LifeLog Stream & Project",
+              "Control whether the built-in 'Life Log' project and routine timeline are active across the app.",
+              (
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-center justify-between p-3.5 rounded-xl border border-[var(--line)] bg-[var(--bg)]">
+                    <div className="space-y-1 pr-3">
+                      <div className="text-[13px] font-bold text-[var(--text)] flex items-center gap-2">
+                        <span>🌊 Enable LifeLog Stream Project</span>
+                        <span
+                          className="chip !py-0.2 text-[9.5px]"
+                          style={{
+                            color: (s.showLifeLogProject ?? true) ? "var(--ok)" : "var(--mut)",
+                          }}
+                        >
+                          {(s.showLifeLogProject ?? true) ? "Active" : "Hidden"}
+                        </span>
+                      </div>
+                      <div className="text-[11.5px] font-medium text-[var(--mut)] leading-relaxed">
+                        Track everyday lifestyle routines (sleep, reading, YouTube, vibe coding, meals) separately from deep work tasks. When turned off, the Life Log project and its entries are cleanly removed from Reports, Daily Review, Day Log, and project selectors. Your past data remains 100% safe and will instantly return if re-enabled.
+                      </div>
+                    </div>
+                    <Toggle
+                      checked={s.showLifeLogProject !== false}
+                      onChange={(checked) => {
+                        patch({ showLifeLogProject: checked });
+                        toast(checked ? "LifeLog Stream project enabled" : "LifeLog Stream project hidden from views", "ok");
+                      }}
+                    />
+                  </div>
+                </div>
+              ),
+              true,
+              undefined,
+              false,
+              (s.showLifeLogProject ?? true) ? "Active" : "Hidden"
+            )}
+
             {/* Tasks & Habits Workflow */}
             {section(
               "Tasks & Habits Workflow",
@@ -1881,10 +2088,15 @@ export function SettingsView() {
             {/* Keyboard Shortcuts Customization */}
             {section(
               "Keyboard Shortcuts & Remapping",
-              "Quick single-key navigation across the app. Press any key in the box to remap. Automatically pauses when typing in text fields.",
+              "Quick single-key navigation across the app. Automatically pauses when typing in text fields.",
               (
                 <div className="flex flex-col gap-3">
-                  <div className="flex items-center justify-between p-3 rounded-2xl glass-clear border" style={{ borderColor: "var(--line)" }}>
+                  <div className="sm:hidden text-xs text-[var(--mut)] bg-[var(--panel2)] p-3 rounded-xl border border-[var(--line)] flex items-center gap-2">
+                    <span>💡</span>
+                    <span>Single-key shortcuts (Ctrl+K, 1-9, Space, Ctrl+N) are tuned for desktop physical keyboards. On mobile, touch navigation & bottom bar are used.</span>
+                  </div>
+
+                  <div className="hidden sm:flex items-center justify-between p-3 rounded-2xl glass-clear border" style={{ borderColor: "var(--line)" }}>
                     <div className="flex items-center gap-2.5">
                       <span className="font-mono text-xs font-bold bg-[var(--panel2)] px-2 py-0.5 rounded-lg border border-[var(--line)]">Ctrl + K</span>
                       <span className="text-[12.5px] font-bold">Universal Command Palette</span>
@@ -1892,13 +2104,13 @@ export function SettingsView() {
                     <span className="text-[11px] font-medium text-[var(--mut)]">Always active</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <div className="hidden sm:grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {SHORTCUT_ACTIONS.map((sa) => {
                       const currentKey = s.shortcuts?.[sa.action] ?? DEFAULT_SHORTCUTS[sa.action] ?? "";
                       return (
                         <div
                           key={sa.action}
-                          className="flex items-center justify-between rounded-xl border px-3 py-2 glass-regular"
+                          className="flex items-center justify-between rounded-xl border px-3 py-2 bg-[var(--panel2)]"
                           style={{ borderColor: "var(--line)" }}
                         >
                           <span className="text-[12.5px] font-bold truncate pr-2">{sa.label}</span>
@@ -1921,7 +2133,7 @@ export function SettingsView() {
                               }}
                               onChange={() => {}}
                               title="Click and press any key to remap"
-                              className="w-16 text-center font-mono text-[12px] font-bold py-1 px-1.5 rounded-lg border border-[var(--line)] bg-[var(--panel2)] text-[var(--accent)] cursor-pointer focus:ring-2 focus:ring-[var(--accent)]"
+                              className="w-16 text-center font-mono text-[12px] font-bold py-1 px-1.5 rounded-lg border border-[var(--line)] bg-[var(--panel)] text-[var(--accent)] cursor-pointer focus:ring-2 focus:ring-[var(--accent)]"
                             />
                           </div>
                         </div>
@@ -1929,7 +2141,7 @@ export function SettingsView() {
                     })}
                   </div>
 
-                  <div className="flex items-center justify-between pt-1">
+                  <div className="hidden sm:flex items-center justify-between pt-1">
                     <span className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
                       Click on any shortcut box and tap a new key on your keyboard to assign.
                     </span>
@@ -1946,7 +2158,10 @@ export function SettingsView() {
                   </div>
                 </div>
               ),
-              true
+              true,
+              undefined,
+              false,
+              "Desktop Only"
             )}
 
             {/* Software Updates & Releases */}

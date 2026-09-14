@@ -74,10 +74,13 @@ export function ReportsView() {
     const m = new Map<string, number>();
     for (const s of workSessions) {
       const t = state.tasks.find((x) => x.id === s.taskId);
-      if (t) m.set(t.projectId, (m.get(t.projectId) ?? 0) + sessionMinutes(s));
+      if (t) {
+        if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) continue;
+        m.set(t.projectId, (m.get(t.projectId) ?? 0) + sessionMinutes(s));
+      }
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [workSessions, state.tasks]);
+  }, [workSessions, state.tasks, state.settings.showLifeLogProject]);
   const byTag = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of workSessions) {
@@ -111,12 +114,13 @@ export function ReportsView() {
 
   /* ---- Life Log vs Work breakdown ---- */
   const lifeTasks = useMemo(() => {
+    if (state.settings.showLifeLogProject === false) return [];
     return state.tasks.filter((t) => {
       if (t.projectId !== LIFE_LOG_PROJECT_ID) return false;
       const d = t.due || isoDate(new Date(t.createdAt));
       return d >= from && d <= to;
     });
-  }, [state.tasks, from, to]);
+  }, [state.tasks, from, to, state.settings.showLifeLogProject]);
 
   const lifeMin = useMemo(() => {
     return lifeTasks.reduce((acc, t) => acc + (t.durationMin || t.estimateMin || 30), 0);
@@ -386,80 +390,88 @@ export function ReportsView() {
       </div>
 
       {/* Life Balance: Work vs Routine & Life Log */}
-      <div className="card card-hover engine-panel p-4.5 w-full min-w-0 glass-regular border" style={{ borderColor: "var(--line)" }}>
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3" style={{ borderColor: "var(--line)" }}>
-          <div className="flex items-center gap-2">
-            <span className="text-xl">🌊</span>
-            <div>
-              <div className="font-display text-[15.5px] font-bold tracking-tight">
-                Life Balance · Work vs Routine Life
-              </div>
-              <div className="text-xs font-semibold text-[var(--mut)]">
-                Comparing deep work sessions vs lifestyle streams (YouTube, research, vibe coding, habits)
+      {state.settings.showLifeLogProject !== false && (
+        <div
+          className={cn(
+            "card card-hover engine-panel p-4.5 w-full min-w-0 border",
+            state.settings.layout === "glass" ? "glass-regular" : "bg-[var(--panel)]"
+          )}
+          style={{ borderColor: "var(--line)" }}
+        >
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-3" style={{ borderColor: "var(--line)" }}>
+            <div className="flex items-center gap-2">
+              <span className="text-xl">🌊</span>
+              <div>
+                <div className="font-display text-[15.5px] font-bold tracking-tight">
+                  Life Balance · Work vs Routine Life
+                </div>
+                <div className="text-xs font-semibold text-[var(--mut)]">
+                  Comparing deep work sessions vs lifestyle streams (YouTube, research, vibe coding, habits)
+                </div>
               </div>
             </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="chip text-xs font-bold text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-soft)]">
+                Work: {fmtDur(totalMin)} ({workPct}%)
+              </span>
+              <span className="chip text-xs font-bold text-sky-500 border-sky-500/40 bg-sky-500/10">
+                Life Log: {fmtDur(lifeMin)} ({lifePct}%)
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="chip text-xs font-bold text-[var(--accent)] border-[var(--accent)] bg-[var(--accent-soft)]">
-              Work: {fmtDur(totalMin)} ({workPct}%)
-            </span>
-            <span className="chip text-xs font-bold text-sky-500 border-sky-500/40 bg-sky-500/10">
-              Life Log: {fmtDur(lifeMin)} ({lifePct}%)
-            </span>
-          </div>
-        </div>
 
-        {/* Visual proportion bar */}
-        <div className="mt-3.5 space-y-1.5">
-          <div className="h-3 w-full rounded-full overflow-hidden flex bg-[var(--panel2)] border border-[var(--line)]">
-            <div
-              className="h-full transition-all"
-              style={{ width: `${workPct}%`, background: "var(--accent)" }}
-              title={`Work & Projects: ${workPct}% (${fmtDur(totalMin)})`}
-            />
-            <div
-              className="h-full transition-all bg-sky-500"
-              style={{ width: `${lifePct}%` }}
-              title={`Routine & Life Streams: ${lifePct}% (${fmtDur(lifeMin)})`}
-            />
-          </div>
-          <div className="flex justify-between text-[11px] font-bold text-[var(--mut)]">
-            <span className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-[var(--accent)] inline-block" />
-              Work & Focus Sessions ({workPct}%)
-            </span>
-            <span className="flex items-center gap-1">
-              <span className="h-2 w-2 rounded-full bg-sky-500 inline-block" />
-              Routine, Learning & Lifestyle ({lifePct}%)
-            </span>
-          </div>
-        </div>
-
-        {/* Life stream activity chips */}
-        {lifeCategoryBreakdown.length > 0 ? (
-          <div className="mt-4 pt-3 border-t grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2" style={{ borderColor: "var(--line)" }}>
-            {lifeCategoryBreakdown.map((item) => (
+          {/* Visual proportion bar */}
+          <div className="mt-3.5 space-y-1.5">
+            <div className="h-3 w-full rounded-full overflow-hidden flex bg-[var(--panel2)] border border-[var(--line)]">
               <div
-                key={item.label}
-                className="flex items-center justify-between p-2.5 rounded-xl border bg-[var(--bg)]"
-                style={{ borderColor: "var(--line)" }}
-              >
-                <div className="flex items-center gap-1.5 truncate">
-                  <span>{item.emoji}</span>
-                  <span className="text-xs font-bold truncate">{item.label}</span>
+                className="h-full transition-all"
+                style={{ width: `${workPct}%`, background: "var(--accent)" }}
+                title={`Work & Projects: ${workPct}% (${fmtDur(totalMin)})`}
+              />
+              <div
+                className="h-full transition-all bg-sky-500"
+                style={{ width: `${lifePct}%` }}
+                title={`Routine & Life Streams: ${lifePct}% (${fmtDur(lifeMin)})`}
+              />
+            </div>
+            <div className="flex justify-between text-[11px] font-bold text-[var(--mut)]">
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-[var(--accent)] inline-block" />
+                Work & Focus Sessions ({workPct}%)
+              </span>
+              <span className="flex items-center gap-1">
+                <span className="h-2 w-2 rounded-full bg-sky-500 inline-block" />
+                Routine, Learning & Lifestyle ({lifePct}%)
+              </span>
+            </div>
+          </div>
+
+          {/* Life stream activity chips */}
+          {lifeCategoryBreakdown.length > 0 ? (
+            <div className="mt-4 pt-3 border-t grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-2" style={{ borderColor: "var(--line)" }}>
+              {lifeCategoryBreakdown.map((item) => (
+                <div
+                  key={item.label}
+                  className="flex items-center justify-between p-2.5 rounded-xl border bg-[var(--bg)]"
+                  style={{ borderColor: "var(--line)" }}
+                >
+                  <div className="flex items-center gap-1.5 truncate">
+                    <span>{item.emoji}</span>
+                    <span className="text-xs font-bold truncate">{item.label}</span>
+                  </div>
+                  <span className="font-mono text-xs font-extrabold text-[var(--text)] shrink-0 pl-1">
+                    {fmtDur(item.min)}
+                  </span>
                 </div>
-                <span className="font-mono text-xs font-extrabold text-[var(--text)] shrink-0 pl-1">
-                  {fmtDur(item.min)}
-                </span>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className="mt-3 pt-2 text-[11px] text-[var(--mut)] font-medium">
-            💡 Log your YouTube watching, vibe coding, reading or leisure under the <strong>🌊 Life Log</strong> project in Tasks to see your breakdown here.
-          </div>
-        )}
-      </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-3 pt-2 text-[11px] text-[var(--mut)] font-medium">
+              💡 Log your YouTube watching, vibe coding, reading or leisure under the <strong>🌊 Life Log</strong> project in Tasks to see your breakdown here.
+            </div>
+          )}
+        </div>
+      )}
 
       {/* summary strip */}
       <div className="stagger grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 w-full min-w-0">

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpRight, CheckCircle2, Flame, History, Lock, PenLine, Save, Sparkles, TrendingDown, TrendingUp } from "lucide-react";
 import type { Note } from "../types";
+import { LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
 import {
@@ -55,6 +56,7 @@ export function ReviewView() {
 
     let done = 0;
     for (const t of state.tasks) {
+      if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (t.done && t.doneAt) { const d = isoDate(new Date(t.doneAt)); if (d >= range.from && d <= range.to) done++; }
       done += t.completions.filter((c) => { const d = isoDate(new Date(c.at)); return d >= range.from && d <= range.to; }).length;
     }
@@ -65,7 +67,10 @@ export function ReviewView() {
       const d = isoDate(new Date(s.startedAt));
       if (d < range.from || d > range.to) continue;
       const t = state.tasks.find((x) => x.id === s.taskId);
-      if (t) byProject.set(t.projectId, (byProject.get(t.projectId) ?? 0) + sessionMinutes(s));
+      if (t) {
+        if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) continue;
+        byProject.set(t.projectId, (byProject.get(t.projectId) ?? 0) + sessionMinutes(s));
+      }
     }
     const top = [...byProject.entries()].sort((a, b) => b[1] - a[1]).slice(0, 3);
 

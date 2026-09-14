@@ -173,6 +173,19 @@ export function TasksView({
   }, [state.tasks, state.settings.tagOrder]);
 
   const isLifeLog = typeof sel === "object" && "project" in sel && sel.project === LIFE_LOG_PROJECT_ID;
+
+  // Fallback if LifeLog project was active but user disabled showLifeLogProject
+  useEffect(() => {
+    if (isLifeLog && state.settings.showLifeLogProject === false) {
+      setSel("today");
+    }
+  }, [isLifeLog, state.settings.showLifeLogProject]);
+
+  const visibleProjects = useMemo(() => {
+    return state.projects.filter(
+      (p) => state.settings.showLifeLogProject !== false || p.id !== LIFE_LOG_PROJECT_ID
+    );
+  }, [state.projects, state.settings.showLifeLogProject]);
   const [routineCat, setRoutineCat] = useState<string>("sleep");
   const [routineTitle, setRoutineTitle] = useState<string>("");
   const [routineDuration, setRoutineDuration] = useState<string>("510");
@@ -443,7 +456,9 @@ export function TasksView({
 
   const completed = useMemo(() => {
     if (isLifeLog) return [];
-    let base = state.tasks.filter((t) => t.done);
+    let base = state.tasks.filter(
+      (t) => t.done && (state.settings.showLifeLogProject !== false || t.projectId !== LIFE_LOG_PROJECT_ID)
+    );
     if (typeof sel === "object" && "project" in sel)
       base = base.filter((t) => t.projectId === sel.project);
     else if (typeof sel === "object" && "tag" in sel)
@@ -451,7 +466,7 @@ export function TasksView({
     else if (typeof sel === "object" && "priority" in sel)
       base = base.filter((t) => t.priority === sel.priority);
     return base.sort((a, b) => (b.doneAt ?? 0) - (a.doneAt ?? 0));
-  }, [state.tasks, isLifeLog, sel]);
+  }, [state.tasks, isLifeLog, sel, state.settings.showLifeLogProject]);
 
   const selTitle = useMemo(() => {
     if (sel === "inbox") return "Inbox";
@@ -849,10 +864,10 @@ export function TasksView({
               </button>
             </div>
             <div className="flex flex-col gap-0.5 max-h-[220px] overflow-y-auto pr-0.5">
-              {state.projects.length === 0 && (
+              {visibleProjects.length === 0 && (
                 <div className="px-2 py-1 text-[11px] text-[var(--mut)]">No projects yet</div>
               )}
-              {state.projects.map((p) => {
+              {visibleProjects.map((p) => {
                 const active = typeof sel === "object" && "project" in sel && sel.project === p.id;
                 const pCount = state.tasks.filter((t) => !t.done && t.projectId === p.id).length;
                 return (

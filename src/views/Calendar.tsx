@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Clock3, Inbox, Layers, Plus, Sparkles } from "lucide-react";
-import type { Task, TaskTimeBlock } from "../types";
+import { LIFE_LOG_PROJECT_ID, type Task, type TaskTimeBlock } from "../types";
 import { useApp } from "../store";
 import {
   WEEKDAYS_SHORT,
@@ -85,6 +85,7 @@ export function CalendarView() {
     const m = new Map<string, CalendarItem[]>();
 
     for (const t of state.tasks) {
+      if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (t.timeBlocks && t.timeBlocks.length > 0) {
         // Multi-block task
         for (const b of t.timeBlocks) {
@@ -160,7 +161,7 @@ export function CalendarView() {
       arr.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
     }
     return m;
-  }, [state.tasks, state.habits]);
+  }, [state.tasks, state.habits, state.settings.showLifeLogProject]);
 
   const days: string[] = useMemo(() => {
     if (view === "day") return [anchor];
@@ -228,6 +229,7 @@ export function CalendarView() {
     const list: UnscheduledItem[] = [];
 
     for (const t of state.tasks) {
+      if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (t.done || (t.snoozedUntil && t.snoozedUntil > Date.now())) continue;
 
       if (t.timeBlocks && t.timeBlocks.length > 0) {
@@ -259,7 +261,7 @@ export function CalendarView() {
       }
     }
     return list;
-  }, [state.tasks]);
+  }, [state.tasks, state.settings.showLifeLogProject]);
 
   // Drag and drop handler
   const dropOn = (iso: string, min: number | null) => (e: React.DragEvent) => {

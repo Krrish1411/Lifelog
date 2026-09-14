@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { CalendarDays, Check, ExternalLink, FileText, Flame, Pencil, Play, Plus, Quote, RotateCcw, SlidersHorizontal, Sparkles, Timer } from "lucide-react";
-import type { Task } from "../types";
+import { LIFE_LOG_PROJECT_ID, type Task } from "../types";
 import { QUOTES } from "../types";
 import { useApp } from "../store";
 import {
@@ -58,6 +58,18 @@ function monthsAgo(iso: string, m: number): string {
   return isoDate(nd);
 }
 
+const DEFAULT_DASHBOARD_WIDGETS: Record<string, boolean> = {
+  greeting: true,
+  focusMetric: true,
+  dayCheckin: true,
+  upcomingSchedule: false,
+  quickTasks: true,
+  dailyNote: false,
+  habitsRadar: true,
+  flashback: true,
+  weeklyProgress: true,
+};
+
 export function Dashboard() {
   const app = useApp();
   const { state, set, setView, requestFocus, openTaskDialog, toggleDone, toast } = app;
@@ -72,15 +84,20 @@ export function Dashboard() {
   const feelingInputRef = useRef<HTMLTextAreaElement | null>(null);
   const [customizeOpen, setCustomizeOpen] = useState(false);
 
-  const widgets = state.settings.dashboardWidgets ?? {};
+  const widgets: Record<string, boolean> = {
+    ...DEFAULT_DASHBOARD_WIDGETS,
+    ...(state.settings.dashboardWidgets ?? {}),
+  };
   const toggleWidget = (k: string) => {
+    const currentVal = widgets[k] !== false;
     set((s) => ({
       ...s,
       settings: {
         ...s.settings,
         dashboardWidgets: {
+          ...DEFAULT_DASHBOARD_WIDGETS,
           ...s.settings.dashboardWidgets,
-          [k]: !(s.settings.dashboardWidgets?.[k] ?? true),
+          [k]: !currentVal,
         },
       },
     }));
@@ -164,7 +181,10 @@ export function Dashboard() {
   const dueTasks = useMemo(
     () =>
       state.tasks
-        .filter((t) => !t.done && t.due && t.due <= today && (!t.snoozedUntil || t.snoozedUntil <= Date.now()))
+        .filter((t) => {
+          if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) return false;
+          return !t.done && t.due && t.due <= today && (!t.snoozedUntil || t.snoozedUntil <= Date.now());
+        })
         .sort((a, b) => {
           if (a.due !== b.due) return (a.due ?? "").localeCompare(b.due ?? "");
           const aw = a.dueTime ? 0 : 1;
@@ -173,19 +193,26 @@ export function Dashboard() {
           const pw = { urgent: 0, high: 1, medium: 2, low: 3 };
           return pw[a.priority] - pw[b.priority];
         }),
-    [state.tasks, today],
+    [state.tasks, today, state.settings.showLifeLogProject],
   );
   const doneToday = useMemo(
-    () => state.tasks.filter((t) => t.done && t.doneAt && isoDate(new Date(t.doneAt)) === today),
-    [state.tasks, today],
+    () =>
+      state.tasks.filter((t) => {
+        if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) return false;
+        return t.done && t.doneAt && isoDate(new Date(t.doneAt)) === today;
+      }),
+    [state.tasks, today, state.settings.showLifeLogProject],
   );
 
   const schedule = useMemo(
     () =>
       state.tasks
-        .filter((t) => !t.done && t.due === today && t.dueTime)
+        .filter((t) => {
+          if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) return false;
+          return !t.done && t.due === today && t.dueTime;
+        })
         .sort((a, b) => (a.dueTime ?? "").localeCompare(b.dueTime ?? "")),
-    [state.tasks, today],
+    [state.tasks, today, state.settings.showLifeLogProject],
   );
   const [nowMin, setNowMin] = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
   useEffect(() => {

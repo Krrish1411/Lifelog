@@ -375,7 +375,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
           className="px-4 py-2.5 border-t text-xs flex items-center justify-between"
           style={{ borderColor: "color-mix(in srgb, var(--line) 80%, transparent)", color: "var(--mut)" }}
         >
-          <div className="flex items-center gap-3">
+          <div className="hidden sm:flex items-center gap-3">
             <span>
               <kbd
                 className="font-mono px-1.5 py-0.5 rounded border text-[11px]"

@@ -159,9 +159,13 @@ export function TaskDialog() {
     } else {
       const preset = taskDialog.presetDate ?? "";
       const presetTime = taskDialog.presetTime ?? "";
-      const isLifeLogDialog = (taskDialog.projectId ?? state.projects[0]?.id) === LIFE_LOG_PROJECT_ID;
+      const firstAvailableProj = state.projects.find(
+        (p) => state.settings.showLifeLogProject !== false || p.id !== LIFE_LOG_PROJECT_ID
+      )?.id ?? state.projects[0]?.id;
+      const initialPid = taskDialog.projectId ?? firstAvailableProj ?? "";
+      const isLifeLogDialog = initialPid === LIFE_LOG_PROJECT_ID;
       setTitle(taskDialog.initialTitle ?? "");
-      setProjectId(taskDialog.projectId ?? state.projects[0]?.id ?? "");
+      setProjectId(initialPid);
       setEmoji(isLifeLogDialog ? "🌊" : "");
       setPriority("medium");
       setTags([]);
@@ -182,7 +186,9 @@ export function TaskDialog() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskDialog.open, taskDialog.taskId]);
 
-  const projects = state.projects;
+  const projects = state.projects.filter(
+    (p) => state.settings.showLifeLogProject !== false || p.id !== LIFE_LOG_PROJECT_ID
+  );
   const recSummary = useMemo(() => (repeats ? describeRecurrence(rec) : "Does not repeat"), [repeats, rec]);
 
   // Natural Language parsing preview

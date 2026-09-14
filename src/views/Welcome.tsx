@@ -285,7 +285,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
     },
     {
       icon: Radio,
-      title: "Cryptographic P2P Sync",
+      title: "Cryptographic P2P Sync*",
       color: "#06b6d4",
       tag: "Zero-Cloud",
       desc: "Direct encrypted device-to-device synchronization over your local Wi-Fi. Zero relay databases, zero third-party cloud accounts, 100% private.",
@@ -340,7 +340,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
       size: "6.8 MB",
       href: "#apk-security",
       badge: "0/70 Clean Scan",
-      note: "Offline SQLite with local P2P sync across your devices",
+      note: "Offline SQLite with local P2P sync* across your devices",
       action: "toggle-android",
     },
     {
@@ -555,10 +555,10 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               <span className="flex h-2 w-2 rounded-full bg-[var(--ok)] animate-pulse shrink-0" />
               <ShieldCheck size={14} className="text-[var(--ok)] shrink-0" />
               <span className="sm:hidden text-[11px] font-bold tracking-tight text-[var(--text)] truncate">
-                Zero-Cloud · 100% Offline SQLite · P2P
+                Zero-Cloud · 100% Offline SQLite · P2P*
               </span>
               <span className="hidden sm:inline text-xs sm:text-sm font-bold tracking-wide text-[var(--text)]">
-                Zero Telemetry · 100% Offline SQLite WAL · AES-256-GCM · Direct P2P Sync
+                Zero Telemetry · 100% Offline SQLite WAL · AES-256-GCM · Direct P2P Sync*
               </span>
             </div>
 
@@ -823,7 +823,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                         <p>
                           Sync state across nodes using{" "}
                           <span className="rounded bg-[var(--accent-soft)] px-1.5 py-0.5 font-mono text-[var(--accent)] font-bold">
-                            @P2P-Sync
+                            @P2P-Sync*
                           </span>{" "}
                           under project{" "}
                           <span className="rounded bg-blue-500/15 px-1.5 py-0.5 font-mono text-blue-500 font-bold">
@@ -935,7 +935,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 </li>
                 <li className="flex items-start gap-2.5">
                   <span className="text-[var(--ok)] font-bold shrink-0">✓</span>
-                  <span><strong>Direct P2P Sync:</strong> Encrypted device-to-device synchronization over local Wi-Fi with zero servers.</span>
+                  <span><strong>Direct P2P Sync*:</strong> Encrypted device-to-device synchronization over local Wi-Fi with zero servers.</span>
                 </li>
               </ul>
             </div>
@@ -1442,7 +1442,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                   <span>The Core Workspace is Forever Free</span>
                 </div>
                 <p className="text-xs sm:text-sm text-[var(--text)]/80 leading-relaxed">
-                  Your daily life system — unlimited tasks, nested subtasks, focus timers, second brain notes, habit streaks, visual time blocking, SQLite database storage, and direct local P2P sync — will <strong className="text-[var(--text)]">never be locked behind a subscription or paywall</strong>.
+                  Your daily life system — unlimited tasks, nested subtasks, focus timers, second brain notes, habit streaks, visual time blocking, SQLite database storage, and direct local P2P sync* — will <strong className="text-[var(--text)]">never be locked behind a subscription or paywall</strong>.
                 </p>
               </div>
 
@@ -1455,6 +1455,26 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                   To sustainably fund continuous updates and research, future specialized power add-ons (such as optional encrypted cloud relay fallback for restrictive firewalls, artisan theme packs, and executive team automation) will be available as optional Pro upgrades. <strong className="text-[var(--text)]">The core remains sovereign and yours for life.</strong>
                 </p>
               </div>
+            </div>
+
+            {/* P2P Sync Relay & Community Donation Covenant Notice */}
+            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-4 sm:p-5 text-xs text-[var(--text)]/80 leading-relaxed space-y-2">
+              <div className="flex items-center gap-2 font-bold text-amber-500 text-xs sm:text-sm">
+                <span className="text-base font-black leading-none">*</span>
+                <span>P2P Sync Infrastructure & Community Donation Notice</span>
+              </div>
+              <p>
+                Direct device pairing relies on encrypted WebRTC signaling relays. Operating these high-availability STUN/TURN servers incurs continuous monthly hosting costs. We gratefully accept community donations via{" "}
+                <a
+                  href="https://buymeacoffee.com/krish1411"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-amber-400 font-bold underline hover:text-amber-300 transition-colors"
+                >
+                  Buy Me a Coffee
+                </a>{" "}
+                to keep zero-cloud P2P relays free for all users. If ongoing server and bandwidth costs outpace community donations, automated P2P relay signaling may become an optional Pro tier feature, while manual encrypted vault backups, file export/import, and the core offline engine will remain forever free.
+              </p>
             </div>
           </div>
         </section>

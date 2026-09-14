@@ -13,6 +13,7 @@ import {
   Pencil,
 } from "lucide-react";
 import type { Priority, Project, ViewId } from "../types";
+import { LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
 import { triggerHaptic } from "../utils/native";
 import { normalizeHex, uid } from "../utils/core";
@@ -59,7 +60,12 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
 
   if (!open) return null;
 
-  const openTasks = state.tasks.filter((t) => !t.done);
+  const visibleProjects = state.projects.filter(
+    (p) => state.settings.showLifeLogProject !== false || p.id !== LIFE_LOG_PROJECT_ID
+  );
+  const openTasks = state.tasks.filter(
+    (t) => !t.done && (state.settings.showLifeLogProject !== false || t.projectId !== LIFE_LOG_PROJECT_ID)
+  );
   const inboxCount = openTasks.filter((t) => !t.due).length;
   const today = new Date().toISOString().slice(0, 10);
   const todayCount = openTasks.filter(
@@ -337,7 +343,7 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
                 className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--mut)] hover:text-[var(--text)] cursor-pointer"
               >
                 {projectsExpanded ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-                <span>Projects ({state.projects.length})</span>
+                <span>Projects ({visibleProjects.length})</span>
               </button>
               <button
                 type="button"
@@ -364,12 +370,12 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
 
             {projectsExpanded && (
               <div className="space-y-0.5 pl-1">
-                {state.projects.length === 0 && (
+                {visibleProjects.length === 0 && (
                   <div className="px-3 py-2 text-[11.5px] font-medium text-[var(--mut)]">
                     No projects yet. Tap + to add one.
                   </div>
                 )}
-                {state.projects.map((p) => {
+                {visibleProjects.map((p) => {
                   const pCount = openTasks.filter((t) => t.projectId === p.id).length;
                   const isSel = currentView === "tasks" && selectedTaskFilter === `p:${p.id}`;
                   return (

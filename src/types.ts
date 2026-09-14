@@ -198,6 +198,8 @@ export interface Settings {
   timeFormat?: "12h" | "24h";
   /* User-defined LifeLog categories */
   customLifeLogCategories?: LifeLogCategory[];
+  /* Enable or hide the LifeLog stream project */
+  showLifeLogProject?: boolean;
   /* Gentle Milestone Support Coffee Prompt */
   lastSupportPromptShownAt?: number;
   muteSupportPrompt?: boolean;
@@ -336,11 +338,14 @@ export const DEFAULT_SETTINGS: Settings = {
     greeting: true,
     focusMetric: true,
     quickTasks: true,
-    upcomingSchedule: true,
+    upcomingSchedule: false,
     habitsRadar: true,
     dayCheckin: true,
     weeklyProgress: true,
+    dailyNote: false,
+    flashback: true,
   },
+  showLifeLogProject: true,
   reportWidgets: {
     timeOfDay: true,
     projects: true,
