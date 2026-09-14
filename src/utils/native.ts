@@ -5,12 +5,14 @@ import { StatusBar, Style } from "@capacitor/status-bar";
 import { LocalNotifications } from "@capacitor/local-notifications";
 
 export const isNativeMobile = Capacitor.isNativePlatform();
+export const isElectron = typeof window !== "undefined" && !!(window as any).electronAPI;
+export const isBrowser = !isNativeMobile && !isElectron;
 export const isTauri = false;
 export const isNative = isNativeMobile;
-export const platformType = isNativeMobile ? "android" : "web";
+export const platformType = isNativeMobile ? "android" : isElectron ? "desktop" : "web";
 const ua = typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() : "";
 export const isLinux = typeof window !== "undefined" && ua.includes("linux") && !ua.includes("android");
-export const isLinuxDesktop = false;
+export const isLinuxDesktop = isElectron && isLinux;
 
 /**
  * Send desktop / web notification via standard Web Notification API.

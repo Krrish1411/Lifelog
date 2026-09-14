@@ -21,7 +21,6 @@ import { fmtClock, fmtDur, isoDate, sessionMinutes, todayIso, uid, isSleepTask }
 import {
   playTimerFinishSound,
   playTimerStartSound,
-  stopSoundscape,
   unlockAudioContext,
 } from "../utils/audio";
 import { Btn, EmptyState, SearchInput, Seg, cn } from "../components/ui";
@@ -108,7 +107,6 @@ export function FocusView() {
     if (!live) {
       setStage(false);
       setBreakOffer(false);
-      stopSoundscape();
     }
   }, [live?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -141,7 +139,6 @@ export function FocusView() {
       ),
     }));
 
-    stopSoundscape();
     cancelTimerEndNotification();
     triggerHaptic(kind === "done" ? "heavy" : "medium");
 

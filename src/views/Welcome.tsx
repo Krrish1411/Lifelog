@@ -164,7 +164,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
       desc: "Distraction-free Pomodoro and continuous Flow timers. Includes offline synthesized acoustic bell chimes and strict pause auditing.",
       bullets: [
         "Pomodoro (25/5), Flow & custom countdowns",
-        "Offline ambient soundscapes & chimes",
+        "Synthesized acoustic bell chimes & audio cues",
         "Micro-pause duration tracking & audit logs",
         "Direct linkage to active priority tasks",
       ],
@@ -694,8 +694,8 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
                     <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
                       <Volume2 size={14} className="text-[var(--text)] shrink-0" />
-                      <span className="text-xs font-bold text-[var(--text)]">Offline Soundscapes:</span>
-                      {["Rainstorm", "Forest Camp", "Synthesized Bell"].map((sound, sIdx) => (
+                      <span className="text-xs font-bold text-[var(--text)]">Synthetic Audio Cues:</span>
+                      {["Start Chime", "Break Bell", "Pause Auditing"].map((sound, sIdx) => (
                         <span
                           key={sIdx}
                           className="rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--text)]"

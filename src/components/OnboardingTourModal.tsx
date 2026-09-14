@@ -72,7 +72,7 @@ const TOUR_SLIDES: Slide[] = [
   {
     badge: "Deep Work",
     title: "Focus Studio: Your Quiet Zone",
-    tagline: "Eliminate distractions and get into the zone with built-in soundscapes and timers.",
+    tagline: "Eliminate distractions and get into the zone with distraction-free timers.",
     icon: Timer,
     accentColor: "#f59e0b",
     highlights: [
@@ -81,15 +81,15 @@ const TOUR_SLIDES: Slide[] = [
         desc: "Choose the classic 25-minute cadence, set a custom countdown, or use the open-ended flow stopwatch.",
       },
       {
-        title: "Built-In Ambient Soundscapes",
-        desc: "Switch on gentle rain, ocean waves, white, pink, or brown noise directly inside the app to block background noise.",
+        title: "Synthetic Bell Chimes & Micro-Audits",
+        desc: "Synthesized acoustic bells notify you when focus blocks complete, with zero external audio dependencies.",
       },
       {
         title: "Honest Pause Tracking",
         desc: "If you take a coffee break or step away, pauses are logged transparently so your focus history reflects reality.",
       },
     ],
-    tip: "Tap Spacebar to pause or resume your active focus timer without touching the mouse.",
+    tip: "Tap Spacebar to pause or resume your timer. Press 'F' to jump directly to Focus.",
   },
   {
     badge: "Second Brain & Schedule",

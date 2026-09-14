@@ -17,6 +17,7 @@ import {
   Trash2,
   CheckCircle2,
   GitMerge,
+  Heart,
 } from "lucide-react";
 import { useApp } from "../store";
 import { syncEngine } from "../sync/syncEngine";
@@ -742,6 +743,17 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
             </div>
           </div>
         )}
+
+        {/* P2P Infrastructure & Community Support Notice */}
+        <div className="mt-4 p-3 rounded-xl border border-amber-500/25 bg-amber-500/5 space-y-1.5 text-left">
+          <div className="flex items-center gap-1.5 text-[11.5px] font-bold text-amber-500">
+            <Heart size={13} className="text-amber-500 shrink-0" />
+            <span>P2P Relay Infrastructure & Community Support</span>
+          </div>
+          <p className="text-[10.5px] text-[var(--mut)] leading-relaxed">
+            Direct device pairing relies on encrypted WebRTC signaling relays. Operating these high-availability STUN/TURN servers incurs continuous monthly hosting costs. Please consider donating via <a href="https://buymeacoffee.com/krish1411" target="_blank" rel="noopener noreferrer" className="text-amber-400 font-semibold underline">Buy Me a Coffee</a> to keep zero-cloud P2P relays free for everyone. If server costs outpace community donations, automated P2P cloud signaling may become a Pro tier feature, while manual file backups remain forever free.
+          </p>
+        </div>
       </div>
     </Modal>
 

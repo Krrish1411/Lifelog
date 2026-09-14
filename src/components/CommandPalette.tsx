@@ -118,7 +118,7 @@ export const CommandPalette: React.FC<CommandPaletteProps> = ({
     const navViews: { id: ViewId; label: string; desc: string }[] = [
       { id: "dashboard", label: "Dashboard", desc: "Overview, stats & quick actions" },
       { id: "tasks", label: "Tasks", desc: "All tasks, projects & manual ordering" },
-      { id: "focus", label: "Focus Timer", desc: "Deep work, pomodoro & ambient sounds" },
+      { id: "focus", label: "Focus Timer", desc: "Deep work, pomodoro & pause auditing" },
       { id: "calendar", label: "Calendar", desc: "Timeline scheduling & time blocks" },
       { id: "habits", label: "Habits", desc: "Daily streaks & consistency heatmap" },
       { id: "notes", label: "Notes", desc: "Encrypted thoughts & linked references" },

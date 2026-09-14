@@ -87,10 +87,9 @@ export async function buildSeedState(): Promise<State> {
     due: today,
     dueTime: "14:00",
     durationMin: 25,
-    notes: "Distraction-free focus stage with synthetic audio chimes, pause-duration auditing, and background soundscapes.",
+    notes: "Distraction-free focus stage with synthetic audio chimes and pause-duration auditing.",
     subtasks: [
-      { id: uid(), title: "Click the focus timer icon next to any task or press '3'", done: false, doneAt: null },
-      { id: uid(), title: "Select your preferred ambient soundscape (Rain, Brown noise, Waves)", done: false, doneAt: null },
+      { id: uid(), title: "Click the focus timer icon next to any task or press 'F'", done: false, doneAt: null },
       { id: uid(), title: "Complete one focused block without switching tabs", done: false, doneAt: null },
     ],
   });
@@ -176,9 +175,8 @@ LifeLog is organized around three natural daily rhythms:
    - Use the **Today** view to keep your immediate focus narrow and calm.
 
 2. **Immerse in Deep Work (Mid-day):**
-   - Click the **Focus** timer next to any task.
+   - Click the **Focus** timer next to any task or press \`F\`.
    - Choose between **Pomodoro** (classic 25m/5m cadence), **Countdown** (custom time budget), or **Flow** (open-ended stopwatch).
-   - Turn on synthesized background audio (White Noise, Rain, Waves, or Binaural beats) to drown out distractions.
    - Any pauses you take are honestly recorded — no cheating your own history!
 
 3. **Reflect & Calibrate (Evening):**
@@ -217,17 +215,19 @@ When you are not typing in a text field, LifeLog supports rapid single-key navig
 
 | Key | Action |
 |:---:|:---|
-| \`1\` | Jump to Cockpit Dashboard |
-| \`2\` | Jump to Tasks & Projects |
-| \`3\` | Jump to Deep Focus Stage |
-| \`4\` | Jump to Time-Grid Calendar |
-| \`5\` | Jump to Habits Tracker |
-| \`6\` | Jump to Notes & Second Brain |
-| \`7\` | Jump to Reports & Analytics |
-| \`8\` | Jump to Daily Log & Reflection |
-| \`9\` | Jump to Settings |
+| \`H\` | Jump to Cockpit Dashboard |
+| \`T\` | Jump to Tasks & Projects |
+| \`F\` | Jump to Deep Focus Stage |
+| \`C\` | Jump to Time-Grid Calendar |
+| \`B\` | Jump to Habits Tracker |
+| \`E\` | Jump to Notes & Second Brain |
+| \`D\` | Jump to Daily Log & Reflection |
+| \`R\` | Jump to Reports & Analytics |
+| \`V\` | Jump to Weekly Review |
+| \`S\` | Jump to Settings |
 | \`Space\` | Start / Pause Active Focus Timer |
 | \`Ctrl+K\` | Open Universal Command Palette |
+| \`Ctrl+N\` | Create New Task |
 
 *Need custom keys? Remap every shortcut to your preference in **Settings > General**.*`;
 

@@ -8,6 +8,7 @@ export interface DesignerTheme {
   desc: string;
   mode: ThemeMode;
   darkOnly?: boolean;
+  isPro?: boolean;
   counterpartId: string;
   accent: string;
   bg: string;
@@ -20,9 +21,10 @@ export const DARK_THEMES: DesignerTheme[] = [
   {
     id: "crimson-dark",
     name: "LifeLog Crimson Dark",
-    tag: "Signature Crimson · Deep Slate Dark",
+    tag: "Core Free · Signature Crimson Slate",
     desc: "Rich dark palette featuring LifeLog's signature crimson red highlights on deep velvet slate.",
     mode: "dark",
+    isPro: false,
     counterpartId: "minimal-white",
     accent: "#ef4444",
     bg: "#090d14",
@@ -46,6 +48,7 @@ export const DARK_THEMES: DesignerTheme[] = [
     desc: "True #000000 black with crisp cyan highlights. Zero power draw on OLED screens.",
     mode: "dark",
     darkOnly: true,
+    isPro: true,
     counterpartId: "minimal-white",
     accent: "#38bdf8",
     bg: "#000000",
@@ -68,6 +71,7 @@ export const DARK_THEMES: DesignerTheme[] = [
     tag: "Cyberpunk · Neon Twilight",
     desc: "Deep neon twilight inspired by nighttime Tokyo city streets and cyan-blue glow.",
     mode: "dark",
+    isPro: true,
     counterpartId: "tokyo-day",
     accent: "#7aa2f7",
     bg: "#1a1b26",
@@ -90,6 +94,7 @@ export const DARK_THEMES: DesignerTheme[] = [
     tag: "Soothing Pastel · Dark Slate",
     desc: "Harmonious pastel lavender accents on a deep velvety purple-slate canvas.",
     mode: "dark",
+    isPro: true,
     counterpartId: "catppuccin-latte",
     accent: "#cba6f7",
     bg: "#1e1e2e",
@@ -112,6 +117,7 @@ export const DARK_THEMES: DesignerTheme[] = [
     tag: "Arctic · North-Bluish Slate",
     desc: "Glacial, arctic palette engineered for prolonged reading and calm concentration.",
     mode: "dark",
+    isPro: true,
     counterpartId: "nord-snow",
     accent: "#88c0d0",
     bg: "#2e3440",
@@ -134,6 +140,7 @@ export const DARK_THEMES: DesignerTheme[] = [
     tag: "High Contrast · Gothic Purple",
     desc: "Vibrant high-contrast midnight palette featuring luminous orchid, mint, and pink.",
     mode: "dark",
+    isPro: true,
     counterpartId: "warm-sepia",
     accent: "#bd93f9",
     bg: "#282a36",
@@ -156,6 +163,7 @@ export const DARK_THEMES: DesignerTheme[] = [
     tag: "Botanical · Organic Deep Forest",
     desc: "Natural deep botanical dark green aesthetic tailored for deep work serenity.",
     mode: "dark",
+    isPro: true,
     counterpartId: "sage-light",
     accent: "#5a9e74",
     bg: "#080d09",
@@ -178,9 +186,10 @@ export const LIGHT_THEMES: DesignerTheme[] = [
   {
     id: "minimal-white",
     name: "LifeLog Crimson Light",
-    tag: "Signature Crimson · Crisp Paper Canvas",
+    tag: "Core Free · Crisp Paper Canvas",
     desc: "Clean light paper canvas with LifeLog's iconic vivid crimson red accents and pristine elevated surfaces.",
     mode: "light",
+    isPro: false,
     counterpartId: "crimson-dark",
     accent: "#dc2626",
     bg: "#f8fafc",
@@ -203,6 +212,7 @@ export const LIGHT_THEMES: DesignerTheme[] = [
     tag: "Editorial · Cobalt Daylight",
     desc: "Bright editorial daytime theme with cobalt blue highlights and warm graphite text.",
     mode: "light",
+    isPro: true,
     counterpartId: "tokyo-night",
     accent: "#2563eb",
     bg: "#f4f6fb",
@@ -225,6 +235,7 @@ export const LIGHT_THEMES: DesignerTheme[] = [
     tag: "Light Pastel · Soft Violet",
     desc: "Delicate light pastel aesthetic with gentle violet accents and pleasant soft contrast.",
     mode: "light",
+    isPro: true,
     counterpartId: "catppuccin-mocha",
     accent: "#8839ef",
     bg: "#eff1f5",
@@ -247,6 +258,7 @@ export const LIGHT_THEMES: DesignerTheme[] = [
     tag: "Glacial Snow · Deep Teal",
     desc: "Cool crystalline snow-white theme with deep arctic teal accents for bright daytime focus.",
     mode: "light",
+    isPro: true,
     counterpartId: "nord-frost",
     accent: "#007899",
     bg: "#eceff4",
@@ -266,9 +278,10 @@ export const LIGHT_THEMES: DesignerTheme[] = [
   {
     id: "warm-sepia",
     name: "Warm Sepia Paper",
-    tag: "Bookish Cream · Terracotta",
+    tag: "Core Free · Terracotta Paper",
     desc: "Gentle literary cream-toned paper with rich terracotta amber accents, zero eye strain.",
     mode: "light",
+    isPro: false,
     counterpartId: "dracula",
     accent: "#c2410c",
     bg: "#fbf7ee",
@@ -291,6 +304,7 @@ export const LIGHT_THEMES: DesignerTheme[] = [
     tag: "Fresh Herbs · Deep Green",
     desc: "Crisp morning garden theme with fresh botanical green accents and clean light cards.",
     mode: "light",
+    isPro: true,
     counterpartId: "sage-dark",
     accent: "#2d6a4f",
     bg: "#f4f7f4",

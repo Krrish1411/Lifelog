@@ -93,6 +93,8 @@ import {
 } from "../utils/audio";
 import {
   checkNativeNotificationPermission,
+  isBrowser,
+  isElectron,
   isLinux,
   isLinuxDesktop,
   isNative,
@@ -284,7 +286,11 @@ export function SettingsView() {
     const p = applyThemePatch(th);
     patch(p);
     triggerHaptic("medium");
-    toast(`Applied “${th.name}” theme`, "ok");
+    if (th.isPro) {
+      toast(`Applied “${th.name}” (Pro Theme · Free Beta Preview)`, "ok");
+    } else {
+      toast(`Applied “${th.name}” (Core Free Theme)`, "ok");
+    }
   };
 
   const handleModeChange = (newMode: ThemeMode) => {
@@ -656,6 +662,22 @@ export function SettingsView() {
         {/* ===================== TAB 1: APPEARANCE ===================== */}
         {activeTab === "appearance" && (
           <>
+            {/* Pro Beta Preview Banner */}
+            <div className="card engine-panel p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-amber-500/30 bg-amber-500/10 lg:col-span-2">
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2 font-display text-[14.5px] font-bold text-amber-400">
+                  <Sparkles size={16} className="text-amber-400 shrink-0" />
+                  <span>Pro Features · Free Beta Preview</span>
+                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
+                    All Unlocked
+                  </span>
+                </div>
+                <p className="text-[11.5px] font-semibold text-[var(--mut)]">
+                  All 10 designer themes, custom hex pickers, token overrides, and custom font uploads are 100% unlocked during our public beta. The 3 core themes (LifeLog Crimson Dark, Crimson Light, Warm Sepia) will remain permanently free forever.
+                </p>
+              </div>
+            </div>
+
             {/* Universal Theme Reset Banner */}
             <div className="card engine-panel p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-[var(--line)] bg-[var(--bg)] lg:col-span-2">
               <div className="space-y-0.5">
@@ -677,10 +699,10 @@ export function SettingsView() {
               </Btn>
             </div>
 
-            {/* Dark Mode Themes (6 Curated Dark Palettes) */}
+            {/* Dark Mode Themes (Curated Dark Palettes) */}
             {section(
               "Dark Mode Themes",
-              "Curated rich night palettes with high contrast. Selecting any theme automatically activates Dark Mode.",
+              "Curated rich night palettes. Pro themes are unlocked during beta preview; core LifeLog themes are permanently free.",
               (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {DARK_THEMES.map((th) => {
@@ -708,11 +730,18 @@ export function SettingsView() {
                             <span className="font-display text-[12px] font-bold tracking-tight truncate">
                               {th.name}
                             </span>
-                            {isCurrent && (
-                              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
-                                <Check size={8} />
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {th.isPro && (
+                                <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                                  PRO
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
+                                  <Check size={8} />
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="text-[9.5px] font-semibold text-[var(--accent)] truncate">
                             {th.tag}
@@ -726,10 +755,10 @@ export function SettingsView() {
               true
             )}
 
-            {/* Light Mode Themes (6 Curated Light Palettes) */}
+            {/* Light Mode Themes (Curated Light Palettes) */}
             {section(
               "Light Mode Themes",
-              "Clean daylight palettes with crisp legibility. Selecting any theme automatically activates Light Mode.",
+              "Clean daylight palettes. Pro themes are unlocked during beta preview; core LifeLog themes are permanently free.",
               (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
                   {LIGHT_THEMES.map((th) => {
@@ -757,11 +786,18 @@ export function SettingsView() {
                             <span className="font-display text-[12px] font-bold tracking-tight truncate">
                               {th.name}
                             </span>
-                            {isCurrent && (
-                              <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
-                                <Check size={8} />
-                              </span>
-                            )}
+                            <div className="flex items-center gap-1 shrink-0">
+                              {th.isPro && (
+                                <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30">
+                                  PRO
+                                </span>
+                              )}
+                              {isCurrent && (
+                                <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--on-accent)] text-[8px] font-bold shrink-0">
+                                  <Check size={8} />
+                                </span>
+                              )}
+                            </div>
                           </div>
                           <div className="text-[9.5px] font-semibold text-[var(--accent)] truncate">
                             {th.tag}
@@ -830,7 +866,7 @@ export function SettingsView() {
                     </div>
                   </div>
 
-                  <Labeled label="Custom Accent Hex" hint="custom hex always available">
+                  <Labeled label="Custom Accent Hex" hint="Pro Beta Preview · custom hex unlocked">
                     <div className="flex items-center gap-2">
                       <ColorPicker value={s.accent} onChange={(hex) => patch({ accent: hex })} />
                       {s.accent.toLowerCase() !== DEFAULT_SETTINGS.accent.toLowerCase() && (
@@ -850,7 +886,7 @@ export function SettingsView() {
                   </Labeled>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Labeled label="Background — dark mode">
+                    <Labeled label="Background — dark mode" hint="Pro Beta Preview">
                       <div className="flex items-center gap-2">
                         <ColorPicker value={s.bgDark} onChange={(hex) => patch({ bgDark: hex })} />
                         {s.bgDark.toLowerCase() !== DEFAULT_SETTINGS.bgDark.toLowerCase() && (
@@ -868,7 +904,7 @@ export function SettingsView() {
                         )}
                       </div>
                     </Labeled>
-                    <Labeled label="Background — light mode">
+                    <Labeled label="Background — light mode" hint="Pro Beta Preview">
                       <div className="flex items-center gap-2">
                         <ColorPicker value={s.bgLight} onChange={(hex) => patch({ bgLight: hex })} />
                         {s.bgLight.toLowerCase() !== DEFAULT_SETTINGS.bgLight.toLowerCase() && (
@@ -894,7 +930,7 @@ export function SettingsView() {
             {/* Token Customizer */}
             {section(
               "Custom Theme Tokens",
-              "Override any token. Contrast guards keep text readable; “Auto” returns to the generated default.",
+              "Override any token. (Pro Feature · Unlocked in Beta) Contrast guards keep text readable; “Auto” returns to the generated default.",
               (
                 <div className="flex flex-col gap-2">
                   {TOKEN_ROWS.map((r) => {
@@ -1205,6 +1241,9 @@ export function SettingsView() {
                         }}
                       >
                         <Upload size={12} /> {s.customFontName ? `Custom: ${CUSTOM_FONT_FAMILY}` : "Upload font (.ttf/.otf/.woff2)"}
+                        <span className="px-1 py-0.2 rounded text-[8px] font-black uppercase tracking-wider bg-amber-500/20 text-amber-500 border border-amber-500/30 ml-0.5">
+                          PRO
+                        </span>
                         <input
                           type="file"
                           accept=".ttf,.otf,.woff,.woff2,font/*,application/octet-stream,*/*"
@@ -1577,6 +1616,20 @@ export function SettingsView() {
                       <Radio size={13} /> Open P2P Sync Pair
                     </Btn>
                   </div>
+
+                  {/* P2P Infrastructure Donation Covenant Card */}
+                  <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3.5 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold text-amber-500">
+                      <Heart size={14} className="text-amber-500 shrink-0" />
+                      <span>P2P Relay Infrastructure & Community Covenant</span>
+                    </div>
+                    <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                      Direct peer-to-peer pairing uses global WebRTC signaling relays and STUN/TURN traversal servers so devices connect instantly without port forwarding. Operating these fast, low-latency relay servers incurs recurring monthly server costs.
+                    </p>
+                    <p className="text-[11.5px] text-[var(--mut)] leading-relaxed">
+                      If you love seamless cross-device syncing, please consider supporting development via <a href="https://buymeacoffee.com/krish1411" target="_blank" rel="noopener noreferrer" className="text-amber-400 font-semibold underline underline-offset-2">Buy Me a Coffee</a>. If relay server expenses outgrow community donations in the future, automated cloud signaling may transition into an optional Pro add-on—while offline snapshot backups, QR manual sync, and local data sovereignty will always remain 100% free and open.
+                    </p>
+                  </div>
                 </div>
               ),
               true
@@ -1884,7 +1937,9 @@ export function SettingsView() {
             {/* Software Updates & Releases */}
             {section(
               "Software Updates & Releases",
-              "LifeLog has zero background telemetry and never checks for updates without your explicit request. Click below to query the official LifeLog Releases repository.",
+              isBrowser
+                ? "LifeLog Web Edition is hosted on edge networks and is always up to date. Download our standalone desktop and mobile apps below."
+                : "LifeLog has zero background telemetry and never checks for updates without your explicit request. Click below to query the official LifeLog Releases repository.",
               (
                 <div className="flex flex-col gap-3">
                   <div
@@ -1897,49 +1952,86 @@ export function SettingsView() {
                       </div>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[13.5px] font-bold">LifeLog Desktop & Mobile</span>
+                          <span className="text-[13.5px] font-bold">
+                            {isBrowser ? "LifeLog Web Edition" : "LifeLog Desktop & Mobile"}
+                          </span>
                           <span className="chip !py-0.5 text-[10.5px] font-mono" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
-                            v{APP_VERSION} Sovereign
+                            {isBrowser ? `v${APP_VERSION} · Always Up to Date` : `v${APP_VERSION} Sovereign`}
                           </span>
                         </div>
                         <div className="text-[11px] font-semibold mt-0.5" style={{ color: "var(--mut)" }}>
-                          Cryptographic offline vault · Native SQLite WAL · P2P DTLS Sync
+                          {isBrowser
+                            ? "Sandboxed Browser Storage · Zero-Cloud P2P · Always Up to Date"
+                            : "Cryptographic offline vault · Native SQLite WAL · P2P DTLS Sync"}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <Btn
-                        variant="primary"
-                        size="sm"
-                        disabled={updateChecking}
-                        onClick={checkForUpdates}
-                        className="gap-1.5 font-bold"
-                      >
-                        <RefreshCw size={13} className={cn(updateChecking && "animate-spin")} />
-                        {updateChecking ? "Checking..." : "Check for Updates"}
-                      </Btn>
-                      <a
-                        href="https://github.com/Krrish1411/Lifelog-Releases/releases"
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="btn btn-ghost !text-xs !py-1.5 gap-1"
-                        title="View Releases on GitHub"
-                      >
-                        <ExternalLink size={12} />
-                        Releases
-                      </a>
+                      {isBrowser ? (
+                        <>
+                          <a
+                            href="https://github.com/Krrish1411/Lifelog-Releases/releases"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-primary !text-xs !py-1.5 gap-1.5 font-bold cursor-pointer"
+                          >
+                            <Download size={13} />
+                            Download App (PC & Mobile)
+                          </a>
+                          <a
+                            href="https://github.com/Krrish1411/Lifelog-Releases/releases"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-ghost !text-xs !py-1.5 gap-1"
+                            title="View Releases on GitHub"
+                          >
+                            <ExternalLink size={12} />
+                            Releases
+                          </a>
+                        </>
+                      ) : (
+                        <>
+                          <Btn
+                            variant="primary"
+                            size="sm"
+                            disabled={updateChecking}
+                            onClick={checkForUpdates}
+                            className="gap-1.5 font-bold"
+                          >
+                            <RefreshCw size={13} className={cn(updateChecking && "animate-spin")} />
+                            {updateChecking ? "Checking..." : "Check for Updates"}
+                          </Btn>
+                          <a
+                            href="https://github.com/Krrish1411/Lifelog-Releases/releases"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="btn btn-ghost !text-xs !py-1.5 gap-1"
+                            title="View Releases on GitHub"
+                          >
+                            <ExternalLink size={12} />
+                            Releases
+                          </a>
+                        </>
+                      )}
                     </div>
                   </div>
 
-                  {updateResult.status === "latest" && (
+                  {isBrowser && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-bold" style={{ borderColor: "var(--ok)", background: "rgba(16, 185, 129, 0.08)", color: "var(--ok)" }}>
+                      <CheckCircle2 size={15} />
+                      You are running the latest sovereign web build (v{APP_VERSION}). Refreshing the browser automatically loads latest updates.
+                    </div>
+                  )}
+
+                  {!isBrowser && updateResult.status === "latest" && (
                     <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-bold" style={{ borderColor: "var(--ok)", background: "rgba(16, 185, 129, 0.08)", color: "var(--ok)" }}>
                       <CheckCircle2 size={15} />
                       You are running the latest sovereign build (v{APP_VERSION}). Zero updates pending.
                     </div>
                   )}
 
-                  {updateResult.status === "available" && updateResult.data && (
+                  {!isBrowser && updateResult.status === "available" && updateResult.data && (
                     <div className="flex items-center justify-between gap-2 p-3 rounded-xl border text-[12px]" style={{ borderColor: "var(--accent)", background: "rgba(99, 102, 241, 0.08)" }}>
                       <div>
                         <div className="font-bold text-[var(--accent)] flex items-center gap-1.5">
@@ -1955,7 +2047,7 @@ export function SettingsView() {
                     </div>
                   )}
 
-                  {updateResult.status === "error" && (
+                  {!isBrowser && updateResult.status === "error" && (
                     <div className="flex items-start gap-2 px-3 py-2 rounded-xl border text-[11.5px] font-semibold" style={{ borderColor: "var(--line)", background: "var(--panel2)", color: "var(--mut)" }}>
                       <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
                       <span>{updateResult.errorMsg}</span>
