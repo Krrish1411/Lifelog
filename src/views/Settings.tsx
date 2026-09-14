@@ -1342,28 +1342,6 @@ export function SettingsView() {
                       </button>
                     );
                   })}
-                  {isLinuxDesktop && (
-                    <div className="col-span-full rounded-2xl border p-3.5 space-y-2 border-l-4 mt-2 bg-[var(--panel2)]" style={{ borderColor: "var(--line)", borderLeftColor: "var(--accent)" }}>
-                      <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold uppercase tracking-wider text-[var(--text)] flex items-center gap-1.5">
-                          <span>🐧</span> Linux Desktop Rendering
-                        </span>
-                        <span className="text-[10.5px] font-mono font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                          Recommended: Desk Suite
-                        </span>
-                      </div>
-                      <p className="text-[12px] leading-relaxed text-[var(--mut)]">
-                        WebKitGTK on Linux runs smoothest with <strong>Desk Suite</strong>. Liquid Glass is automatically redirected to Desk on Linux to prevent GPU compositor blank screens, but you can override this if desired.
-                      </p>
-                      <div className="pt-1">
-                        <Toggle
-                          checked={s.disableGlassOnLinux === false}
-                          onChange={(checked) => patch({ disableGlassOnLinux: !checked })}
-                          label="Force Liquid Glass on Linux (requires hardware accelerated compositor)"
-                        />
-                      </div>
-                    </div>
-                  )}
                 </div>
               ),
               true,

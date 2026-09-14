@@ -192,8 +192,6 @@ export interface Settings {
   reduceMotion: boolean;
   reduceTransparency: boolean;
   highContrast: boolean;
-  /* Linux platform override */
-  disableGlassOnLinux?: boolean;
   /* Time format preference */
   timeFormat?: "12h" | "24h";
   /* User-defined LifeLog categories */

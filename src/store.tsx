@@ -30,7 +30,6 @@ import { loadFullStateFromDb, saveFullStateToDb } from "./db/database";
 import { runOneTimeLegacyMigration } from "./db/migrateLegacy";
 import {
   cancelTaskDueNotification,
-  isLinuxDesktop,
   isNative,
   scheduleTaskDueNotification,
   triggerHaptic,
@@ -138,7 +137,6 @@ function mergeState(raw: Partial<State>): State {
   }
 
   const initialLayout = base.settings?.layout ?? DEFAULT_SETTINGS.layout;
-  const isLinuxAutoDesk = isLinuxDesktop && initialLayout === "glass" && base.settings?.disableGlassOnLinux !== false;
 
   return {
     version: STATE_VERSION,
@@ -153,7 +151,7 @@ function mergeState(raw: Partial<State>): State {
     settings: {
       ...DEFAULT_SETTINGS,
       ...(base.settings ?? {}),
-      layout: isLinuxAutoDesk ? "desk" : initialLayout,
+      layout: initialLayout,
       accent:
         !base.settings?.accent || base.settings.accent.toLowerCase() === "#d97706"
           ? DEFAULT_SETTINGS.accent

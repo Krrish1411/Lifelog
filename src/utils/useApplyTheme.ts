@@ -3,7 +3,6 @@ import type { Settings, TokenKey } from "../types";
 import { FONT_PAIRS } from "../types";
 import { ensureContrast, mix, normalizeHex, readableOn } from "./core";
 import { CUSTOM_FONT_FAMILY } from "./fonts";
-import { isLinuxDesktop } from "./native";
 
 /**
  * Applies the complete LifeLog theme, CSS custom properties, font pairs,
@@ -81,15 +80,9 @@ export function useApplyTheme(s: Settings) {
     root.style.setProperty("--font-display", fam);
     document.body.style.fontFamily = fam;
 
-    const effectiveLayout = isLinuxDesktop && s.layout === "glass" && s.disableGlassOnLinux !== false ? "desk" : (s.layout ?? "glass");
     root.dataset.theme = dark ? "dark" : "light";
-    root.dataset.engine = effectiveLayout;
+    root.dataset.engine = s.layout ?? "glass";
     root.dataset.mobileEngine = s.mobileLayout ?? "classic";
-    if (isLinuxDesktop && s.layout === "glass" && s.disableGlassOnLinux !== false) {
-      root.dataset.linuxEngineForced = "desk";
-    } else {
-      delete root.dataset.linuxEngineForced;
-    }
     root.style.background = bg;
     root.style.color = derived.text;
     document.body.style.background = bg;
