@@ -386,3 +386,29 @@ This document provides a complete, authoritative, and chronological record of th
 - **Pages Branch (`gh-pages`)**:
   - Contains 100% compiled, hardened, obfuscated static web assets (`dist/index.html`, `404.html`, `.nojekyll`, `sql-wasm.wasm`, `version.json`, `assets/`).
   - Zero private source code, zero TypeScript files, zero commit history leaks.
+
+---
+
+## 13. Modern Liquid Landing Page Overhaul & Typography Polish
+
+### A. Liquid UI & Mesh Gradient Ambient System (`src/views/Welcome.tsx`)
+- Integrated multi-orb ambient liquid mesh gradients using CSS radial gradients and pulse keyframes with deep blurs (`blur-[140px]`).
+- Translucent frosted glass containers (`bg-[var(--panel)]/80 backdrop-blur-xl border border-[var(--line)]`) with soft specular highlights.
+
+### B. Widescreen Expansion & Edge-to-Edge Space Utilization
+- Expanded the layout boundary from cramped `max-w-4xl`/`max-w-5xl` constraints to **`max-w-7xl`** (1280px) with fluid 2-column widescreen hero and 3-column / 4-column responsive cards.
+- Hero features dual-column layout: left column for value proposition, trust pills, and primary CTAs; right column for an interactive live simulator.
+
+### C. Interactive Live Simulator Sandbox (Dopamine & User Engagement)
+- **Interactive Tasks**: Real interactive tasks with clickable checkmarks, dynamic momentum progress bar animating from 67% to 100%, time badges, and celebratory completion badge.
+- **Interactive Pomodoro Studio**: Live ticking countdown timer with Start/Pause controls, reset, and ambient soundscape tag previews.
+- **Interactive Second Brain**: Live Markdown note preview highlighting dynamic `@Tasks`, `#Projects`, and `[[Notes]]` wiki-links.
+- **Interactive 5 Layout Engines**: Live preview cards for Glassmorphic, Planify Clean, Control Center, Desk Station, and Zen Focus.
+
+### D. Typography & Accessibility Scaling
+- Completely eliminated hard-to-read micro-typography (`text-[10px]`, `text-[11px]`, `text-[11.5px]`).
+- Scaled all body and descriptive copy to `text-sm` (14px) and `text-base` (16px) with comfortable leading.
+- Scaled section headings to `text-3xl` / `text-4xl` and hero title to `text-4xl` to `text-6xl`.
+
+### E. Buy Me a Coffee Typography Standardization
+- Replaced the cursive `"Cookie"` font in both [`src/views/Welcome.tsx`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/views/Welcome.tsx) and [`src/views/Settings.tsx`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/views/Settings.tsx) with clean, modern, high-contrast bold sans-serif UI typography.
