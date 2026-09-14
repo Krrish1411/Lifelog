@@ -1,0 +1,51 @@
+{
+  "name": "LifeLog — Sovereign Personal Operating System",
+  "short_name": "LifeLog",
+  "description": "Offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep focus.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#090d14",
+  "theme_color": "#ffffff",
+  "lang": "en-US",
+  "dir": "ltr",
+  "categories": ["productivity", "utilities", "lifestyle"],
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Tasks & Habits",
+      "short_name": "Tasks",
+      "description": "Open your tasks agenda and habit cadence",
+      "url": "./#tasks",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Deep Focus",
+      "short_name": "Focus",
+      "description": "Start a deep focus or pomodoro session",
+      "url": "./#focus",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    },
+    {
+      "name": "Second Brain Notes",
+      "short_name": "Notes",
+      "description": "Open encrypted markdown notes",
+      "url": "./#notes",
+      "icons": [{ "src": "icon-192.png", "sizes": "192x192" }]
+    }
+  ]
+}

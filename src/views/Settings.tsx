@@ -2179,7 +2179,7 @@ export function SettingsView() {
             {/* Support LifeLog / Monetization */}
             {section(
               "Support LifeLog",
-              "LifeLog is 100% free, private, and open-source with zero trackers and zero ads. If LifeLog helps you stay focused and organized, consider supporting its independent development.",
+              "LifeLog is 100% free, private, sovereign software with zero trackers, zero telemetry, and zero ads. If LifeLog helps you stay focused and organized, consider supporting its independent development.",
               (
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-center gap-2.5">
