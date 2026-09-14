@@ -17,10 +17,6 @@
 
 **[🚀 Launch Live Web App](https://krrish1411.github.io/Lifelog-Releases/)** • **[📦 Download Desktop & Mobile](#-official-downloads)** • **[🛡️ Security Architecture](#-zero-cloud-sovereignty-guarantee)** • **[🐛 Report an Issue](https://github.com/Krrish1411/Lifelog-Releases/issues)**
 
-<br/>
-
-<img src="screenshot.png" alt="LifeLog Interface Preview" width="100%" style="border-radius: 14px; border: 1px solid rgba(255,255,255,0.12); box-shadow: 0 12px 40px rgba(0,0,0,0.25);" />
-
 </div>
 
 ---
