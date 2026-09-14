@@ -2080,15 +2080,13 @@ export function SettingsView() {
                       href="https://buymeacoffee.com/Krrish1411"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 rounded-xl px-4 py-1.5 text-[20px] font-normal shadow-xs transition-all hover:scale-[1.03] active:scale-[0.97] border border-black/80"
+                      className="inline-flex items-center gap-2 rounded-xl px-3.5 py-2 text-sm font-bold shadow-xs transition-all hover:scale-[1.02] active:scale-[0.98] border border-black/80"
                       style={{
                         background: "#FFDD00",
                         color: "#000000",
-                        fontFamily: "'Cookie', cursive",
-                        lineHeight: 1.1,
                       }}
                     >
-                      <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M20 8h-1V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v10c0 2.2 1.8 4 4 4h10c2.2 0 4-1.8 4-4v-2h1c1.7 0 3-1.3 3-3s-1.3-3-3-3zm-3 8c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V6h14v10zm3-4h-1v-2h1c.6 0 1 .4 1 1s-.4 1-1 1z" fill="#000000"/>
                         <path d="M6 9h2v4H6zm4 0h2v4h-2zm4 0h2v4h-2z" fill="#ffffff"/>
                       </svg>
