@@ -88,6 +88,7 @@
         "deb",
         "tar.gz"
       ],
+      "artifactName": "LifeLog-Linux-${arch}.${ext}",
       "maintainer": "Krrish1411 <Tablenovo1411@gmail.com>",
       "category": "Utility",
       "icon": "electron/icons/icon.png"
@@ -99,11 +100,20 @@
       ],
       "icon": "electron/icons/icon.ico"
     },
+    "nsis": {
+      "artifactName": "LifeLog-Windows-Setup.${ext}",
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "portable": {
+      "artifactName": "LifeLog-Windows-Portable.${ext}"
+    },
     "mac": {
       "target": [
         "dmg",
         "zip"
       ],
+      "artifactName": "LifeLog-macOS.${ext}",
       "category": "public.app-category.productivity",
       "icon": "electron/icons/icon.icns",
       "identity": null

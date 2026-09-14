@@ -45,28 +45,34 @@ jobs:
       - name: Build Android APKs
         run: |
           cd android
-          ./gradlew assembleRelease assembleDebug --stacktrace
+          ./gradlew assembleRelease --stacktrace
+          cd ..
+          cp android/app/build/outputs/apk/release/*-release.apk android/app/build/outputs/apk/release/LifeLog-Android.apk 2>/dev/null || cp android/app/build/outputs/apk/release/*.apk android/app/build/outputs/apk/release/LifeLog-Android.apk
 
       - name: Upload Release APK Artifact
         uses: actions/upload-artifact@v4
         with:
           name: LifeLog-Release-APK
-          path: android/app/build/outputs/apk/release/*.apk
+          path: android/app/build/outputs/apk/release/LifeLog-Android.apk
           if-no-files-found: warn
           retention-days: 30
 
-      - name: Upload Debug APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: LifeLog-Debug-APK
-          path: android/app/build/outputs/apk/debug/*.apk
-          if-no-files-found: warn
-          retention-days: 30
+      - name: Extract Changelog for Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          TAG="${GITHUB_REF_NAME}"
+          sed -n "/^## 🌟 ${TAG}/,/^---/p" RELEASE.md > RELEASE_BODY.md
+          if [ ! -s RELEASE_BODY.md ]; then
+            head -n 50 RELEASE.md > RELEASE_BODY.md
+          fi
 
-      - name: Attach APK to GitHub Release
+      - name: Attach APK to Lifelog-Releases
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
+          repository: Krrish1411/Lifelog-Releases
+          token: ${{ secrets.RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
+          name: LifeLog ${{ github.ref_name }} — Sovereign Release
+          body_path: RELEASE_BODY.md
           files: |
-            android/app/build/outputs/apk/release/*.apk
-            android/app/build/outputs/apk/debug/*.apk
+            android/app/build/outputs/apk/release/LifeLog-Android.apk
