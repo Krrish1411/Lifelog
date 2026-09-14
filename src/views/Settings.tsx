@@ -663,17 +663,19 @@ export function SettingsView() {
         {activeTab === "appearance" && (
           <>
             {/* Pro Beta Preview Banner */}
-            <div className="card engine-panel p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-amber-500/30 bg-amber-500/10 lg:col-span-2">
-              <div className="space-y-0.5">
-                <div className="flex items-center gap-2 font-display text-[14.5px] font-bold text-amber-400">
-                  <Sparkles size={16} className="text-amber-400 shrink-0" />
-                  <span>Pro Features · Free Beta Preview</span>
-                  <span className="px-1.5 py-0.5 rounded text-[9px] font-black tracking-wider uppercase bg-amber-500/20 text-amber-300 border border-amber-500/40">
-                    All Unlocked
+            <div className="card engine-panel p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border border-[var(--line)] bg-[var(--panel)] lg:col-span-2 shadow-xs">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2 font-display text-[14px] font-bold text-[var(--text)]">
+                  <div className="w-6 h-6 rounded-lg bg-[var(--accent)] text-[var(--on-accent)] flex items-center justify-center shrink-0 shadow-xs">
+                    <Sparkles size={13} />
+                  </div>
+                  <span>Pro Themes · Free Beta Preview</span>
+                  <span className="px-2 py-0.5 rounded-full text-[9px] font-black tracking-wider uppercase bg-[var(--accent-soft)] text-[var(--accent)] border border-[var(--accent)]/20">
+                    Unlocked
                   </span>
                 </div>
-                <p className="text-[11.5px] font-semibold text-[var(--mut)]">
-                  All 10 designer themes, custom hex pickers, token overrides, and custom font uploads are 100% unlocked during our public beta. The 3 core themes (LifeLog Crimson Dark, Crimson Light, Warm Sepia) will remain permanently free forever.
+                <p className="text-[11.5px] font-medium text-[var(--mut)] leading-relaxed">
+                  Designer boutique themes (OLED Pure Black, Tokyo Night/Day, Catppuccin, Nord, Dracula) and custom font uploads are completely unlocked during our public beta. 6 core themes (LifeLog Crimson, Warm Sepia, and Sage in both Dark &amp; Light) are permanently free forever.
                 </p>
               </div>
             </div>
@@ -866,7 +868,7 @@ export function SettingsView() {
                     </div>
                   </div>
 
-                  <Labeled label="Custom Accent Hex" hint="Pro Beta Preview · custom hex unlocked">
+                  <Labeled label="Custom Accent Hex" hint="custom hex always available">
                     <div className="flex items-center gap-2">
                       <ColorPicker value={s.accent} onChange={(hex) => patch({ accent: hex })} />
                       {s.accent.toLowerCase() !== DEFAULT_SETTINGS.accent.toLowerCase() && (
@@ -886,7 +888,7 @@ export function SettingsView() {
                   </Labeled>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <Labeled label="Background — dark mode" hint="Pro Beta Preview">
+                    <Labeled label="Background — dark mode">
                       <div className="flex items-center gap-2">
                         <ColorPicker value={s.bgDark} onChange={(hex) => patch({ bgDark: hex })} />
                         {s.bgDark.toLowerCase() !== DEFAULT_SETTINGS.bgDark.toLowerCase() && (
@@ -904,7 +906,7 @@ export function SettingsView() {
                         )}
                       </div>
                     </Labeled>
-                    <Labeled label="Background — light mode" hint="Pro Beta Preview">
+                    <Labeled label="Background — light mode">
                       <div className="flex items-center gap-2">
                         <ColorPicker value={s.bgLight} onChange={(hex) => patch({ bgLight: hex })} />
                         {s.bgLight.toLowerCase() !== DEFAULT_SETTINGS.bgLight.toLowerCase() && (
@@ -930,7 +932,7 @@ export function SettingsView() {
             {/* Token Customizer */}
             {section(
               "Custom Theme Tokens",
-              "Override any token. (Pro Feature · Unlocked in Beta) Contrast guards keep text readable; “Auto” returns to the generated default.",
+              "Override any token. Contrast guards keep text readable; “Auto” returns to the generated default.",
               (
                 <div className="flex flex-col gap-2">
                   {TOKEN_ROWS.map((r) => {
