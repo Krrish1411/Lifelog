@@ -370,29 +370,29 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 h-screen w-full overflow-y-auto scroll-smooth bg-[var(--bg)] text-[var(--text)] select-text z-50 overscroll-y-auto cursor-default transition-colors duration-200"
+      className="fixed inset-0 h-full w-full overflow-y-auto overflow-x-hidden scroll-smooth bg-[var(--bg)] text-[var(--text)] select-text z-50 overscroll-y-auto cursor-default transition-colors duration-200"
       style={{
         paddingBottom: "max(calc(var(--safe-bottom, 12px) + 32px), 64px)",
         WebkitOverflowScrolling: "touch",
       }}
     >
-      {/* Ambient Liquid Mesh Background Glows */}
+      {/* Ambient Liquid Mesh Background Glows (Optimized blur sizes for smooth mobile 120Hz) */}
       <div className="pointer-events-none fixed inset-0 overflow-hidden select-none z-0">
         <div
-          className="absolute -top-[15%] -left-[10%] h-[550px] w-[650px] rounded-full blur-[130px] opacity-25 dark:opacity-20 animate-pulse"
+          className="absolute -top-[15%] -left-[10%] h-[350px] w-[350px] sm:h-[550px] sm:w-[650px] rounded-full blur-[80px] sm:blur-[130px] opacity-25 dark:opacity-20 animate-pulse"
           style={{
             background: "radial-gradient(circle, var(--accent) 0%, transparent 70%)",
             animationDuration: "9s",
           }}
         />
         <div
-          className="absolute -top-[10%] -right-[10%] h-[600px] w-[700px] rounded-full blur-[140px] opacity-20 dark:opacity-15"
+          className="absolute -top-[10%] -right-[10%] h-[350px] w-[350px] sm:h-[600px] sm:w-[700px] rounded-full blur-[80px] sm:blur-[140px] opacity-20 dark:opacity-15"
           style={{
             background: "radial-gradient(circle, rgba(6, 182, 212, 0.4) 0%, rgba(59, 130, 246, 0.2) 50%, transparent 70%)",
           }}
         />
         <div
-          className="absolute bottom-[-15%] left-[20%] h-[500px] w-[700px] rounded-full blur-[150px] opacity-20 dark:opacity-15"
+          className="absolute bottom-[-15%] left-[20%] h-[350px] w-[350px] sm:h-[500px] sm:w-[700px] rounded-full blur-[90px] sm:blur-[150px] opacity-20 dark:opacity-15"
           style={{
             background: "radial-gradient(circle, rgba(245, 158, 11, 0.3) 0%, rgba(139, 92, 246, 0.18) 50%, transparent 70%)",
           }}
@@ -407,16 +407,16 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
         />
       </div>
 
-      {/* Top Header Navigation Bar (Refined & Balanced Full Width) */}
+      {/* Top Header Navigation Bar (Mobile Native Optimized) */}
       <header
         className="sticky top-0 z-50 w-full border-b border-[var(--line)] bg-[var(--panel)]/95 backdrop-blur-xl select-none transition-colors shadow-xs"
         style={{ paddingTop: "var(--safe-top, 0px)" }}
       >
-        <div className="w-full flex items-center justify-between px-4 sm:px-8 md:px-12 py-3">
+        <div className="w-full flex items-center justify-between px-3 sm:px-8 md:px-12 py-2.5 sm:py-3 gap-2">
           {/* Brand Logo & Version Badge */}
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex items-center justify-center">
-              <svg width={34} height={34} viewBox="0 0 32 32" aria-hidden className="shrink-0">
+          <div className="flex items-center gap-2 sm:gap-2.5 shrink-0">
+            <div className="relative flex items-center justify-center shrink-0">
+              <svg width={28} height={28} viewBox="0 0 32 32" aria-hidden className="shrink-0 sm:w-[32px] sm:h-[32px]">
                 <rect width="32" height="32" rx="9" fill="var(--panel2)" stroke="var(--line)" />
                 <circle
                   cx="16"
@@ -431,15 +431,18 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 />
                 <circle cx="16" cy="16" r="3" fill="var(--accent)" />
               </svg>
-              <div className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-[var(--ok)] ring-2 ring-[var(--panel)] animate-pulse" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 sm:w-2.5 sm:h-2.5 rounded-full bg-[var(--ok)] ring-2 ring-[var(--panel)] animate-pulse" />
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="font-display text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-display text-lg sm:text-2xl font-black tracking-tight text-[var(--text)]">
                 LifeLog
               </span>
-              <span className="rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2.5 py-0.5 text-xs font-mono font-bold tracking-wide text-[var(--accent)]">
+              <span className="hidden sm:inline-flex rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2.5 py-0.5 text-xs font-mono font-bold tracking-wide text-[var(--accent)]">
                 v{APP_VERSION} Sovereign
+              </span>
+              <span className="sm:hidden rounded-full border border-[var(--line)] bg-[var(--panel2)] px-1.5 py-0.5 text-[10px] font-mono font-bold text-[var(--accent)]">
+                v{APP_VERSION}
               </span>
             </div>
           </div>
@@ -484,11 +487,11 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
           </nav>
 
           {/* Right Action Items: Dark Mode Toggle + Buy Me a Coffee + Launch */}
-          <div className="flex items-center gap-2 sm:gap-3">
+          <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
             {/* Dark / Light Mode Toggle Button */}
             <button
               onClick={handleToggleTheme}
-              className="flex items-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-3 py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:scale-[1.03] active:scale-[0.97] shadow-xs cursor-pointer"
+              className="flex items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-2 sm:px-3 sm:py-1.5 text-xs font-bold text-[var(--text)] transition-all hover:scale-[1.03] active:scale-[0.97] shadow-xs cursor-pointer"
               title={isDark ? "Switch to Light Mode" : "Switch to Dark Mode"}
               aria-label="Toggle theme mode"
             >
@@ -505,12 +508,12 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               )}
             </button>
 
-            {/* Official Buy Me a Coffee Button (Sans UI Font) */}
+            {/* Official Buy Me a Coffee Button */}
             <a
               href="https://buymeacoffee.com/Krrish1411"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-[1.03] active:scale-[0.97] border border-black/80 shrink-0 cursor-pointer"
+              className="inline-flex items-center justify-center gap-1.5 rounded-xl p-2 sm:px-3 sm:py-1.5 text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-[1.03] active:scale-[0.97] border border-black/80 shrink-0 cursor-pointer"
               style={{
                 background: "#FFDD00",
                 color: "#000000",
@@ -521,72 +524,76 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 <path d="M20 8h-1V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v10c0 2.2 1.8 4 4 4h10c2.2 0 4-1.8 4-4v-2h1c1.7 0 3-1.3 3-3s-1.3-3-3-3zm-3 8c0 1.1-.9 2-2 2H5c-1.1 0-2-.9-2-2V6h14v10zm3-4h-1v-2h1c.6 0 1 .4 1 1s-.4 1-1 1z" fill="#000000"/>
                 <path d="M6 9h2v4H6zm4 0h2v4h-2zm4 0h2v4h-2z" fill="#ffffff"/>
               </svg>
-              <span className="font-bold tracking-tight">Buy me a coffee</span>
+              <span className="hidden sm:inline font-bold tracking-tight">Buy me a coffee</span>
             </a>
 
             {/* Primary Launch Action */}
             <button
               onClick={onEnter}
-              className="inline-flex items-center gap-1.5 rounded-xl px-3.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold text-[var(--on-accent)] shadow-md shadow-[var(--accent)]/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+              className="inline-flex items-center gap-1 sm:gap-1.5 rounded-xl px-2.5 sm:px-4 py-1.5 text-xs sm:text-sm font-bold text-[var(--on-accent)] shadow-md shadow-[var(--accent)]/25 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
               style={{ background: "var(--accent)" }}
             >
-              <span>{canDismiss ? "Launch Workspace" : "Enter LifeLog"}</span>
-              <ArrowRight size={14} />
+              <span className="sm:hidden">{canDismiss ? "Launch" : "Enter"}</span>
+              <span className="hidden sm:inline">{canDismiss ? "Launch Workspace" : "Enter LifeLog"}</span>
+              <ArrowRight size={13} className="shrink-0" />
             </button>
           </div>
         </div>
       </header>
 
       {/* Main Content Container (Well-Proportioned max-w-7xl) */}
-      <main className="relative z-10 mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-8 sm:py-12 space-y-16 sm:space-y-24">
+      <main className="relative z-10 mx-auto max-w-7xl px-3.5 sm:px-6 lg:px-8 py-5 sm:py-12 space-y-10 sm:space-y-20">
         
-        {/* HERO SECTION: Perfectly Balanced Above-the-Fold Grid */}
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center pt-2">
+        {/* HERO SECTION: Perfectly Balanced Mobile & Desktop Grid */}
+        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-10 items-center pt-1 sm:pt-2">
           
           {/* Left Column: Authoritative Message & Psychological Hooks */}
-          <div className="lg:col-span-7 space-y-5 text-left">
+          <div className="lg:col-span-7 space-y-4 sm:space-y-5 text-left">
             
             {/* Trust Pill */}
-            <div className="inline-flex flex-wrap items-center gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] px-3.5 py-1.5 shadow-xs">
-              <span className="flex h-2 w-2 rounded-full bg-[var(--ok)] animate-pulse" />
-              <ShieldCheck size={15} className="text-[var(--ok)] shrink-0" />
-              <span className="text-xs sm:text-sm font-bold tracking-wide text-[var(--text)]">
+            <div className="inline-flex items-center gap-1.5 sm:gap-2 rounded-full border border-[var(--line)] bg-[var(--panel)] px-3 py-1 sm:px-3.5 sm:py-1.5 shadow-xs max-w-full">
+              <span className="flex h-2 w-2 rounded-full bg-[var(--ok)] animate-pulse shrink-0" />
+              <ShieldCheck size={14} className="text-[var(--ok)] shrink-0" />
+              <span className="sm:hidden text-[11px] font-bold tracking-tight text-[var(--text)] truncate">
+                Zero-Cloud · 100% Offline SQLite · P2P
+              </span>
+              <span className="hidden sm:inline text-xs sm:text-sm font-bold tracking-wide text-[var(--text)]">
                 Zero Telemetry · 100% Offline SQLite WAL · AES-256-GCM · Direct P2P Sync
               </span>
             </div>
 
-            {/* Main Headline (Clean, Powerful, Perfectly Sized) */}
-            <h1 className="font-display text-3xl sm:text-4xl lg:text-[46px] font-black tracking-tight leading-[1.12] text-[var(--text)]">
+            {/* Main Headline */}
+            <h1 className="font-display text-2xl sm:text-4xl lg:text-[46px] font-black tracking-tight leading-[1.15] text-[var(--text)]">
               The Sovereign Personal Operating System.
             </h1>
 
             {/* Sub-headline */}
-            <p className="text-base sm:text-lg text-[var(--text)]/80 font-normal leading-relaxed max-w-xl">
+            <p className="text-sm sm:text-lg text-[var(--text)]/80 font-normal leading-relaxed max-w-xl">
               Take back absolute control over your schedule, deep work, habits, and private second-brain notes. Powered entirely by local SQLite WAL with instant sub-5ms boot speeds. <strong className="text-[var(--text)] font-bold">Zero monthly subscriptions, zero third-party cloud lock-in, and zero AI telemetry scraping.</strong>
             </p>
 
             {/* Psychological Reassurance Banner (Overwhelm Mitigation) */}
-            <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm transition-all duration-300 hover:border-[var(--accent)] group">
-              <div className="flex items-start gap-3">
-                <div className="p-2.5 rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] shrink-0 group-hover:scale-105 transition-transform">
-                  <Sparkles size={20} />
+            <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-3.5 sm:p-4 shadow-sm transition-all duration-300 hover:border-[var(--accent)] group">
+              <div className="flex items-start gap-2.5 sm:gap-3">
+                <div className="p-2 sm:p-2.5 rounded-xl bg-[var(--accent-soft)] text-[var(--accent)] shrink-0 group-hover:scale-105 transition-transform">
+                  <Sparkles size={18} className="sm:w-5 sm:h-5" />
                 </div>
                 <div>
-                  <h4 className="text-sm sm:text-base font-bold text-[var(--text)]">
+                  <h4 className="text-xs sm:text-base font-bold text-[var(--text)]">
                     Massive Power, Zero Overwhelm
                   </h4>
-                  <p className="mt-1 text-xs sm:text-sm text-[var(--text)]/75 leading-relaxed font-normal">
+                  <p className="mt-0.5 sm:mt-1 text-[11px] sm:text-sm text-[var(--text)]/75 leading-relaxed font-normal">
                     LifeLog includes full-scale modular capabilities, but you don&#39;t have to master everything on day one. Start with just 1 priority task today. Toggle features and views only when you feel ready.
                   </p>
                 </div>
               </div>
             </div>
 
-            {/* Call to Actions */}
-            <div className="flex flex-wrap items-center gap-3 pt-1">
+            {/* Call to Actions (Full Width Stack on Mobile, Inline on Desktop) */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3 pt-1">
               <button
                 onClick={onEnter}
-                className="flex items-center gap-2 rounded-xl px-6 sm:px-7 py-3 text-sm sm:text-base font-bold text-[var(--on-accent)] shadow-lg shadow-[var(--accent)]/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-6 sm:px-7 py-3 text-sm sm:text-base font-bold text-[var(--on-accent)] shadow-lg shadow-[var(--accent)]/30 transition-all hover:scale-[1.02] active:scale-[0.98] cursor-pointer"
                 style={{ background: "var(--accent)" }}
               >
                 <span>Launch LifeLog Instantly</span>
@@ -596,7 +603,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               <a
                 href="#downloads"
                 onClick={(e) => scrollToSection(e, "downloads")}
-                className="flex items-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-5 sm:px-6 py-3 text-sm sm:text-base font-bold text-[var(--text)] shadow-xs transition-all hover:bg-[var(--panel2)] hover:scale-[1.01] cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel)] px-5 sm:px-6 py-3 text-sm sm:text-base font-bold text-[var(--text)] shadow-xs transition-all hover:bg-[var(--panel2)] hover:scale-[1.01] cursor-pointer text-center"
               >
                 <Download size={17} className="text-[var(--accent)]" />
                 <span>Get Desktop & Mobile Apps</span>
@@ -604,18 +611,24 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
             </div>
 
             {/* 3 Core Value Pillars Strip */}
-            <div className="grid grid-cols-3 gap-3 pt-4 border-t border-[var(--line)]">
+            <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-[var(--line)] text-center sm:text-left">
               <div className="space-y-0.5">
-                <div className="text-xs font-bold uppercase tracking-wider text-[var(--mut)]">Engine Speed</div>
-                <div className="text-sm sm:text-base font-extrabold text-[var(--text)]">Sub-5ms Boot</div>
+                <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[var(--mut)]">Speed</div>
+                <div className="text-xs sm:text-base font-extrabold text-[var(--text)]">Sub-5ms Boot</div>
               </div>
               <div className="space-y-0.5">
-                <div className="text-xs font-bold uppercase tracking-wider text-[var(--mut)]">Cryptography</div>
-                <div className="text-sm sm:text-base font-extrabold text-[var(--text)]">Hardware AES-256</div>
+                <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[var(--mut)]">Security</div>
+                <div className="text-xs sm:text-base font-extrabold text-[var(--text)]">
+                  <span className="sm:hidden">Hardware AES</span>
+                  <span className="hidden sm:inline">Hardware AES-256</span>
+                </div>
               </div>
               <div className="space-y-0.5">
-                <div className="text-xs font-bold uppercase tracking-wider text-[var(--mut)]">Sovereign Cost</div>
-                <div className="text-sm sm:text-base font-extrabold text-[var(--ok)]">$0 · No Paywalls</div>
+                <div className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[var(--mut)]">Pricing</div>
+                <div className="text-xs sm:text-base font-extrabold text-[var(--ok)]">
+                  <span className="sm:hidden">$0 · Forever</span>
+                  <span className="hidden sm:inline">$0 · No Paywalls</span>
+                </div>
               </div>
             </div>
 
@@ -623,29 +636,29 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
           {/* Right Column: Interactive Live Sandbox Teaser */}
           <div id="interactive-demo" className="lg:col-span-5 scroll-mt-24">
-            <div className="relative rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-5 sm:p-6 shadow-xl transition-all duration-300 hover:shadow-2xl hover:border-[var(--accent)] group">
+            <div className="relative rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-4 sm:p-6 shadow-xl transition-all duration-300 hover:shadow-2xl hover:border-[var(--accent)] group">
               
               {/* Simulator Top Header */}
-              <div className="flex items-center justify-between border-b border-[var(--line)] pb-3.5">
-                <div className="flex items-center gap-2">
-                  <div className="h-3 w-3 rounded-full bg-red-500/90" />
-                  <div className="h-3 w-3 rounded-full bg-amber-500/90" />
-                  <div className="h-3 w-3 rounded-full bg-emerald-500/90" />
-                  <span className="ml-2 text-xs font-bold uppercase tracking-wider text-[var(--text)]">
-                    Interactive Live Sandbox
+              <div className="flex items-center justify-between border-b border-[var(--line)] pb-3">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-red-500/90" />
+                  <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-amber-500/90" />
+                  <div className="h-2.5 w-2.5 sm:h-3 sm:w-3 rounded-full bg-emerald-500/90" />
+                  <span className="ml-1 sm:ml-2 text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[var(--text)]">
+                    Interactive Sandbox
                   </span>
                 </div>
-                <span className="rounded-full bg-[var(--ok)]/15 border border-[var(--ok)]/30 px-2.5 py-0.5 text-[11px] font-extrabold text-[var(--ok)] uppercase tracking-wider animate-pulse">
+                <span className="rounded-full bg-[var(--ok)]/15 border border-[var(--ok)]/30 px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-[11px] font-extrabold text-[var(--ok)] uppercase tracking-wider animate-pulse">
                   Live Preview
                 </span>
               </div>
 
               {/* Interactive Tabs */}
-              <div className="mt-4 flex rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-1">
+              <div className="mt-3.5 flex rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-1 gap-0.5">
                 {[
-                  { id: "tasks", label: "Tasks & Momentum", icon: ListTodo },
-                  { id: "timer", label: "Pomodoro Studio", icon: Timer },
-                  { id: "notes", label: "Second Brain", icon: FileText },
+                  { id: "tasks", label: "Tasks & Momentum", short: "Tasks", icon: ListTodo },
+                  { id: "timer", label: "Pomodoro Studio", short: "Focus", icon: Timer },
+                  { id: "notes", label: "Second Brain", short: "Notes", icon: FileText },
                 ].map((tab) => {
                   const Icon = tab.icon;
                   const isActive = simTab === tab.id;
@@ -654,14 +667,15 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                       key={tab.id}
                       onClick={() => setSimTab(tab.id as any)}
                       className={cn(
-                        "flex flex-1 items-center justify-center gap-1.5 rounded-lg py-2 text-xs font-bold transition-all cursor-pointer",
+                        "flex flex-1 items-center justify-center gap-1 sm:gap-1.5 rounded-lg py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold transition-all cursor-pointer",
                         isActive
                           ? "bg-[var(--panel)] text-[var(--text)] shadow-xs border border-[var(--line)]"
                           : "text-[var(--text)]/70 hover:text-[var(--text)]"
                       )}
                     >
-                      <Icon size={14} className={isActive ? "text-[var(--accent)]" : ""} />
-                      <span>{tab.label}</span>
+                      <Icon size={13} className={isActive ? "text-[var(--accent)]" : ""} />
+                      <span className="sm:hidden">{tab.short}</span>
+                      <span className="hidden sm:inline">{tab.label}</span>
                     </button>
                   );
                 })}
@@ -749,19 +763,19 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
                 {/* TAB 2: Pomodoro Timer Sandbox */}
                 {simTab === "timer" && (
-                  <div className="space-y-4 text-center">
-                    <div className="rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-5">
-                      <div className="text-xs font-bold uppercase tracking-wider text-[var(--text)]/70">
+                  <div className="space-y-3.5 sm:space-y-4 text-center">
+                    <div className="rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-4 sm:p-5">
+                      <div className="text-[11px] sm:text-xs font-bold uppercase tracking-wider text-[var(--text)]/70">
                         Deep Work Focus Block (Session 1 of 4)
                       </div>
-                      <div className="mt-2 font-mono text-4xl sm:text-5xl font-black tracking-tight text-[var(--text)]">
+                      <div className="mt-1.5 sm:mt-2 font-mono text-3xl sm:text-5xl font-black tracking-tight text-[var(--text)]">
                         {formatTimer(timerSeconds)}
                       </div>
 
-                      <div className="mt-4 flex items-center justify-center gap-3">
+                      <div className="mt-3.5 sm:mt-4 flex items-center justify-center gap-2.5 sm:gap-3">
                         <button
                           onClick={() => setTimerRunning(!timerRunning)}
-                          className="flex items-center gap-2 rounded-xl px-5 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:scale-[1.03] cursor-pointer"
+                          className="flex items-center gap-2 rounded-xl px-4 sm:px-5 py-2 sm:py-2.5 text-xs font-bold text-white shadow-md transition-all hover:scale-[1.03] cursor-pointer"
                           style={{ background: timerRunning ? "var(--warn)" : "var(--accent)" }}
                         >
                           {timerRunning ? <Pause size={14} /> : <Play size={14} />}
@@ -772,7 +786,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                             setTimerRunning(false);
                             setTimerSeconds(1500);
                           }}
-                          className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel)] text-[var(--text)] hover:border-[var(--accent)] cursor-pointer"
+                          className="p-2 sm:p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel)] text-[var(--text)] hover:border-[var(--accent)] cursor-pointer"
                           title="Reset"
                         >
                           <RotateCcw size={14} />
@@ -781,12 +795,12 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                     </div>
 
                     <div className="flex flex-wrap items-center justify-center gap-1.5 pt-0.5">
-                      <Volume2 size={14} className="text-[var(--text)] shrink-0" />
-                      <span className="text-xs font-bold text-[var(--text)]">Synthetic Audio Cues:</span>
-                      {["Start Chime", "Break Bell", "Pause Auditing"].map((sound, sIdx) => (
+                      <Volume2 size={13} className="text-[var(--text)] shrink-0" />
+                      <span className="text-[11px] sm:text-xs font-bold text-[var(--text)]">Audio Cues:</span>
+                      {["Start Chime", "Break Bell", "Pause Alert"].map((sound, sIdx) => (
                         <span
                           key={sIdx}
-                          className="rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2.5 py-0.5 text-[11px] font-bold text-[var(--text)]"
+                          className="rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2 py-0.5 text-[10px] sm:text-[11px] font-bold text-[var(--text)]"
                         >
                           {sound}
                         </span>
@@ -798,12 +812,12 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 {/* TAB 3: Second Brain Notes Sandbox */}
                 {simTab === "notes" && (
                   <div className="space-y-3">
-                    <div className="rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-4 text-left">
-                      <div className="flex items-center justify-between border-b border-[var(--line)] pb-2.5 mb-2.5">
+                    <div className="rounded-xl border border-[var(--line)] bg-[var(--panel2)] p-3.5 sm:p-4 text-left">
+                      <div className="flex items-center justify-between border-b border-[var(--line)] pb-2 mb-2">
                         <span className="text-xs font-bold text-[var(--text)]">
                           📓 Architecture Manifesto.md
                         </span>
-                        <span className="text-[11px] font-mono font-bold text-[var(--accent)]">AES-256 Encrypted</span>
+                        <span className="text-[10px] sm:text-[11px] font-mono font-bold text-[var(--accent)]">AES-256 Encrypted</span>
                       </div>
                       <div className="space-y-2 text-xs sm:text-sm font-medium leading-relaxed text-[var(--text)]">
                         <p>
@@ -835,8 +849,8 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 )}
 
                 {/* Bottom Interactive CTA */}
-                <div className="pt-3.5 border-t border-[var(--line)] flex items-center justify-between">
-                  <span className="text-xs font-semibold text-[var(--text)]/70">
+                <div className="pt-3 border-t border-[var(--line)] flex items-center justify-between">
+                  <span className="text-[11px] sm:text-xs font-semibold text-[var(--text)]/70">
                     Ready to build your personal sanctuary?
                   </span>
                   <button
@@ -855,29 +869,29 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
         </section>
 
         {/* SECTION 2: Why LifeLog vs Big Tech Cloud (Loss Aversion & Privacy Urgency) */}
-        <section id="comparison" className="space-y-6 pt-4 scroll-mt-24">
-          <div className="text-center space-y-2">
-            <span className="rounded-full bg-[var(--accent-soft)] px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
+        <section id="comparison" className="space-y-5 sm:space-y-6 pt-2 sm:pt-4 scroll-mt-24">
+          <div className="text-center space-y-1.5 sm:space-y-2">
+            <span className="rounded-full bg-[var(--accent-soft)] px-3 py-0.5 sm:px-3.5 sm:py-1 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
               Digital Sovereignty
             </span>
-            <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[var(--text)]">
+            <h2 className="font-display text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[var(--text)]">
               LifeLog vs. Big Tech Cloud SaaS
             </h2>
-            <p className="mx-auto max-w-2xl text-sm sm:text-base text-[var(--text)]/75 leading-relaxed font-normal">
+            <p className="mx-auto max-w-2xl text-xs sm:text-base text-[var(--text)]/75 leading-relaxed font-normal">
               Why settle for cloud services that hold your private thoughts hostage, charge perpetual subscriptions, and feed your data to AI algorithms?
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
             {/* The Old Way: Cloud SaaS */}
-            <div className="rounded-2xl border border-red-500/25 bg-[var(--panel)] p-6 sm:p-7 shadow-sm space-y-4 transition-all duration-300 hover:shadow-lg hover:border-red-500/50">
+            <div className="rounded-2xl border border-red-500/25 bg-[var(--panel)] p-4 sm:p-7 shadow-sm space-y-3.5 sm:space-y-4 transition-all duration-300 hover:shadow-lg hover:border-red-500/50">
               <div className="flex items-center justify-between">
-                <span className="text-sm sm:text-base font-bold uppercase tracking-wider text-red-500">
-                  Big Tech Cloud SaaS (Notion, Todoist, Evernote)
+                <span className="text-xs sm:text-base font-bold uppercase tracking-wider text-red-500">
+                  Big Tech Cloud SaaS (Notion, Todoist)
                 </span>
-                <span className="text-xl">⚠️</span>
+                <span className="text-lg sm:text-xl">⚠️</span>
               </div>
-              <ul className="space-y-3 text-sm text-[var(--text)]/80">
+              <ul className="space-y-2.5 sm:space-y-3 text-xs sm:text-sm text-[var(--text)]/80">
                 <li className="flex items-start gap-2.5">
                   <span className="text-red-500 font-bold shrink-0">✕</span>
                   <span><strong>Perpetual recurring fees:</strong> $8 to $25/month per user that drains your wallet forever.</span>
@@ -898,15 +912,15 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
             </div>
 
             {/* The Sovereign Way: LifeLog */}
-            <div className="rounded-2xl border border-[var(--ok)]/50 bg-[var(--panel)] p-6 sm:p-7 shadow-md space-y-4 transition-all duration-300 hover:shadow-xl hover:border-[var(--ok)] relative overflow-hidden">
-              <div className="absolute top-0 right-0 w-28 h-28 bg-[var(--ok)]/10 rounded-bl-full pointer-events-none" />
+            <div className="rounded-2xl border border-[var(--ok)]/50 bg-[var(--panel)] p-4 sm:p-7 shadow-md space-y-3.5 sm:space-y-4 transition-all duration-300 hover:shadow-xl hover:border-[var(--ok)] relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 sm:w-28 sm:h-28 bg-[var(--ok)]/10 rounded-bl-full pointer-events-none" />
               <div className="flex items-center justify-between">
-                <span className="text-sm sm:text-base font-bold uppercase tracking-wider text-[var(--ok)]">
+                <span className="text-xs sm:text-base font-bold uppercase tracking-wider text-[var(--ok)]">
                   LifeLog Sovereign System
                 </span>
-                <span className="text-xl">🛡️</span>
+                <span className="text-lg sm:text-xl">🛡️</span>
               </div>
-              <ul className="space-y-3 text-sm text-[var(--text)]">
+              <ul className="space-y-2.5 sm:space-y-3 text-xs sm:text-sm text-[var(--text)]">
                 <li className="flex items-start gap-2.5">
                   <span className="text-[var(--ok)] font-bold shrink-0">✓</span>
                   <span><strong>100% Free Forever:</strong> Zero subscriptions, zero paywalls, zero locked features.</span>
@@ -929,56 +943,56 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
         </section>
 
         {/* SECTION 3: 7 Core Feature Pillars */}
-        <section id="pillars" className="space-y-6 pt-4 scroll-mt-24">
-          <div className="text-center space-y-2">
-            <span className="rounded-full bg-[var(--accent-soft)] px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
+        <section id="pillars" className="space-y-5 sm:space-y-6 pt-2 sm:pt-4 scroll-mt-24">
+          <div className="text-center space-y-1.5 sm:space-y-2">
+            <span className="rounded-full bg-[var(--accent-soft)] px-3 py-0.5 sm:px-3.5 sm:py-1 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
               Integrated Capabilities
             </span>
-            <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[var(--text)]">
+            <h2 className="font-display text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[var(--text)]">
               7 Unified Pillars. Zero Friction.
             </h2>
-            <p className="mx-auto max-w-2xl text-sm sm:text-base text-[var(--text)]/75 leading-relaxed font-normal">
+            <p className="mx-auto max-w-2xl text-xs sm:text-base text-[var(--text)]/75 leading-relaxed font-normal">
               Every tool works together seamlessly in a single cohesive, privacy-first workspace.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-5">
             {pillars.map((p, i) => {
               const Icon = p.icon;
               return (
                 <div
                   key={i}
-                  className="flex flex-col justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-5 sm:p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-md group"
+                  className="flex flex-col justify-between rounded-2xl border border-[var(--line)] bg-[var(--panel)] p-4 sm:p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:border-[var(--accent)] hover:shadow-md group"
                 >
                   <div>
                     <div className="flex items-center justify-between">
                       <div
-                        className="flex h-11 w-11 items-center justify-center rounded-xl shadow-xs transition-transform group-hover:scale-105"
+                        className="flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl shadow-xs transition-transform group-hover:scale-105"
                         style={{
                           background: `color-mix(in srgb, ${p.color} 15%, transparent)`,
                           color: p.color,
                         }}
                       >
-                        <Icon size={22} />
+                        <Icon size={20} className="sm:w-[22px] sm:h-[22px]" />
                       </div>
-                      <span className="rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2.5 py-0.5 text-xs font-bold tracking-wider text-[var(--text)]">
+                      <span className="rounded-full border border-[var(--line)] bg-[var(--panel2)] px-2 sm:px-2.5 py-0.5 text-[11px] sm:text-xs font-bold tracking-wider text-[var(--text)]">
                         {p.tag}
                       </span>
                     </div>
 
-                    <h3 className="mt-4 font-display text-lg font-bold text-[var(--text)]">
+                    <h3 className="mt-3 sm:mt-4 font-display text-base sm:text-lg font-bold text-[var(--text)]">
                       {p.title}
                     </h3>
-                    <p className="mt-1.5 text-xs sm:text-sm text-[var(--text)]/75 leading-relaxed font-normal">
+                    <p className="mt-1 sm:mt-1.5 text-xs sm:text-sm text-[var(--text)]/75 leading-relaxed font-normal">
                       {p.desc}
                     </p>
                   </div>
 
-                  <div className="mt-5 pt-4 border-t border-[var(--line)]">
-                    <ul className="space-y-2">
+                  <div className="mt-4 sm:mt-5 pt-3 sm:pt-4 border-t border-[var(--line)]">
+                    <ul className="space-y-1.5 sm:space-y-2">
                       {p.bullets.map((b, bi) => (
                         <li key={bi} className="flex items-start gap-2 text-xs sm:text-sm font-medium text-[var(--text)]">
-                          <CheckCircle2 size={15} style={{ color: p.color }} className="shrink-0 mt-0.5" />
+                          <CheckCircle2 size={14} style={{ color: p.color }} className="shrink-0 mt-0.5 sm:w-[15px] sm:h-[15px]" />
                           <span>{b}</span>
                         </li>
                       ))}
@@ -991,20 +1005,20 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
         </section>
 
         {/* SECTION 4: Cross-Platform Ecosystem & Downloads Hub */}
-        <section id="downloads" className="space-y-6 pt-4 scroll-mt-24">
-          <div className="text-center space-y-2">
-            <span className="rounded-full bg-[var(--accent-soft)] px-3.5 py-1 text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
+        <section id="downloads" className="space-y-5 sm:space-y-6 pt-2 sm:pt-4 scroll-mt-24">
+          <div className="text-center space-y-1.5 sm:space-y-2">
+            <span className="rounded-full bg-[var(--accent-soft)] px-3 py-0.5 sm:px-3.5 sm:py-1 text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-[var(--accent)]">
               Cross-Platform Ecosystem
             </span>
-            <h2 className="font-display text-2xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[var(--text)]">
+            <h2 className="font-display text-xl sm:text-3xl lg:text-4xl font-black tracking-tight text-[var(--text)]">
               Download LifeLog for Your Devices
             </h2>
-            <p className="mx-auto max-w-2xl text-sm sm:text-base text-[var(--text)]/75 leading-relaxed font-normal">
+            <p className="mx-auto max-w-2xl text-xs sm:text-base text-[var(--text)]/75 leading-relaxed font-normal">
               Pre-built native binaries with verified SHA-256 checksums, direct arm64 Android APKs, and zero-install PWA support for iOS and Web.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {platforms.map((pl, idx) => {
               const Icon = pl.icon;
               const isIos = pl.action === "toggle-ios";
@@ -1035,23 +1049,23 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                   target={isIos || isAndroid || isWeb ? undefined : "_blank"}
                   rel={isIos || isAndroid || isWeb ? undefined : "noopener noreferrer"}
                   className={cn(
-                    "flex flex-col justify-between p-5 rounded-2xl border shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md group cursor-pointer",
+                    "flex flex-col justify-between p-4 sm:p-5 rounded-2xl border shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-md group cursor-pointer",
                     isOpen
                       ? "border-[var(--accent)] ring-2 ring-[var(--accent)]/25 bg-[var(--panel2)]"
                       : "border-[var(--line)] bg-[var(--panel)] hover:border-[var(--accent)]"
                   )}
                 >
-                  <div className="space-y-4">
+                  <div className="space-y-3.5 sm:space-y-4">
                     <div className="flex items-center justify-between">
                       <div
                         className={cn(
-                          "h-11 w-11 rounded-xl flex items-center justify-center border transition-all",
+                          "h-10 w-10 sm:h-11 sm:w-11 rounded-xl flex items-center justify-center border transition-all",
                           isOpen
                             ? "bg-[var(--accent)] text-white border-transparent"
                             : "border-[var(--line)] bg-[var(--panel2)] text-[var(--accent)] group-hover:bg-[var(--accent)] group-hover:text-white"
                         )}
                       >
-                        <Icon size={22} />
+                        <Icon size={20} className="sm:w-[22px] sm:h-[22px]" />
                       </div>
                       <span
                         className={cn(
@@ -1072,7 +1086,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                     </div>
                   </div>
 
-                  <div className="mt-5 pt-3.5 border-t border-[var(--line)] flex items-center justify-between text-xs sm:text-sm font-bold text-[var(--accent)]">
+                  <div className="mt-4 sm:mt-5 pt-3 sm:pt-3.5 border-t border-[var(--line)] flex items-center justify-between text-xs sm:text-sm font-bold text-[var(--accent)]">
                     <span>
                       {isIos
                         ? isIosOpen
@@ -1109,19 +1123,19 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
           {activeDownloadDetail === "ios" && (
             <div
               id="ios-guide"
-              className="rounded-3xl border border-[var(--accent)]/50 bg-[var(--panel)] p-6 sm:p-8 shadow-md space-y-6 scroll-mt-24 transition-all animate-in fade-in zoom-in-95 duration-200"
+              className="rounded-3xl border border-[var(--accent)]/50 bg-[var(--panel)] p-4 sm:p-8 shadow-md space-y-4 sm:space-y-6 scroll-mt-24 transition-all animate-in fade-in zoom-in-95 duration-200"
             >
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[var(--line)] pb-5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 sm:gap-4 border-b border-[var(--line)] pb-4 sm:pb-5">
                 <div className="flex items-center gap-3">
-                  <div className="p-3 rounded-2xl bg-[var(--panel2)] border border-[var(--line)] text-[var(--text)] shrink-0">
-                    <Apple size={26} />
+                  <div className="p-2.5 sm:p-3 rounded-2xl bg-[var(--panel2)] border border-[var(--line)] text-[var(--text)] shrink-0">
+                    <Apple size={24} className="sm:w-[26px] sm:h-[26px]" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-display text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
+                      <h3 className="font-display text-lg sm:text-2xl font-black tracking-tight text-[var(--text)]">
                         iOS & iPadOS Installation Guide
                       </h3>
-                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-xs font-bold text-emerald-500">
+                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 sm:px-2.5 py-0.5 text-[10px] sm:text-xs font-bold text-emerald-500">
                         Zero App Store Fees
                       </span>
                     </div>
@@ -1130,62 +1144,62 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2.5 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
                   <button
                     onClick={onEnter}
-                    className="inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2.5 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all cursor-pointer shadow-sm"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-4 py-2 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all cursor-pointer shadow-sm"
                   >
                     <span>Launch Web App</span>
-                    <ArrowRight size={15} />
+                    <ArrowRight size={14} />
                   </button>
                   <button
                     onClick={() => setActiveDownloadDetail(null)}
-                    className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-[var(--text)]/70 hover:text-[var(--text)] hover:bg-[var(--line)] transition-all cursor-pointer"
+                    className="p-2 sm:p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-[var(--text)]/70 hover:text-[var(--text)] hover:bg-[var(--line)] transition-all cursor-pointer"
                     title="Close Guide"
                   >
-                    <X size={18} />
+                    <X size={16} className="sm:w-[18px] sm:h-[18px]" />
                   </button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5 sm:gap-4">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden">
                   <div className="flex items-center justify-between">
-                    <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">1</span>
-                    <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step One</span>
+                    <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">1</span>
+                    <span className="text-[11px] sm:text-xs font-mono font-bold text-[var(--text)]/60">Step One</span>
                   </div>
-                  <div className="font-display text-base font-bold text-[var(--text)]">Open in Safari</div>
+                  <div className="font-display text-sm sm:text-base font-bold text-[var(--text)]">Open in Safari</div>
                   <p className="text-xs text-[var(--text)]/75 leading-relaxed">
                     Launch the official LifeLog URL (<code className="font-mono text-[var(--accent)]">https://krrish1411.github.io/Lifelog-Releases/</code>) inside Apple Safari on your iPhone or iPad.
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden">
                   <div className="flex items-center justify-between">
-                    <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">2</span>
-                    <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step Two</span>
+                    <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">2</span>
+                    <span className="text-[11px] sm:text-xs font-mono font-bold text-[var(--text)]/60">Step Two</span>
                   </div>
-                  <div className="font-display text-base font-bold text-[var(--text)]">Tap the Share Icon</div>
+                  <div className="font-display text-sm sm:text-base font-bold text-[var(--text)]">Tap the Share Icon</div>
                   <p className="text-xs text-[var(--text)]/75 leading-relaxed">
                     Tap the <strong>Share</strong> button at the bottom of Safari (the square icon with an upward arrow <span className="font-bold text-[var(--accent)]">⎋ / 📤</span>).
                   </p>
                 </div>
 
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3 relative overflow-hidden">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-2.5 sm:space-y-3 relative overflow-hidden">
                   <div className="flex items-center justify-between">
-                    <span className="w-7 h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">3</span>
-                    <span className="text-xs font-mono font-bold text-[var(--text)]/60">Step Three</span>
+                    <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-full bg-[var(--accent)] text-white font-mono text-xs font-black flex items-center justify-center">3</span>
+                    <span className="text-[11px] sm:text-xs font-mono font-bold text-[var(--text)]/60">Step Three</span>
                   </div>
-                  <div className="font-display text-base font-bold text-[var(--text)]">Tap "Add to Home Screen"</div>
+                  <div className="font-display text-sm sm:text-base font-bold text-[var(--text)]">Tap "Add to Home Screen"</div>
                   <p className="text-xs text-[var(--text)]/75 leading-relaxed">
                     Scroll down the share sheet, tap <strong>"Add to Home Screen"</strong> (➕), and tap <strong>"Add"</strong> in the top-right corner.
                   </p>
                 </div>
               </div>
 
-              <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm text-[var(--text)]">
+              <div className="rounded-2xl border border-emerald-500/25 bg-emerald-500/5 p-3.5 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs sm:text-sm text-[var(--text)]">
                 <div className="flex items-start sm:items-center gap-2.5">
-                  <CheckCircle2 size={18} className="text-emerald-500 shrink-0 mt-0.5 sm:mt-0" />
+                  <CheckCircle2 size={17} className="text-emerald-500 shrink-0 mt-0.5 sm:mt-0" />
                   <span>
                     <strong>Native Standalone Experience:</strong> Launches with zero Safari address bars, fluid 120Hz scrolling, and local encrypted SQLite database persistence right on your iOS device.
                   </span>
@@ -1198,61 +1212,61 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
           {activeDownloadDetail === "android" && (
             <div
               id="apk-security"
-              className="rounded-3xl border border-emerald-500/40 bg-[var(--panel)] p-6 sm:p-8 shadow-md space-y-6 scroll-mt-24 transition-all animate-in fade-in zoom-in-95 duration-200"
+              className="rounded-3xl border border-emerald-500/40 bg-[var(--panel)] p-4 sm:p-8 shadow-md space-y-4 sm:space-y-6 scroll-mt-24 transition-all animate-in fade-in zoom-in-95 duration-200"
             >
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-[var(--line)] pb-5">
-                <div className="flex items-start gap-3.5">
-                  <div className="p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 shrink-0">
-                    <ShieldCheck size={28} />
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3.5 sm:gap-4 border-b border-[var(--line)] pb-4 sm:pb-5">
+                <div className="flex items-start gap-3 sm:gap-3.5">
+                  <div className="p-2.5 sm:p-3 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-500 shrink-0">
+                    <ShieldCheck size={24} className="sm:w-7 sm:h-7" />
                   </div>
                   <div>
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-display text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
-                        Android APK Safety & Verification Center
+                    <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                      <h3 className="font-display text-lg sm:text-2xl font-black tracking-tight text-[var(--text)]">
+                        Android APK Safety Center
                       </h3>
-                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-3 py-0.5 text-xs font-mono font-bold text-emerald-500">
-                        0/70 Clean Scan • 100% Malware-Free
+                      <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2 sm:px-3 py-0.5 text-[10px] sm:text-xs font-mono font-bold text-emerald-500">
+                        0/70 Clean Scan
                       </span>
                     </div>
                     <p className="text-xs sm:text-sm font-medium text-[var(--text)]/75 mt-1 max-w-3xl leading-relaxed">
-                      When downloading APKs directly from GitHub releases, Android displays a default generic security warning (<em>"File might be harmful"</em>) because the file was compiled outside Google Play. We believe in radical transparency: don't just take our word for it — here is undeniable mathematical, cryptographic, and zero-telemetry proof:
+                      Android displays a generic warning (<em>"File might be harmful"</em>) because this APK is compiled outside Google Play. Here is undeniable cryptographic, virus-scan, and zero-telemetry proof:
                     </p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto justify-between sm:justify-end">
                   <a
                     href="https://github.com/Krrish1411/Lifelog-Releases/releases/latest"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 text-xs sm:text-sm font-bold text-white shadow-sm transition-all cursor-pointer"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 px-4 py-2 text-xs sm:text-sm font-bold text-white shadow-sm transition-all cursor-pointer"
                   >
-                    <Download size={15} />
-                    <span>Download .apk</span>
+                    <Download size={14} />
+                    <span>Download APK</span>
                   </a>
                   <button
                     onClick={() => setActiveDownloadDetail(null)}
-                    className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-[var(--text)]/70 hover:text-[var(--text)] hover:bg-[var(--line)] transition-all cursor-pointer"
+                    className="p-2 sm:p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] text-[var(--text)]/70 hover:text-[var(--text)] hover:bg-[var(--line)] transition-all cursor-pointer"
                     title="Close Proof"
                   >
-                    <X size={18} />
+                    <X size={16} className="sm:w-[18px] sm:h-[18px]" />
                   </button>
                 </div>
               </div>
 
               {/* 4 Pillars of Proof */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 sm:gap-4">
                 {/* Proof 1: VirusTotal 0/70 Clean Scan */}
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-2.5 sm:space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
-                      <CheckCircle2 size={15} />
+                    <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider text-emerald-500 flex items-center gap-1.5">
+                      <CheckCircle2 size={14} />
                       Multi-Engine Antivirus Audit
                     </span>
-                    <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-emerald-500">
+                    <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold text-emerald-500">
                       0/70 Clean
                     </span>
                   </div>
-                  <div className="font-display text-base font-bold text-[var(--text)]">
+                  <div className="font-display text-sm sm:text-base font-bold text-[var(--text)]">
                     VirusTotal 70+ Security Vendor Verification
                   </div>
                   <p className="text-xs text-[var(--text)]/75 leading-relaxed">
@@ -1262,7 +1276,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                     href="https://www.virustotal.com/gui/home/upload"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-1"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-0.5"
                   >
                     <span>Verify APK on VirusTotal</span>
                     <ExternalLink size={12} />
@@ -1270,46 +1284,46 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 </div>
 
                 {/* Proof 2: Cryptographic SHA-256 Checksum */}
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-2.5 sm:space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
-                      <Fingerprint size={15} />
+                    <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider text-[var(--accent)] flex items-center gap-1.5">
+                      <Fingerprint size={14} />
                       Cryptographic Integrity
                     </span>
-                    <span className="rounded bg-[var(--accent-soft)] px-2 py-0.5 text-[11px] font-mono font-bold text-[var(--accent)]">
+                    <span className="rounded bg-[var(--accent-soft)] px-2 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold text-[var(--accent)]">
                       SHA-256
                     </span>
                   </div>
-                  <div className="font-display text-base font-bold text-[var(--text)]">
+                  <div className="font-display text-sm sm:text-base font-bold text-[var(--text)]">
                     Immutable Hash Verification
                   </div>
                   <p className="text-xs text-[var(--text)]/75 leading-relaxed">
                     Verify that the APK you downloaded is bit-for-bit identical to the compiled source and has not been intercepted, tampered with, or modified:
                   </p>
-                  <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--bg)] px-3 py-2 font-mono text-[11px] text-[var(--text)]/90">
-                    <code>sha256sum LifeLog-1.0.0.apk</code>
+                  <div className="flex items-center justify-between rounded-xl border border-[var(--line)] bg-[var(--bg)] px-2.5 py-1.5 font-mono text-[10px] sm:text-[11px] text-[var(--text)]/90 overflow-hidden">
+                    <code className="truncate mr-2">sha256sum LifeLog-1.0.0.apk</code>
                     <button
                       onClick={handleCopySha}
-                      className="ml-2 p-1 text-[var(--accent)] hover:opacity-80 cursor-pointer"
+                      className="shrink-0 p-1 text-[var(--accent)] hover:opacity-80 cursor-pointer"
                       title="Copy Verification Command"
                     >
-                      {copiedSha ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                      {copiedSha ? <Check size={13} className="text-emerald-500" /> : <Copy size={13} />}
                     </button>
                   </div>
                 </div>
 
                 {/* Proof 3: Zero Invasive Permissions */}
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-2.5 sm:space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
-                      <Lock size={15} />
+                    <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider text-blue-500 flex items-center gap-1.5">
+                      <Lock size={14} />
                       Zero Invasive Permissions
                     </span>
-                    <span className="rounded bg-blue-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-blue-500">
+                    <span className="rounded bg-blue-500/15 px-2 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold text-blue-500">
                       Strict Sandbox
                     </span>
                   </div>
-                  <div className="font-display text-base font-bold text-[var(--text)]">
+                  <div className="font-display text-sm sm:text-base font-bold text-[var(--text)]">
                     Transparent Android Manifest Audit
                   </div>
                   <div className="space-y-1.5 text-xs text-[var(--text)]/75">
@@ -1337,17 +1351,17 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 </div>
 
                 {/* Proof 4: Zero Outbound Telemetry (Network Inspected) */}
-                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-5 space-y-3">
+                <div className="rounded-2xl border border-[var(--line)] bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-2.5 sm:space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-mono font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
-                      <Radio size={15} />
+                    <span className="text-[11px] sm:text-xs font-mono font-bold uppercase tracking-wider text-amber-500 flex items-center gap-1.5">
+                      <Radio size={14} />
                       Zero Telemetry
                     </span>
-                    <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[11px] font-mono font-bold text-amber-500">
+                    <span className="rounded bg-amber-500/15 px-2 py-0.5 text-[10px] sm:text-[11px] font-mono font-bold text-amber-500">
                       Network Verified
                     </span>
                   </div>
-                  <div className="font-display text-base font-bold text-[var(--text)]">
+                  <div className="font-display text-sm sm:text-base font-bold text-[var(--text)]">
                     Zero Spyware & Zero Tracking Network Proof
                   </div>
                   <p className="text-xs text-[var(--text)]/75 leading-relaxed">
@@ -1357,7 +1371,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                     href="https://github.com/Krrish1411/Lifelog-Releases#-zero-cloud-sovereignty-guarantee"
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-1"
+                    className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--accent)] hover:underline pt-0.5"
                   >
                     <span>Review Sovereignty Guarantee</span>
                     <ExternalLink size={12} />
@@ -1366,7 +1380,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               </div>
 
               {/* THE PWA FALLBACK (Direct User Request) */}
-              <div className="rounded-2xl border border-[var(--accent)]/40 bg-[var(--accent-soft)] p-5 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+              <div className="rounded-2xl border border-[var(--accent)]/40 bg-[var(--accent-soft)] p-4 sm:p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3.5 sm:gap-4">
                 <div className="space-y-1 max-w-2xl">
                   <div className="flex items-center gap-2">
                     <Globe size={18} className="text-[var(--accent)] shrink-0" />
@@ -1381,7 +1395,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 <div className="flex items-center gap-2.5 shrink-0 w-full sm:w-auto">
                   <button
                     onClick={handleInstallPwa}
-                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-3 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all cursor-pointer shadow-sm"
+                    className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-[var(--accent)] px-5 py-2.5 sm:py-3 text-xs sm:text-sm font-bold text-white hover:opacity-90 transition-all cursor-pointer shadow-sm"
                   >
                     <span>{pwaPrompt ? "Install PWA App" : "Open Sovereign Web App"}</span>
                     <ArrowRight size={15} />
@@ -1405,14 +1419,14 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
         </section>
 
         {/* SECTION 5: The Sovereign Covenant & Future Pro Roadmap */}
-        <section className="pt-4">
-          <div className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-6 sm:p-8 shadow-sm space-y-5">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 rounded-xl bg-amber-500/15 text-amber-500 shrink-0">
-                <Crown size={24} />
+        <section className="pt-2 sm:pt-4">
+          <div className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-4 sm:p-8 shadow-sm space-y-4 sm:space-y-5">
+            <div className="flex items-center gap-2.5 sm:gap-3">
+              <div className="p-2 sm:p-2.5 rounded-xl bg-amber-500/15 text-amber-500 shrink-0">
+                <Crown size={20} className="sm:w-6 sm:h-6" />
               </div>
               <div>
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
+                <h3 className="text-lg sm:text-2xl font-black tracking-tight text-[var(--text)]">
                   The Sovereign Covenant & Independent Funding
                 </h3>
                 <p className="text-xs sm:text-sm font-medium text-[var(--text)]/70">
@@ -1421,10 +1435,10 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-              <div className="rounded-xl border border-[var(--ok)]/40 bg-[var(--panel2)]/60 p-5 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-bold text-[var(--ok)]">
-                  <CheckCircle2 size={17} />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 sm:gap-4 pt-1">
+              <div className="rounded-xl border border-[var(--ok)]/40 bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-1.5 sm:space-y-2">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-[var(--ok)]">
+                  <CheckCircle2 size={16} />
                   <span>The Core Workspace is Forever Free</span>
                 </div>
                 <p className="text-xs sm:text-sm text-[var(--text)]/80 leading-relaxed">
@@ -1432,9 +1446,9 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
                 </p>
               </div>
 
-              <div className="rounded-xl border border-amber-500/40 bg-[var(--panel2)]/60 p-5 space-y-2">
-                <div className="flex items-center gap-2 text-sm font-bold text-amber-500">
-                  <Zap size={17} />
+              <div className="rounded-xl border border-amber-500/40 bg-[var(--panel2)]/60 p-4 sm:p-5 space-y-1.5 sm:space-y-2">
+                <div className="flex items-center gap-2 text-xs sm:text-sm font-bold text-amber-500">
+                  <Zap size={16} />
                   <span>Future Optional Pro Power Extensions</span>
                 </div>
                 <p className="text-xs sm:text-sm text-[var(--text)]/80 leading-relaxed">
@@ -1446,17 +1460,17 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
         </section>
 
         {/* SECTION 6: Creator Philosophy & Manifesto */}
-        <section id="philosophy" className="pt-4 scroll-mt-24">
-          <div className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-6 sm:p-10 shadow-sm space-y-6 transition-all duration-300 hover:border-[var(--accent)]">
-            <div className="flex items-center gap-4">
+        <section id="philosophy" className="pt-2 sm:pt-4 scroll-mt-24">
+          <div className="rounded-3xl border border-[var(--line)] bg-[var(--panel)] p-5 sm:p-10 shadow-sm space-y-5 sm:space-y-6 transition-all duration-300 hover:border-[var(--accent)]">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div
-                className="w-13 h-13 rounded-2xl flex items-center justify-center text-white font-black text-xl shadow-md"
+                className="w-11 h-11 sm:w-13 sm:h-13 rounded-2xl flex items-center justify-center text-white font-black text-base sm:text-xl shadow-md shrink-0"
                 style={{ background: "var(--accent)" }}
               >
                 KP
               </div>
               <div>
-                <h3 className="text-xl sm:text-2xl font-black tracking-tight text-[var(--text)]">
+                <h3 className="text-lg sm:text-2xl font-black tracking-tight text-[var(--text)]">
                   Why I Built LifeLog
                 </h3>
                 <p className="text-xs sm:text-sm font-semibold text-[var(--mut)]">
@@ -1465,7 +1479,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               </div>
             </div>
 
-            <div className="space-y-4 text-sm sm:text-base leading-relaxed text-[var(--text)]/80 font-normal">
+            <div className="space-y-3 sm:space-y-4 text-xs sm:text-base leading-relaxed text-[var(--text)]/80 font-normal">
               <p>
                 Modern productivity software has lost its core purpose. Simple daily planners, calendars, and notes have been turned into bloated surveillance engines designed to harvest your telemetry, lock your thoughts behind monthly recurring subscription paywalls, and force your life into closed corporate silos.
               </p>
@@ -1475,20 +1489,20 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
               <p>
                 There are no cloud databases. There are no tracking pixels or advertising algorithms. LifeLog writes directly to local SQLite WAL files on your machine. When you synchronize multiple devices, they communicate directly via encrypted peer-to-peer WebRTC sockets over your own local network.
               </p>
-              <p className="pt-2 text-sm sm:text-base italic text-[var(--text)] font-semibold border-l-4 border-[var(--accent)] pl-4">
+              <p className="pt-2 text-xs sm:text-base italic text-[var(--text)] font-semibold border-l-4 border-[var(--accent)] pl-3 sm:pl-4">
                 "LifeLog is designed to run for decades without requiring a single remote server to stay online. Thank you for choosing sovereign personal computing."
               </p>
             </div>
 
             {/* Creator Actions & Contact */}
-            <div className="pt-6 border-t border-[var(--line)] flex flex-wrap items-center justify-between gap-4">
-              <div className="flex flex-wrap items-center gap-3">
+            <div className="pt-4 sm:pt-6 border-t border-[var(--line)] flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 sm:gap-3">
                 {/* Buy Me a Coffee */}
                 <a
                   href="https://buymeacoffee.com/Krrish1411"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="inline-flex items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-[1.03] active:scale-[0.97] border border-black/80 cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl px-3.5 py-2.5 sm:py-2 text-xs sm:text-sm font-bold shadow-xs transition-all hover:scale-[1.03] active:scale-[0.97] border border-black/80 cursor-pointer"
                   style={{
                     background: "#FFDD00",
                     color: "#000000",
@@ -1503,7 +1517,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
                 <a
                   href="mailto:getlifelog@proton.me"
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-4 py-2 text-xs sm:text-sm font-bold text-[var(--text)] transition-colors hover:bg-[var(--line)] cursor-pointer"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] px-4 py-2.5 sm:py-2 text-xs sm:text-sm font-bold text-[var(--text)] transition-colors hover:bg-[var(--line)] cursor-pointer"
                 >
                   <Mail size={15} />
                   <span>getlifelog@proton.me</span>
@@ -1512,7 +1526,7 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
 
               <button
                 onClick={onEnter}
-                className="flex items-center gap-2 rounded-xl px-6 py-2.5 text-sm font-bold text-[var(--on-accent)] shadow-md shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl px-6 py-3 sm:py-2.5 text-xs sm:text-sm font-bold text-[var(--on-accent)] shadow-md shadow-[var(--accent)]/20 transition-all hover:scale-[1.02] cursor-pointer"
                 style={{ background: "var(--accent)" }}
               >
                 <span>Launch LifeLog Now</span>
@@ -1526,14 +1540,14 @@ export function WelcomeView({ onEnter, canDismiss = true }: WelcomeProps) {
       </main>
 
       {/* Footer */}
-      <footer className="relative z-10 border-t border-[var(--line)] bg-[var(--panel)] py-8 text-center text-xs sm:text-sm font-semibold text-[var(--text)]/70">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2">
+      <footer className="relative z-10 border-t border-[var(--line)] bg-[var(--panel)] py-6 sm:py-8 text-center text-xs sm:text-sm font-semibold text-[var(--text)]/70">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center sm:text-left">
+          <div className="flex items-center gap-2 flex-wrap justify-center sm:justify-start">
             <span className="font-bold text-[var(--text)]">LifeLog v{APP_VERSION}</span>
             <span>·</span>
             <span>Created by <strong className="text-[var(--accent)] font-bold">Krish Patel</strong></span>
           </div>
-          <div>
+          <div className="text-[11px] sm:text-xs">
             100% Offline Sovereign Sanctuary · Zero Telemetry · Open Architecture
           </div>
         </div>
