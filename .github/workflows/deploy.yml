@@ -1,4 +1,4 @@
-name: Deploy to GitHub Pages
+name: Build & Deploy Web App to Lifelog-Releases
 
 on:
   push:
@@ -7,16 +7,15 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  pages: write
-  id-token: write
+  contents: write
 
 concurrency:
-  group: "pages"
+  group: "web-deploy"
   cancel-in-progress: true
 
 jobs:
-  build:
+  build-and-deploy:
+    name: Build Hardened Web & Sync
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Source Code
@@ -31,13 +30,13 @@ jobs:
       - name: Install Dependencies
         run: npm ci
 
-      - name: Build Web Production Assets
+      - name: Build Hardened Web Production Assets
         run: |
           npm run build
           touch dist/.nojekyll
           cp dist/index.html dist/404.html
 
-      - name: Deploy to Public Lifelog-Releases Repo (gh-pages)
+      - name: Deploy to Public Lifelog-Releases (gh-pages)
         if: ${{ secrets.RELEASES_TOKEN != '' }}
         uses: peaceiris/actions-gh-pages@v4
         with:
@@ -46,22 +45,3 @@ jobs:
           publish_branch: gh-pages
           publish_dir: ./dist
           force_orphan: false
-
-      - name: Upload Pages Artifact
-        continue-on-error: true
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: ./dist
-
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    runs-on: ubuntu-latest
-    needs: build
-    continue-on-error: true
-    steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        continue-on-error: true
-        uses: actions/deploy-pages@v4
