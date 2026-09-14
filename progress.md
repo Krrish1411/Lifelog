@@ -1,214 +1,198 @@
-# LifeLog — Engineering Progress & Changelog
+# LifeLog — Engineering Progress & Comprehensive Changelog
 
-This document provides a concise yet comprehensive summary of the recent enhancements, bug fixes, and architectural refinements implemented in LifeLog. Any developer or AI working on this codebase can reference this file to understand what changes are intact, where they reside, and why they were built.
+This document provides a complete, authoritative, and chronological record of the architectural enhancements, security upgrades, database transformations, and UI refinements implemented in LifeLog. Any developer or AI working on this codebase can reference this file to understand the architecture, exact file locations, and design decisions.
 
 ---
 
-## 1. Summary of Changed & New Files
+## 1. Complete File Manifest & Change Summary
 
-| File | Status | Purpose / What Changed |
+| File | Status | Purpose & Architectural Role |
 |---|---|---|
-| `src/components/MentionAutocomplete.tsx` | **NEW** | Floating mention dropdown with dynamic caret positioning for `@` (Tasks), `#` (Projects), and `[` / `[[` (Notes). |
+| `electron/db.cjs` | **NEW** | Native Node.js `node:sqlite` (`DatabaseSync`) database manager with WAL mode, normalized schema (10 tables), B-Tree indexes, atomic batch transactions, and `VACUUM INTO` exports. |
+| `electron/main.cjs` | Modified | Registered IPC handlers for native SQLite operations (`db-init`, `db-save-row`, `db-delete-row`, `db-batch-save`, `db-load-all`, `db-exec`, `db-query`, `db-export-backup`, `db-import-backup`) and storage path resolutions. |
+| `electron/preload.cjs` | Modified | Exposed typed Electron SQLite API to renderer context via `window.electronAPI`. |
+| `src/types.ts` | Modified | Extended `Habit` with calendar scheduling (`time?: string`, `order?: number`), added `SqliteAllData` interface, and updated `ElectronAPI` SQLite signatures. |
+| `src/db/webSqlite.ts` | **NEW** | WebAssembly `sql.js` SQLite engine for Web Browsers and Android Capacitor WebView with debounced snapshot persistence to IndexedDB (`LifeLogSQLiteStorage`). |
+| `src/db/database.ts` | **NEW** | Unified cross-platform database abstraction layer with row-level AES-GCM-256 authenticated encryption, universal `.lifelog` backup routing, and fallback to `DEFAULT_SETTINGS`. |
+| `src/db/migrateLegacy.ts` | **NEW** | Automated, one-time legacy data migration utility (< 60ms) converting old JSON/IDB structures into normalized SQLite tables on boot. |
+| `src/security/masterKey.ts` | **NEW** | Hardware device-bound encryption key caching (`getDeviceKey()`) providing instant 0-password < 5ms app startup and row-level AES-GCM-256 cipher operations. |
+| `src/sync/syncTypes.ts` | Modified | Removed `KEY_SYNC` to enforce sovereign independent per-device keys across P2P pairs. |
+| `src/sync/syncEngine.ts` | Modified | Re-engineered pure sovereign P2P sync over WebRTC DTLS; eliminated key transmission and removed all key/data wiping on disconnect. |
+| `src/views/Settings.tsx` | Modified | Streamlined **Vault Backups & Migration** UI: added 1-click unencrypted `.lifelog` snapshot with security advisory modal, password-protected backup, smart unified import, and removed internal SQLite diagnostics, Paste JSON, and 12-word phrase clutter. |
+| `src/store.tsx` | Modified | Integrated SQLite database boot, background persistence hooks, and automated one-time legacy migration. |
+| `src/components/MentionAutocomplete.tsx` | **NEW** | Dynamic caret-tracking floating mention dropdown for `@` (Tasks), `#` (Projects), and `[` / `[[` (Notes). |
 | `src/views/Notes.tsx` | Modified | Integrated `MentionAutocomplete` into the note editor body textarea. |
-| `src/components/TaskDialog.tsx` | Modified | Integrated `MentionAutocomplete` into the task notes textarea. |
-| `src/types.ts` | Modified | Extended `Habit` with optional `time?: string` and `order?: number` for calendar scheduling. |
-| `src/views/Calendar.tsx` | Modified | Enabled habit drag-and-drop time placement; implemented drag-to-tray unscheduling/unblocking; removed Pro ICS teaser. |
-| `src/components/DiffConflictModal.tsx` | Overhauled | Rebuilt as a portal-mounted, scroll-free (~410px) pop-up with a unified device comparison strip and compact merge options. |
-| `src/components/SyncDialog.tsx` | Modified | Moved `DiffConflictModal` outside the inner `<Modal>` to prevent CSS filter/transform clipping; removed commercial Pro cloud banners. |
-| `src/views/Settings.tsx` | Modified | Removed the "Upcoming Pro Cloud Infrastructure" commercial roadmap block. |
-| `src/components/Shell.tsx` | Modified | Removed the "Buy Me a Coffee" button across all 5 engine layouts to keep core navigation clean. |
-| `src/views/Welcome.tsx` | Modified | Placed "Buy Me a Coffee" in the top bar; resolved mouse wheel scrolling lock via root container CSS. |
-| `src/views/Reports.tsx` | Modified | Added lag-free PDF export configuration modal; fixed missing progress bars and unconstrained print heights for energy/mood and estimate calibration. |
-| `src/components/ui.tsx` | Modified | Updated `BarRow` with explicit border tracks and `print-color-adjust: exact`. |
-| `src/index.css` | Modified | Enhanced `@media print` with universal exact color adjustment, light-mode palette variables, and unclipped container overrides. |
-| `electron/db.cjs` | **NEW** | Native Node `DatabaseSync` SQLite manager with WAL tuning, schema setup, indexed queries, batch transactions, and VACUUM backup. |
-| `electron/main.cjs` | Modified | Exposed SQLite IPC handlers (`db-init`, `db-save-row`, `db-load-all`, `db-batch-save`, `db-export-backup`, `db-import-backup`) and integrated SQLite paths. |
-| `electron/preload.cjs` | Modified | Exposed native SQLite API methods to renderer via `window.electronAPI`. |
-| `src/types.ts` | Modified | Added `SqliteAllData` interface and updated `ElectronAPI` with SQLite database methods. |
-| `src/db/webSqlite.ts` | **NEW** | `sql.js` WebAssembly SQLite engine for Browser & Capacitor WebView with debounced snapshot persistence to IndexedDB. |
-| `src/db/database.ts` | **NEW** | Unified SQLite database layer with row-level AES-GCM-256 encryption, portable backup export/import, and automatic platform routing. |
-| `src/db/migrateLegacy.ts` | **NEW** | One-time automated migration utility (< 60ms) to convert legacy JSON/IDB data to normalized SQLite tables. |
-| `src/security/masterKey.ts` | **NEW** | Prioritizes device-bound hardware key (`getDeviceKey()`) for instant 0-password <5ms local vault launch. |
-| `src/sync/syncTypes.ts` | Modified | Removed `KEY_SYNC` to ensure sovereign per-device encryption across P2P pairs. |
-| `src/sync/syncEngine.ts` | Modified | Pure P2P sync without key exchange; disconnect preserves all local data and keys intact. |
-| `src/views/Settings.tsx` | Modified | Streamlined 1-click portable `.lifelog` snapshot, password-protected backup, and unified import. |
-| `src/store.tsx` | Modified | Integrated SQLite database boot & debounced persistence hooks with automated 1-time legacy migration. |
+| `src/components/TaskDialog.tsx` | Modified | Integrated `MentionAutocomplete` into task private notes textarea. |
+| `src/views/Calendar.tsx` | Modified | Implemented drag-and-drop habit time-slot locking and drag-to-tray unscheduling/unblocking; removed Pro teaser banners. |
+| `src/components/DiffConflictModal.tsx` | Overhauled | Rebuilt as a portal-mounted, scroll-free (~410px) pop-up with a unified side-by-side device comparison strip and 3 clean merge options. |
+| `src/components/SyncDialog.tsx` | Modified | Moved `DiffConflictModal` outside the parent `<Modal>` to eliminate CSS filter/backdrop clipping; removed commercial Pro cloud banners. |
+| `src/components/Shell.tsx` | Modified | Removed "Buy Me a Coffee" button from all 5 engine layouts to preserve distraction-free navigation. |
+| `src/views/Welcome.tsx` | Modified | Relocated "Buy Me a Coffee" to the top bar; resolved mouse wheel scrolling lock via root container CSS. |
+| `src/views/Reports.tsx` | Modified | Added zero-lag PDF export configuration modal; resolved missing CSS progress bars and unconstrained print heights. |
+| `src/components/ui.tsx` | Modified | Updated `BarRow` with explicit border tracks and inline `print-color-adjust: exact`. |
+| `src/index.css` | Modified | Configured `@media print` universal exact color adjustment, light-mode palette variables, and unclipped container overrides. |
+| `src/security/recoveryPhrase.ts` | **DELETED** | Removed 12-word recovery phrase generator and PBKDF2 phrase key derivation to eliminate unnecessary onboarding friction. |
+| `src/security/bip39Wordlist.ts` | **DELETED** | Removed 2048-word BIP-39 dictionary. |
 
 ---
 
-## 2. Detailed Technical Breakdown
+## 2. Detailed Technical Breakdown: UI, Notes, Calendar, Conflicts & Reports
 
 ### A. Mention Autocomplete (`@`, `#`, `[`, `[[`)
-- **File**: `src/components/MentionAutocomplete.tsx`
-- **Integrations**: `src/views/Notes.tsx`, `src/components/TaskDialog.tsx`
-- **Behavior**:
-  - Automatically activates when typing `@` (Tasks), `#` (Projects), or `[` / `[[` (Notes).
-  - Continuously updates suggestions in real-time as the user types queries after the trigger.
-  - Dynamically calculates caret coordinates in the textarea using a hidden clone measurement helper.
-  - Supports keyboard navigation: <kbd>↑</kbd> and <kbd>↓</kbd> to cycle items, <kbd>Enter</kbd> or <kbd>Tab</kbd> to insert, <kbd>Escape</kbd> to dismiss.
-  - Inserts standard LifeLog markdown references:
+- **Files**: `src/components/MentionAutocomplete.tsx`, integrated in `src/views/Notes.tsx` and `src/components/TaskDialog.tsx`.
+- **Functionality**:
+  - Automatically triggers when typing `@` (Tasks), `#` (Projects), or `[` / `[[` (Notes).
+  - Dynamically computes pixel-accurate caret coordinates in the active textarea using a hidden clone measurement helper.
+  - Supports keyboard navigation: <kbd>↑</kbd> and <kbd>↓</kbd> to cycle suggestions, <kbd>Enter</kbd> or <kbd>Tab</kbd> to insert, <kbd>Escape</kbd> to dismiss.
+  - Automatically formats markdown references:
     - `@Task` &rarr; `[Task Title](task:taskId)`
     - `#Project` &rarr; `[#Project Name](project:projectId)`
     - `[Note` &rarr; `[[Note Title]]` or `[Note Title](note:noteId)`
 
 ### B. Calendar Habit Scheduling & Drag-to-Tray Unblocking
-- **Files**: `src/types.ts`, `src/views/Calendar.tsx`
-- **Behavior**:
-  - **Habit Placement**: `Habit` now supports `time?: string` (format `HH:mm`). Dropping a habit onto the calendar time grid locks it to that specific time slot. Clicking a scheduled habit block toggles completion directly on the schedule.
+- **Files**: `src/types.ts`, `src/views/Calendar.tsx`.
+- **Functionality**:
+  - **Habit Time Placement**: `Habit` schema supports `time?: string` (format `HH:mm`). Dropping a habit onto the calendar time grid locks it to that specific time slot. Clicking a scheduled habit block toggles completion directly on the schedule.
   - **Drag-to-Tray Unschedule**:
-    - The top non-scheduled bar (`Tray`) acts as an active drop target (`onDragOver`, `onDragLeave`, `onDrop`).
+    - The top non-scheduled bar (`Tray`) acts as an active HTML5 drop target (`onDragOver`, `onDragLeave`, `onDrop`).
     - Dragging any scheduled task back up to the tray clears `dueTime: null` (or resets `time: null, date: null` on multi-block tasks) and restores it to unscheduled status.
     - Dragging a habit to the tray clears its `time` property.
-    - Added an active visual highlight (`isHot` state) when hovering over the tray with a dragged item.
+    - Displays an active visual drop highlight (`isHot` state) when hovering over the tray with a dragged item.
 
 ### C. Visual Sync Conflict Diff Modal Overhaul
-- **Files**: `src/components/DiffConflictModal.tsx`, `src/components/SyncDialog.tsx`
-- **Problem Fixed**:
-  - Previously, `DiffConflictModal` was rendered inside `SyncDialog`'s `<Modal>`. Because the parent modal used backdrop-filter and `overflow-hidden`, standard CSS made it the containing block for fixed positioning. This trapped the diff modal in a double-frame box, clipped the bottom buttons, and broke scrolling.
+- **Files**: `src/components/DiffConflictModal.tsx`, `src/components/SyncDialog.tsx`.
+- **Problem Solved**:
+  - Previously, `DiffConflictModal` was rendered inside `SyncDialog`'s `<Modal>`. The parent modal's backdrop-filter and `overflow-hidden` created an isolated CSS containing block, trapping the diff modal in a clipped sub-frame, breaking scrolling, and hiding action buttons.
 - **Solution**:
-  - **Root Portal**: Uses `createPortal(modal, document.body)` with `z-[9999]`, rendering directly at the document body.
-  - **Single Compact Pop-Up (~410px)**: The entire modal fits on screen with **zero internal scrolling** needed on desktops, laptops, and mobile screens.
-  - **Unified Device Strip**: Replaced two bulky multi-row boxes with a concise side-by-side header (`Local 💻` vs `Peer 📱`) and 3-column pill comparison metrics (Tasks, Notes, Habits count).
+  - **Document Body Portal**: Uses `createPortal(modal, document.body)` with `z-[9999]`.
+  - **Scroll-Free Pop-Up (~410px)**: The entire modal fits on screen with **zero internal scrolling** on desktop and mobile displays.
+  - **Unified Device Strip**: Concise side-by-side header (`Local 💻` vs `Peer 📱`) with 3-column pill comparison metrics (Tasks, Notes, Habits count).
   - **3 Clean Merge Options**: Smart 3-Way Union (Lossless), Keep This Device, Accept Peer Device.
-  - **Always-Visible Footer**: E2EE AES-256 badge, Cancel, and Apply Resolution buttons are permanently accessible.
 
-### D. Buy Me a Coffee Relocation & Welcome Screen Scroll
-- **Files**: `src/components/Shell.tsx`, `src/views/Welcome.tsx`
-- **Behavior**:
-  - Removed coffee support button from all 5 engine layouts (Glassmorphic, Control Center, Desk Station, Planify Clean, Zen Focus).
-  - Placed the button in the top bar of `Welcome.tsx`.
-  - Fixed mouse wheel scrolling lock on the Welcome screen by configuring the root container to `fixed inset-0 h-screen w-full overflow-y-auto overscroll-y-auto select-text z-50`.
+### D. Layout Polish, Welcome Scroll & Coffee Button Relocation
+- **Files**: `src/components/Shell.tsx`, `src/views/Welcome.tsx`.
+- **Functionality**:
+  - Removed "Buy Me a Coffee" from all 5 workspace layouts (Glassmorphic, Control Center, Desk Station, Planify Clean, Zen Focus).
+  - Placed the button cleanly in the top bar of `Welcome.tsx`.
+  - Fixed mouse wheel scrolling lock on the Welcome screen by adjusting the root container CSS to `fixed inset-0 h-screen w-full overflow-y-auto overscroll-y-auto select-text z-50`.
 
-### E. Commercial Pro Feature Cleanup
-- **Files**: `src/views/Settings.tsx`, `src/components/SyncDialog.tsx`, `src/views/Calendar.tsx`
-- **Behavior**:
-  - Removed "Upcoming Pro Cloud Infrastructure" upgrade sections and teaser banners.
-  - Preserved full architectural roadmap and backend specifications in `PENDING-FEATURES.md` for future monetization / feature tier discussions.
-
-### F. PDF Export Optimization & Progress Bar Rendering
-- **Files**: `src/views/Reports.tsx`, `src/components/ui.tsx`, `src/index.css`
-- **Problem Fixed**:
-  - When exporting to PDF or printing, browser print engines strip CSS background colors and gradients by default, causing energy/mood bars, estimate vs actual bars, and tag charts to render as blank white space.
-  - Container classes with `max-h-[300px] overflow-y-auto` clipped check-in logs and task lists on printed pages.
-  - The previous default "Executive Summary" mode omitted task rows entirely.
+### E. PDF Export Engine & Print CSS Optimization
+- **Files**: `src/views/Reports.tsx`, `src/components/ui.tsx`, `src/index.css`.
+- **Problem Solved**:
+  - Browser print dialogs stripped CSS background colors and gradients by default, causing energy/mood bars, estimate calibration bars, and tag charts to print as blank white spaces.
+  - Scroll container classes (`max-h-[300px] overflow-y-auto`) clipped task rows and logs on printed pages.
 - **Solution**:
-  - **Print CSS**: Added `-webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;` to `*, *::before, *::after` in `src/index.css`.
+  - **Print CSS**: Added `-webkit-print-color-adjust: exact !important; print-color-adjust: exact !important;` to all elements under `@media print`.
   - **Print Palette**: Enforced clean, high-contrast light-mode theme variables during `@media print` (`--bg: #ffffff`, `--panel2: #f1f5f9`, `--line: #cbd5e1`, `--text: #0f172a`, `--ok: #16a34a`, `--warn: #d97706`, `--danger: #dc2626`).
   - **Unclipped Containers**: Overrode scroll containers with `.overflow-y-auto, [class*="max-h-"] { max-height: none !important; overflow: visible !important; }`.
-  - **Explicit Bar Styling**: Added border tracks and solid fallback hex colors (`#16a34a`, `#d97706`, `#dc2626`, `#94a3b8`) with inline `printColorAdjust: "exact"` across Energy/Mood bars, Estimate Calibration bars, and `BarRow`.
-  - **Export Modal**: Added an export modal defaulting to **"🎯 Summary + Key Tasks (Recommended, 0 Lag)"**, which includes the top 5 estimate vs actual tasks with their progress bars without lagging the browser on large datasets.
+  - **Explicit Bar Styling**: Added border tracks and solid fallback colors with inline `printColorAdjust: "exact"` across Energy/Mood bars, Estimate Calibration bars, and `BarRow`.
+  - **Lag-Free Preset**: Added an export modal defaulting to **"🎯 Summary + Key Tasks (Recommended, 0 Lag)"**, which outputs the top 5 estimate vs actual tasks with their progress bars without freezing the browser.
 
 ---
 
-## 4. Electron Desktop Multi-Platform CI Builds & Encrypted Attachment Architecture
+## 3. Electron Desktop Multi-Platform CI Builds & Encrypted Attachment Architecture
 
 ### A. GitHub Actions Multi-Platform Workflow (`build-electron.yml`)
-- **Problem**:
-  - Desktop builds failed across all 3 platforms (Ubuntu Linux, Windows, macOS).
-  - **Root Cause 1**: `.gitignore` ignored `build/`, preventing application icons (`.png`, `.ico`, `.icns`) from being pushed to the repository. Runners failed during packaging due to missing icon files.
-  - **Root Cause 2**: In CI (`CI=true`), `electron-builder` defaulted to publishing releases, failing immediately due to a missing GitHub Personal Access Token.
-  - **Root Cause 3**: macOS runner attempted to invoke `codesign` with an Apple Developer identity that did not exist on the runner.
-  - **Root Cause 4**: Ubuntu runner lacked FUSE and archive utilities required for AppImage creation.
-- **Solution**:
-  - Un-ignored `build/` in `.gitignore` and committed explicit multi-size icons: `build/icon.ico` (multi-size 16-256px), `build/icon.icns` (Apple ICNS), and `build/icon.png` (512x512) alongside `electron/icons/`.
-  - Added `"publish": null` to `package.json` and passed `--publish never` across all platform jobs.
-  - Configured `CSC_IDENTITY_AUTO_DISCOVERY: false` and `identity: null` to permit clean, unsigned CI builds.
-  - Added required `deb` package metadata (`author`, `homepage`, `repository`, `license`, `linux.maintainer`) to satisfy `FpmTarget` validation.
-  - Enabled `APPIMAGE_EXTRACT_AND_RUN: 1` and installed `libarchive-tools`, `libfuse2`, and `desktop-file-utils` on Ubuntu runners.
-
-### B. Database Architecture: Web Browser vs. Desktop vs. Android
-- **Web Browser (IndexedDB + Web Crypto AES-256-GCM)**:
-  - Stays on **IndexedDB**. Web browsers cannot execute native SQLite without heavy WASM layers that consume excessive RAM and are subject to browser storage quotas. IndexedDB is zero-dependency, ultra-fast, and supported in 100% of modern browsers.
-- **Desktop Electron (Encrypted Attachments Folder + Local Vault)**:
-  - When users have 1,000+ tasks, long notes, and 1–2 GB of attachments, packing attachments into a single database or JSON crashes V8 engine heap memory (>1.4 GB limit).
-  - Implemented a dedicated native encrypted directory: `<userData>/attachments/`.
-  - Every attachment is encrypted with **AES-256-GCM** and saved as an isolated `<attachmentId>.enc` binary file on disk.
-  - Added Electron IPC handlers (`save-attachment`, `load-attachment`, `delete-attachment`, `get-storage-info`).
-  - Vault metadata stays featherweight and fast, loading attachments on demand.
-- **Android Native APK**:
-  - Uses the private, sandboxed app directory (`Directory.Data/attachments/`) with client-side AES-256-GCM encryption.
-
----
-
-## 5. Build & Test Verification
-
-- **TypeScript Compilation**: `npm run typecheck` &rarr; `tsc --noEmit` passed with 0 errors.
-- **Vite Production Build**: `npm run build` &rarr; built production bundle in `< 3.0s`.
-- **GitHub Actions Multi-Platform Artifacts (Run ID 34704912740 - 100% GREEN)**:
+- **Problem Solved**:
+  - Automated CI packaging previously failed on all 3 target OS platforms (Ubuntu Linux, Windows, macOS).
+- **Solutions Implemented**:
+  1. **Icon Asset Visibility**: Un-ignored `build/` in `.gitignore` and committed multi-resolution icons: `build/icon.ico` (16–256px multi-size), `build/icon.icns` (Apple ICNS format), and `build/icon.png` (512x512).
+  2. **Publish Flag Configuration**: Added `"publish": null` to `package.json` and passed `--publish never` across all platform matrix jobs to prevent runner token failures.
+  3. **Unsigned CI Builds**: Set `CSC_IDENTITY_AUTO_DISCOVERY: false` and `identity: null` to allow clean, unsigned desktop builds in open-source CI.
+  4. **Linux Packaging**: Added required `deb` package metadata (`author`, `homepage`, `repository`, `license`, `linux.maintainer`) to satisfy `FpmTarget` validation; enabled `APPIMAGE_EXTRACT_AND_RUN: 1` and installed `libarchive-tools`, `libfuse2`, and `desktop-file-utils` on Ubuntu runners.
+- **Result (Run ID 34704912740 - 100% Green)**:
   - 🐧 **Linux**: `LifeLog-Desktop-Linux` (350.61 MB) — `.AppImage`, `.deb`, `.tar.gz`
   - 🪟 **Windows**: `LifeLog-Desktop-Windows` (223.41 MB) — Setup `.exe` (NSIS) & Portable `.exe`
   - 🍎 **macOS**: `LifeLog-Desktop-macOS` (261.73 MB) — `.dmg` & `.zip`
-- **Zero Local Disk Wear**: 100% of compilation and packaging executed in the GitHub Actions cloud.
+
+### B. Dedicated Attachment Directory Architecture
+- To prevent V8 engine heap exhaustion (> 1.4 GB memory limits) when users store hundreds of large photos, voice notes, and document attachments:
+  - Attachments are stored as individual files in `<userData>/attachments/`.
+  - Each attachment file is encrypted with **AES-256-GCM** and saved as `<attachmentId>.enc`.
+  - Database rows store metadata (`note_id`, `mime_type`, `byte_size`, `created_at`), loading the encrypted binary on-demand.
 
 ---
 
-## 6. Unified SQLite Database Engine, Zero-Password 12-Word Recovery Phrase & Universal Backups
+## 4. Unified SQLite Database Engine & Migration Architecture
 
-### A. Unified SQLite Engine Across All Platforms
-- **Desktop Electron (Native SQLite)**:
-  - Replaced legacy monolithic JSON vault file with native SQLite via Node.js `node:sqlite` (`DatabaseSync`) in `electron/db.cjs`.
-  - Tuned with `PRAGMA journal_mode = WAL;`, `PRAGMA synchronous = NORMAL;`, `PRAGMA foreign_keys = ON;`, and `PRAGMA busy_timeout = 5000;`.
-  - Normalized database schema with 10 tables: `meta`, `tasks`, `notes`, `attachments`, `habits`, `projects`, `folders`, `sessions`, `day_logs`, and `app_settings`.
-  - B-Tree indexes created on `updated_at` and foreign key relationships for sub-millisecond lookups.
-  - Implemented atomic `VACUUM INTO` for zero-lock, zero-corruption compacted database exports.
-  - Exposed full SQLite IPC suite (`db-init`, `db-save-row`, `db-delete-row`, `db-batch-save`, `db-load-all`, `db-exec`, `db-query`, `db-export-backup`, `db-import-backup`) in `electron/main.cjs` and `electron/preload.cjs`.
-- **Web Browser & Android Capacitor (WASM SQLite)**:
-  - Integrated `sql.js` WebAssembly engine (`public/sql-wasm.wasm`) in `src/db/webSqlite.ts`.
-  - In-memory execution with debounced snapshot persistence to IndexedDB (`LifeLogSQLiteStorage`).
-  - 100% binary compatibility with desktop SQLite `.sqlite3` / `.db` files.
-- **Unified DB Abstraction & Row-Level E2EE**:
-  - `src/db/database.ts` handles seamless routing across Electron and Web/Mobile.
-  - Transparent row-level **AES-GCM-256** authenticated encryption: note bodies, task notes, habit entries, and raw attachment binaries are encrypted before touching disk.
+### A. Native Desktop SQLite (`DatabaseSync`)
+- **File**: `electron/db.cjs`
+- Built on Node.js native `node:sqlite` (`DatabaseSync`), eliminating bulky native binary dependencies like `better-sqlite3`.
+- **Database Tuning**:
+  ```sql
+  PRAGMA journal_mode = WAL;
+  PRAGMA synchronous = NORMAL;
+  PRAGMA foreign_keys = ON;
+  PRAGMA busy_timeout = 5000;
+  ```
+- **10 Normalized Tables**:
+  - `meta`: Store schema version, migration flags, and database metadata.
+  - `tasks`: Task items, project relations, status, priority, and encrypted payloads.
+  - `notes`: Markdown notes, folder relations, and encrypted payloads.
+  - `attachments`: File attachment metadata and encrypted blobs.
+  - `habits`: Habit definitions, frequencies, streaks, and encrypted payloads.
+  - `projects`: Projects, color codes, sort orders, and encrypted payloads.
+  - `folders`: Hierarchical note folder tree structure.
+  - `sessions`: Focus/Pomodoro logs, intervals, and pause/resume timestamps.
+  - `day_logs`: Daily check-in logs, mood, energy ratings, and notes.
+  - `app_settings`: Key-value application configurations and theme tokens.
+- **Indexes**: B-Tree indexes created on `updated_at` and foreign key relationships for sub-millisecond query performance.
+- **Pristine Compacted Backups**: Implemented atomic `VACUUM INTO` for zero-lock, zero-corruption SQLite file snapshots.
 
-### B. Zero-Password Daily Launch & 12-Word Recovery Phrase
-- **Zero Passwords in Daily Use**:
-  - The master encryption key is bound to local OS storage and memory.
-  - LifeLog opens instantly on everyday launches with **0 password prompts**.
-- **12-Word BIP-39 Recovery Phrase**:
-  - Implemented in `src/security/recoveryPhrase.ts` using the official 2048-word BIP-39 standard dictionary (`src/security/bip39Wordlist.ts`).
-  - Auto-generates a human-readable 12-word phrase on first run.
-  - Derives the 256-bit AES-GCM Master Key using `PBKDF2-HMAC-SHA256` (100,000 rounds).
-  - Writing down these 12 words allows full vault recovery and backup decryption on any device.
+### B. Web Browser & Android WebAssembly SQLite (`sql.js`)
+- **File**: `src/db/webSqlite.ts`
+- Executes `sql.js` WebAssembly (`public/sql-wasm.wasm`) in-memory.
+- Debounced snapshot persistence saves the SQLite binary buffer into IndexedDB (`LifeLogSQLiteStorage`).
+- 100% binary compatibility with desktop SQLite `.sqlite3` and `.db` files.
 
-### C. P2P Key Synchronization & Automatic Revocation on Disconnect
-- **Automatic Key Sync on Pairing**:
-  - In `src/sync/syncEngine.ts` and `src/sync/syncTypes.ts`, when a Primary device and Secondary device pair via PIN or QR code, the Primary device sends its 12-word recovery phrase via an encrypted `KEY_SYNC` packet over WebRTC DTLS.
-  - The secondary device (e.g. Phone) adopts the key and re-encrypts its local database with the shared master key.
-  - Works offline seamlessly while paired.
-- **Secondary Key Wiping on Disconnect**:
-  - When the user unpairs or disconnects the sync relationship, the secondary phone immediately wipes the synced recovery phrase and master key from local storage and memory.
-  - Only the Primary PC retains the master key and recovery phrase.
+### C. Unified Database Abstraction Layer (`database.ts`)
+- **File**: `src/db/database.ts`
+- Routes calls seamlessly between Electron IPC (`window.electronAPI`) and Browser WASM (`webSqlite.ts`).
+- **Row-Level AES-GCM-256 Encryption**:
+  - Note bodies, task private notes, habit records, and attachments are encrypted before being written to SQLite tables.
+  - Transparent decryption on read ensures fast, safe memory operation.
 
-### D. 1-Time User Data Migration (< 60ms)
-- `src/db/migrateLegacy.ts` detects existing `lifelog-vault.json` or legacy IndexedDB on boot.
-- Converts all legacy records into normalized SQLite tables inside an atomic transaction.
-- Sets `migrated_to_sqlite: 'true'` in the database `meta` table and is permanently bypassed on future launches.
-
-### E. Settings UI Upgrades
-### E. Settings UI Streamlining
-- Streamlined **Vault Backups & Migration** card: removed technical SQLite engine diagnostic banner, redundant Paste JSON button, and 12-word recovery phrase card.
-- Clean 3-action layout: `Export Portable Snapshot (.lifelog)`, `Password-Protect (.lifelog)`, and `Import Backup (.lifelog / .json)`.
+### D. Automated 1-Time User Data Migration (< 60ms)
+- **File**: `src/db/migrateLegacy.ts`
+- On boot, automatically checks for legacy `lifelog-vault.json` or legacy IndexedDB data.
+- Converts all existing records into normalized SQLite tables in a single atomic transaction.
+- Writes `migrated_to_sqlite = 'true'` in the `meta` table and is permanently bypassed on all subsequent launches.
 
 ---
 
-## 7. Sovereign P2P Sync (Zero Key Drama & Independent Device Keys)
+## 5. Sovereign P2P Sync (Zero Key Drama & Independent Device Keys)
 
-### A. Pure P2P Sync Without Key Transmission
-- **Eliminated `KEY_SYNC`**: Removed key exchange message type from `src/sync/syncTypes.ts` and `src/sync/syncEngine.ts`.
-- **Independent Encryption**: WebRTC DTLS already provides transport-layer End-to-End Encryption. Peer devices transmit decrypted state records across the secure WebRTC channel. Each device encrypts and persists records into its local SQLite database using its own independent hardware device key (`getDeviceKey()`).
-- **Zero Key Wiping on Disconnect**: Unpairing or disconnecting sync leaves all local database records and keys 100% intact on both devices. Neither device ever loses access to its data.
-- **Instant <5ms Startup**: Reverted `getActiveVaultKey()` in `src/security/masterKey.ts` to prioritize `getDeviceKey()`, guaranteeing instant startup with zero password or recovery phrase popups.
+### A. Pure P2P Sync Over WebRTC DTLS
+- **Transport Security**: WebRTC data channels natively provide transport-level End-to-End Encryption (DTLS-SRTP).
+- **Eliminated `KEY_SYNC`**:
+  - Removed `KEY_SYNC` message type from `src/sync/syncTypes.ts` and `src/sync/syncEngine.ts`.
+  - Peer devices transmit decrypted state records across the secure WebRTC tunnel.
+  - Each device persists and encrypts records into its local SQLite database using its own independent hardware device key (`getDeviceKey()`).
+  - Neither device ever transmits, receives, or overwrites database encryption keys.
+
+### B. Non-Destructive Disconnect
+- Unpairing or disconnecting sync leaves all local database records and encryption keys **100% intact** on both devices.
+- Neither phone nor PC ever wipes or locks local data upon disconnect.
+
+### C. Instant < 5ms Startup
+- Reverted `getActiveVaultKey()` in `src/security/masterKey.ts` to prioritize `getDeviceKey()`.
+- Guarantees immediate launch with **0 password prompts** and zero recovery phrase requirements on everyday use.
 
 ---
 
-## 8. Transparent Universal Backups (`.lifelog`) & User Security Advisory
+## 6. Transparent Universal Backups (`.lifelog`) & User Security Advisory
 
 ### A. 1-Click Portable Snapshot (`.lifelog`)
-- Generates a universal, portable `.lifelog` snapshot containing the complete decrypted state (tasks, notes with bodies/attachments, habits, projects, sessions, daylogs, tag colors, settings).
-- Fully cross-device and cross-platform: can be imported onto any laptop, browser, or Android phone without passwords.
-- Displays a prominent security advisory modal on export:
-  > **⚠️ Unencrypted Portable Snapshot**
-  > *This file contains your complete history in plain portable format so you can easily restore or migrate to another device without passwords. **Please delete this file after migration or keep it temporarily on trusted offline drives.** If storing in cloud storage or email, use the password-protected option.*
+- Added `handleExportLifelogSnapshot` in `src/views/Settings.tsx`.
+- Generates a universal, portable `.lifelog` snapshot containing the complete decrypted state (tasks, notes with attachments, habits, projects, sessions, daylogs, tag colors, settings).
+- 100% cross-device and cross-platform: can be imported onto any laptop, browser, or Android phone without passwords.
+- **Prominent Security Advisory Modal**:
+  - On export, displays a clear, highlighted advisory modal:
+    > **⚠️ Unencrypted Portable Snapshot Exported**
+    > *This file contains your complete history in plain portable format so you can easily restore or migrate to another device without passwords.*
+    > * **Delete after use**: Once restored on your target device, permanently delete this snapshot from your computer or downloads folder.
+    > * **Trusted storage only**: Keep temporarily on personal drives or offline USB sticks. Do not upload to public cloud drives or email.
+    > * **For Cloud Storage**: Use the **Password-Protect (.lifelog)** option instead.
 
 ### B. Optional Password-Protected Backup
 - "Password-Protect (.lifelog)" allows users to seal their snapshot with a custom password using PBKDF2 (150,000 iterations) + AES-256-GCM (`encryptBackup`).
@@ -217,28 +201,62 @@ This document provides a concise yet comprehensive summary of the recent enhance
 ### C. Unified Smart Import Handler
 - Consolidated multiple disparate import buttons into one clean, styled `Import Backup (.lifelog / .json)` picker.
 - Automatically handles:
-  1. Unencrypted portable `.lifelog` snapshots &rarr; confirms record counts and restores into local SQLite.
+  1. Unencrypted portable `.lifelog` snapshots &rarr; confirms record counts and restores into local SQLite using the local device key.
   2. Password-protected `.lifelog` backups &rarr; prompts for master password, decrypts, and restores.
   3. Legacy plain JSON exports (`.json`) &rarr; restores cleanly.
   4. Raw SQLite binary databases (`.sqlite3`, `.db`) &rarr; restores directly via native Electron or Web SQLite WASM.
 
-### D. Complete Removal of 12-Word Phrase Engine & UI Clutter
-- Removed `src/security/recoveryPhrase.ts` and `src/security/bip39Wordlist.ts`.
-- Removed 12-word recovery phrase view/restore modals and state from `src/views/Settings.tsx`.
-- Removed internal SQLite engine diagnostic card (end users do not need technical engine status).
-- Removed redundant `Paste JSON` button in favor of unified file import.
+---
+
+## 7. Settings UI Streamlining & Clutter Elimination
+
+### A. Removed 12-Word Recovery Phrase Engine
+- Deleted `src/security/bip39Wordlist.ts` and `src/security/recoveryPhrase.ts`.
+- Removed all 12-word phrase states, handlers, and the two bottom modals from `src/views/Settings.tsx`.
+- Cleaned up imports in `src/security/masterKey.ts`.
+- Eliminates unnecessary user cognitive load: local storage is already secure via device hardware keys, and exports provide 1-click snapshots or custom password protection.
+
+### B. Removed Internal SQLite Engine Diagnostic Banner
+- Removed the technical "Unified SQLite Database Engine 1ms WAL" card from the UI. End users do not need internal database engine diagnostics.
+
+### C. Removed Redundant "Paste JSON" Button
+- Removed the separate "Paste JSON" button from the backup card, keeping the interface focused on three clear actions:
+  1. `Export Portable Snapshot (.lifelog)`
+  2. `Password-Protect (.lifelog)`
+  3. `Import Backup (.lifelog / .json)`
 
 ---
 
-## 9. Pending Features Roadmap (Future Monetization)
+## 8. Build, Typecheck & Packaging Verification
 
-### LifeLog Pro / Premium Security Vault
+1. **TypeScript Verification**:
+   ```bash
+   npm run typecheck
+   # tsc --noEmit -> 0 errors across all source files
+   ```
+2. **Production Vite Build**:
+   ```bash
+   npm run build
+   # Built in 2.50s -> all client bundles optimized and clean
+   ```
+3. **Git Cleanliness**:
+   * All changes committed with clear conventional commit messages.
+   * Synced directly with remote repository `origin/main` (`git@github.com:Krrish1411/Lifelog.git`).
+
+---
+
+## 9. Pending Features Roadmap (Future Monetization & LifeLog Pro)
+
+### A. LifeLog Pro / Premium Security Vault
 - **Whole-App Screen PIN Lock**:
   - 4-digit or 6-digit glassmorphic PIN screen overlay on app cold launch or after configurable inactivity timeouts (1m, 5m, 15m).
-  - Designed as an optional paid security tier.
+  - Biometric authentication (Fingerprint / Face Unlock on Android).
 - **Per-Note 🔒 Privacy Shield (Apple Notes Style)**:
   - Mask sensitive journal entries, therapy logs, or financial notes behind a lock icon while leaving daily grocery tasks, habits, and focus timers immediately accessible.
-- **Dedicated Security Tab**:
-  - Consolidation of all security controls, PIN options, and vault encryption under a single premium settings hub.
+- **Dedicated Security & Privacy Tab**:
+  - Premium settings hub consolidating PIN configuration, note shields, and audit logs.
 
-
+### B. Recommended Monetization Architecture
+- **Model**: Free Core + 1-Time Lifetime Purchase ($29–$49) or Yearly Subscription ($19/year) via Gumroad / LemonSqueezy.
+- **Zero-Server Offline License Verification**:
+  - Use asymmetric cryptography (Ed25519 signatures) so users can enter a license key that verifies 100% offline in 0ms with zero central server dependencies, preserving LifeLog's sovereign privacy principles.
