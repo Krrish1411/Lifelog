@@ -43,6 +43,7 @@ import {
   normalizeHex,
   readableOn,
   sessionSeconds,
+  sessionMinutes,
   streakStats,
   calculateFocusDayStreak,
   todayIso,
@@ -56,6 +57,7 @@ import { Btn, Modal, TextInput, Toggle, cn } from "./ui";
 import { TaskDialog } from "./TaskDialog";
 import { SyncDialog } from "./SyncDialog";
 import { OnboardingTourModal } from "./OnboardingTourModal";
+import { SupportCoffeeModal } from "./SupportCoffeeModal";
 import { CommandPalette } from "./CommandPalette";
 import { LiveAnnouncer } from "./LiveAnnouncer";
 import { MobileBottomNav } from "./MobileBottomNav";
@@ -1665,7 +1667,59 @@ function Overlays({
   const [moreSheetOpen, setMoreSheetOpen] = useState(false);
   const [help, setHelp] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
+  const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [namePromptInput, setNamePromptInput] = useState(state.settings.profileName || "");
+
+  const completedTasksCount = useMemo(
+    () => state.tasks.filter((t) => t.done).length,
+    [state.tasks]
+  );
+  const totalFocusMinutes = useMemo(
+    () => state.sessions.reduce((acc, s) => acc + sessionMinutes(s), 0),
+    [state.sessions]
+  );
+
+  useEffect(() => {
+    if (!state.meta?.hasSeenWelcome) return;
+    if (state.settings.muteSupportPrompt) return;
+
+    // Check milestones: 10 completed tasks OR 300 focus minutes (5 hours)
+    const reachesMilestone = completedTasksCount >= 10 || totalFocusMinutes >= 300;
+    if (!reachesMilestone) return;
+
+    // Check 7-day cooldown
+    const lastShown = state.settings.lastSupportPromptShownAt || 0;
+    const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
+    if (Date.now() - lastShown < sevenDaysMs) return;
+
+    const t = setTimeout(() => {
+      setSupportModalOpen(true);
+    }, 2500);
+    return () => clearTimeout(t);
+  }, [
+    state.meta?.hasSeenWelcome,
+    state.settings.muteSupportPrompt,
+    state.settings.lastSupportPromptShownAt,
+    completedTasksCount,
+    totalFocusMinutes,
+  ]);
+
+  const handleSnoozeSupport = () => {
+    set((s) => ({
+      ...s,
+      settings: { ...s.settings, lastSupportPromptShownAt: Date.now() },
+    }));
+    setSupportModalOpen(false);
+  };
+
+  const handlePermanentOptOut = () => {
+    set((s) => ({
+      ...s,
+      settings: { ...s.settings, muteSupportPrompt: true, lastSupportPromptShownAt: Date.now() },
+    }));
+    setSupportModalOpen(false);
+    toast("No worries at all! LifeLog will always stay 100% free and sovereign for you. ☕", "ok");
+  };
 
   useEffect(() => {
     if (state.meta?.hasSeenWelcome && !state.settings.onboardingTourSeen) {
@@ -2107,6 +2161,16 @@ function Overlays({
 
       {/* Interactive 5-Slide Onboarding Tour */}
       <OnboardingTourModal open={tourOpen} onClose={() => setTourOpen(false)} />
+
+      {/* Gentle Milestone Supporter Coffee Modal */}
+      <SupportCoffeeModal
+        open={supportModalOpen}
+        onClose={handleSnoozeSupport}
+        completedTasksCount={completedTasksCount}
+        totalFocusMinutes={totalFocusMinutes}
+        onSnoozeWeek={handleSnoozeSupport}
+        onPermanentOptOut={handlePermanentOptOut}
+      />
 
       {/* Mobile Android Bottom Dock & Hub Sheet (< md) */}
       <MobileBottomNav

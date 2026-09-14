@@ -260,3 +260,68 @@ This document provides a complete, authoritative, and chronological record of th
 - **Model**: Free Core + 1-Time Lifetime Purchase ($29–$49) or Yearly Subscription ($19/year) via Gumroad / LemonSqueezy.
 - **Zero-Server Offline License Verification**:
   - Use asymmetric cryptography (Ed25519 signatures) so users can enter a license key that verifies 100% offline in 0ms with zero central server dependencies, preserving LifeLog's sovereign privacy principles.
+
+---
+
+## 10. LifeLog v1.0.0 Production Release (In-App Features, Guided Onboarding & Playbooks)
+
+### A. Milestone Supporter Coffee Prompt (`src/components/SupportCoffeeModal.tsx`)
+- **Milestone Trigger**: Replaced disruptive random prompts with genuine productivity milestone checks:
+  - Triggers only when `completedTasksCount >= 10 || totalFocusMinutes >= 300` (5 hours of deep focus).
+  - Wired into `src/components/Shell.tsx` with portal mounting (`z-[9999]`) and safe cooldown math.
+- **Actions**:
+  - `Buy Me a Coffee ☕`: Opens `https://buymeacoffee.com/Krrish1411`.
+  - `Remind Me in a Week ⏳`: Snoozes prompt for 7 full days (`lastSupportPromptShownAt = Date.now()`).
+  - `Don't Show Again 🚫`: Permanently disables supporter prompts (`muteSupportPrompt = true`).
+  - Setting toggle in **Settings > General > Support LifeLog** allows users to opt in or out anytime.
+
+### B. In-App Update Checker & Privacy Feedback Hub (`src/views/Settings.tsx`)
+- **Software Updates & Releases Card**:
+  - Manual, strictly on-demand check querying `https://raw.githubusercontent.com/Krrish1411/Lifelog-Releases/main/version.json`.
+  - Enforces a strict 5-second timeout via `AbortController`.
+  - Compares semantic versioning (`v1.0.0` vs remote).
+  - Displays version status pill (`Latest Sovereign Build` vs `Update Available` with modal showing changelog bullets and direct `.exe`, `.dmg`, `.AppImage`, `.apk` download links).
+- **Privacy-First Feedback & Community Hub**:
+  - Direct Email: `mailto:getlifelog@proton.me` with automatic, non-identifying diagnostics (app version, OS platform, display mode).
+  - Public Bug Tracker: Links directly to `https://github.com/Krrish1411/Lifelog-Releases/issues`.
+
+### C. Welcome View Overhaul (`src/views/Welcome.tsx`)
+- Elevated into a high-end product showcase:
+  - Top bar with `v1.0.0 Sovereign` badge, nav anchors, `Buy me a coffee` button, and `Launch Workspace` CTA.
+  - Zero-Cloud Trust Badge (Zero Telemetry, SQLite WAL, AES-256-GCM, P2P DTLS Sync).
+  - 7 Core Feature Pillars (Tasks & Habits, Deep Focus Studio, Sovereign Second Brain, Time-Grid Calendar, Habit Streaks, Calibrated Analytics, Cryptographic P2P Sync).
+  - Cross-Platform Downloads Hub (Windows `.exe`, macOS `.dmg`, Linux `.AppImage`, Android `.apk`).
+  - Creator Philosophy statement by Krish Patel on why sovereign computing matters.
+  - Root container configured for frictionless mouse wheel scrolling and touch panning.
+
+### D. Guided Onboarding Tasks & Rich Educational Notes (`src/data/seed.ts`, `src/utils/cleanSeed.ts`)
+- **Tutorial Tasks with Subtasks**:
+  - `Welcome to LifeLog! Complete your first 3-minute setup` (Cockpit exploration, checklist, command palette, themes).
+  - `Explore Notes: Discover your Sovereign Second Brain` (Guides reading, dynamic `@/#/[` mentions, markdown).
+  - `Try a 25-minute Pomodoro or Flow focus session` (Timer start, ambient soundscapes, pause tracking).
+  - `Schedule your afternoon by dragging a task onto the Calendar` (Time grid, drag-to-tray unblocking).
+  - `Pair a second device using zero-cloud P2P Sync` (Settings > Sync & Storage, WebRTC DTLS pairing).
+- **3 Comprehensive Markdown Notes in `Guides & Principles` Folder**:
+  1. `Welcome to LifeLog: The Sovereign Workspace Guide`: Reassuring 3-minute mental model explaining how to use LifeLog without feeling overwhelmed.
+  2. `Power User Guide: Mentions, Wiki-Links & Shortcuts`: Tutorial on dynamic `@/#/[` dropdowns and single-key navigation.
+  3. `Zero-Cloud Architecture & Cryptographic Sovereignty`: Deep-dive into local SQLite WAL, AES-256-GCM, and pure P2P DTLS sync.
+- **Seed Data Purge Parity (`cleanSeed.ts`)**:
+  - All new task titles, project IDs/names, and note titles registered in `cleanSeed.ts`.
+  - Guarantees that "Purge Demo Data" leaves a 100% clean vault while preserving any personal items created by the user.
+
+### E. Onboarding Tour Modal Rewrite (`src/components/OnboardingTourModal.tsx`)
+- Rewritten in warm, friendly, plain language designed specifically to eliminate feature overwhelm.
+- Reassures users to start small with just one or two tasks, use only what they want, and let the app adapt to their flow.
+
+### F. Electron Native External URL Support (`electron/main.cjs`)
+- Added `mailto:` support to `mainWindow.webContents.setWindowOpenHandler` so clicking `getlifelog@proton.me` smoothly delegates to the user's default OS desktop email client (Thunderbird, Outlook, Apple Mail) via `shell.openExternal`.
+
+### G. Master Documentation & Release Playbook
+- **`features.md`**: Master architectural specification documenting all 8 primary views, 5 layout engines, shortcuts, SQLite WAL architecture, P2P sync, crypto envelopes, and reporting calibration.
+- **`RELEASE_PLAYBOOK.md`**: Production binary release playbook for Krish Patel covering build commands for Windows, Linux, macOS, Android APK, Git release tagging, and updating `version.json` in `Krrish1411/Lifelog-Releases`.
+
+### H. Verification & Codebase Super-Audit
+- **TypeScript Check**: `npm run typecheck` (`tsc --noEmit`) &rarr; **0 errors**.
+- **Production Bundle**: `npm run build` (`vite build`) &rarr; **built cleanly in 2.66s**.
+- **Network Audit**: Zero unsolicited background network queries on boot; update checker is strictly manual with a 5-second timeout.
+

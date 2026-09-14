@@ -29,9 +29,13 @@ import {
   Cloud,
   History,
   CheckSquare,
+  CheckCircle2,
+  Mail,
+  RefreshCw,
 } from "lucide-react";
-import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey } from "../types";
+import type { LayoutMode, MobileLayoutMode, State, ThemeMode, TokenKey, AppVersionInfo } from "../types";
 import {
+  APP_VERSION,
   DEFAULT_SETTINGS,
   DEFAULT_SHORTCUTS,
   FONT_PAIRS,
@@ -160,6 +164,61 @@ export function SettingsView() {
   const [importPayload, setImportPayload] = useState<string | null>(null);
   const [importErr, setImportErr] = useState("");
 
+  // Update checker state
+  const [updateChecking, setUpdateChecking] = useState(false);
+  const [updateResult, setUpdateResult] = useState<{
+    status: "idle" | "latest" | "available" | "error";
+    data?: AppVersionInfo;
+    errorMsg?: string;
+  }>({ status: "idle" });
+  const [showUpdateModal, setShowUpdateModal] = useState(false);
+
+  const isNewerVersion = (remote: string, current: string): boolean => {
+    const rParts = remote.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+    const cParts = current.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
+    for (let i = 0; i < Math.max(rParts.length, cParts.length); i++) {
+      const r = rParts[i] ?? 0;
+      const c = cParts[i] ?? 0;
+      if (r > c) return true;
+      if (r < c) return false;
+    }
+    return false;
+  };
+
+  const checkForUpdates = async () => {
+    setUpdateChecking(true);
+    setUpdateResult({ status: "idle" });
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    try {
+      const res = await fetch("https://raw.githubusercontent.com/Krrish1411/Lifelog-Releases/main/version.json", {
+        signal: controller.signal,
+        headers: { "Cache-Control": "no-cache" },
+      });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: AppVersionInfo = await res.json();
+
+      if (isNewerVersion(data.version, APP_VERSION)) {
+        setUpdateResult({ status: "available", data });
+        setShowUpdateModal(true);
+      } else {
+        setUpdateResult({ status: "latest", data });
+        toast(`LifeLog is up to date (v${APP_VERSION})`, "ok");
+      }
+    } catch (err: any) {
+      clearTimeout(timeoutId);
+      setUpdateResult({
+        status: "error",
+        errorMsg: err.name === "AbortError"
+          ? "Update check timed out. You may be offline or the connection was slow."
+          : "Could not reach the releases server. Verify your connection.",
+      });
+    } finally {
+      setUpdateChecking(false);
+    }
+  };
 
   const [quotesDraft, setQuotesDraft] = useState(s.customQuotes.join("\n"));
   useEffect(() => setQuotesDraft(s.customQuotes.join("\n")), [s.customQuotes]);
@@ -1822,6 +1881,147 @@ export function SettingsView() {
               true
             )}
 
+            {/* Software Updates & Releases */}
+            {section(
+              "Software Updates & Releases",
+              "LifeLog has zero background telemetry and never checks for updates without your explicit request. Click below to query the official LifeLog Releases repository.",
+              (
+                <div className="flex flex-col gap-3">
+                  <div
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border"
+                    style={{ borderColor: "var(--line)", background: "var(--bg)" }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border shrink-0" style={{ borderColor: "var(--line)", background: "var(--panel2)" }}>
+                        <Sparkles size={18} style={{ color: "var(--accent)" }} />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[13.5px] font-bold">LifeLog Desktop & Mobile</span>
+                          <span className="chip !py-0.5 text-[10.5px] font-mono" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+                            v{APP_VERSION} Sovereign
+                          </span>
+                        </div>
+                        <div className="text-[11px] font-semibold mt-0.5" style={{ color: "var(--mut)" }}>
+                          Cryptographic offline vault · Native SQLite WAL · P2P DTLS Sync
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <Btn
+                        variant="primary"
+                        size="sm"
+                        disabled={updateChecking}
+                        onClick={checkForUpdates}
+                        className="gap-1.5 font-bold"
+                      >
+                        <RefreshCw size={13} className={cn(updateChecking && "animate-spin")} />
+                        {updateChecking ? "Checking..." : "Check for Updates"}
+                      </Btn>
+                      <a
+                        href="https://github.com/Krrish1411/Lifelog-Releases/releases"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-ghost !text-xs !py-1.5 gap-1"
+                        title="View Releases on GitHub"
+                      >
+                        <ExternalLink size={12} />
+                        Releases
+                      </a>
+                    </div>
+                  </div>
+
+                  {updateResult.status === "latest" && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl border text-[12px] font-bold" style={{ borderColor: "var(--ok)", background: "rgba(16, 185, 129, 0.08)", color: "var(--ok)" }}>
+                      <CheckCircle2 size={15} />
+                      You are running the latest sovereign build (v{APP_VERSION}). Zero updates pending.
+                    </div>
+                  )}
+
+                  {updateResult.status === "available" && updateResult.data && (
+                    <div className="flex items-center justify-between gap-2 p-3 rounded-xl border text-[12px]" style={{ borderColor: "var(--accent)", background: "rgba(99, 102, 241, 0.08)" }}>
+                      <div>
+                        <div className="font-bold text-[var(--accent)] flex items-center gap-1.5">
+                          <Sparkles size={14} /> LifeLog v{updateResult.data.version} is now available!
+                        </div>
+                        <div className="text-[11px] text-[var(--mut)] mt-0.5 font-medium">
+                          Released on {updateResult.data.releaseDate}. Click to view changelog and platform binaries.
+                        </div>
+                      </div>
+                      <Btn variant="primary" size="sm" onClick={() => setShowUpdateModal(true)}>
+                        View Update
+                      </Btn>
+                    </div>
+                  )}
+
+                  {updateResult.status === "error" && (
+                    <div className="flex items-start gap-2 px-3 py-2 rounded-xl border text-[11.5px] font-semibold" style={{ borderColor: "var(--line)", background: "var(--panel2)", color: "var(--mut)" }}>
+                      <AlertCircle size={14} className="text-amber-500 shrink-0 mt-0.5" />
+                      <span>{updateResult.errorMsg}</span>
+                    </div>
+                  )}
+                </div>
+              ),
+              true
+            )}
+
+            {/* Privacy-First Feedback & Community */}
+            {section(
+              "Feedback & Community Support",
+              "Zero telemetry means your voice is the only way we learn about issues, feature wishes, and usability quirks. Reach out directly or open a GitHub issue.",
+              (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <a
+                    href={`mailto:getlifelog@proton.me?subject=${encodeURIComponent(`LifeLog Feedback & Diagnostics [v${APP_VERSION}]`)}&body=${encodeURIComponent(
+                      `Hi LifeLog Team,\n\n[Describe your feedback, bug report, or idea here]\n\n---\nSystem Diagnostics (No personal, habit, or task data included):\n- App Version: v${APP_VERSION}\n- Platform: ${isNativeMobile ? "Android" : isLinuxDesktop ? "Linux Desktop" : isLinux ? "Linux" : "Desktop/Web"}\n- User Agent: ${typeof navigator !== "undefined" ? navigator.userAgent : "Unknown"}\n`
+                    )}`}
+                    className="flex flex-col justify-between p-3.5 rounded-xl border transition-all hover:scale-[1.01] hover:border-[var(--accent)]"
+                    style={{ borderColor: "var(--line)", background: "var(--bg)" }}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 font-bold text-[13px] text-[var(--text)]">
+                        <Mail size={15} style={{ color: "var(--accent)" }} />
+                        <span>Direct Developer Support</span>
+                      </div>
+                      <div className="text-[11px] font-semibold mt-1 text-[var(--mut)]">
+                        Encrypted email to <span className="font-mono text-[var(--text)]">getlifelog@proton.me</span> with automatic non-identifying diagnostics.
+                      </div>
+                    </div>
+                    <div className="mt-3 inline-flex items-center gap-1 text-[11.5px] font-bold text-[var(--accent)]">
+                      <span>Send Email</span>
+                      <ExternalLink size={11} />
+                    </div>
+                  </a>
+
+                  <a
+                    href="https://github.com/Krrish1411/Lifelog-Releases/issues"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex flex-col justify-between p-3.5 rounded-xl border transition-all hover:scale-[1.01] hover:border-[var(--accent)]"
+                    style={{ borderColor: "var(--line)", background: "var(--bg)" }}
+                  >
+                    <div>
+                      <div className="flex items-center gap-2 font-bold text-[13px] text-[var(--text)]">
+                        <svg className="w-4 h-4 shrink-0 fill-current" viewBox="0 0 24 24">
+                          <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z" />
+                        </svg>
+                        <span>GitHub Public Issue Tracker</span>
+                      </div>
+                      <div className="text-[11px] font-semibold mt-1 text-[var(--mut)]">
+                        Browse open issues, propose features, and track bug fixes transparently in the public releases repo.
+                      </div>
+                    </div>
+                    <div className="mt-3 inline-flex items-center gap-1 text-[11.5px] font-bold text-[var(--accent)]">
+                      <span>Open Tracker</span>
+                      <ExternalLink size={11} />
+                    </div>
+                  </a>
+                </div>
+              ),
+              true
+            )}
+
             {/* About LifeLog */}
             {section(
               "About LifeLog",
@@ -1838,10 +2038,31 @@ export function SettingsView() {
                         Crafted with precision by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span>
                       </div>
                     </div>
-                    <span className="chip text-[11px] font-mono">v{STATE_VERSION}.0</span>
+                    <div className="flex items-center gap-2">
+                      <span className="chip text-[11px] font-mono">v{APP_VERSION} Sovereign</span>
+                    </div>
                   </div>
                   <div className="text-[11px] font-medium" style={{ color: "var(--mut)" }}>
-                    Zero telemetry · 100% offline-first · Local IndexedDB storage · AES-256-GCM encryption · Tailored for Android & Desktop
+                    Zero telemetry · 100% offline-first · Local SQLite WAL & IndexedDB storage · AES-256-GCM encryption · Tailored for Android & Desktop
+                  </div>
+                  <div className="flex flex-wrap items-center gap-3 pt-1 text-[11px] font-bold">
+                    <a
+                      href="https://github.com/Krrish1411/Lifelog-Releases"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[var(--accent)] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>Public Releases & Downloads</span>
+                      <ExternalLink size={10} />
+                    </a>
+                    <span className="text-[var(--line)]">·</span>
+                    <a
+                      href="mailto:getlifelog@proton.me"
+                      className="text-[var(--accent)] hover:underline inline-flex items-center gap-1"
+                    >
+                      <span>getlifelog@proton.me</span>
+                      <ExternalLink size={10} />
+                    </a>
                   </div>
                 </div>
               ),
@@ -1887,6 +2108,17 @@ export function SettingsView() {
                       <Heart size={14} className="text-red-500 fill-red-500" /> GitHub Sponsors
                     </a>
                   </div>
+
+                  <div className="flex items-center justify-between rounded-xl border p-3 mt-1" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                    <div>
+                      <div className="text-[13px] font-bold">Milestone Supporter Prompts</div>
+                      <div className="text-[11px] font-semibold" style={{ color: "var(--mut)" }}>
+                        Show an occasional coffee reminder after reaching major milestones (e.g. 10 completed tasks or 5 hours of deep focus).
+                      </div>
+                    </div>
+                    <Toggle checked={!s.muteSupportPrompt} onChange={(v) => patch({ muteSupportPrompt: !v })} />
+                  </div>
+
                   <div className="text-[11px] font-medium" style={{ color: "var(--mut)" }}>
                     Pay what you want · 100% goes directly to development · $0 mandatory cost for users
                   </div>
@@ -2065,6 +2297,103 @@ export function SettingsView() {
           </div>
         )}
       </Modal>
+
+      {/* Update Available / Details Modal */}
+      {updateResult.data && (
+        <Modal
+          open={showUpdateModal}
+          onClose={() => setShowUpdateModal(false)}
+          title={`🚀 LifeLog v${updateResult.data.version} Available`}
+          width={520}
+          footer={
+            <div className="flex items-center justify-between w-full">
+              <span className="text-[11px] font-mono text-[var(--mut)]">
+                Released {updateResult.data.releaseDate}
+              </span>
+              <Btn variant="primary" onClick={() => setShowUpdateModal(false)} className="font-bold">
+                Close
+              </Btn>
+            </div>
+          }
+        >
+          <div className="space-y-4">
+            <div className="p-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-xs text-[var(--text)]">
+              <div className="font-bold text-indigo-400 mb-1">What's New in v{updateResult.data.version}:</div>
+              <ul className="list-disc list-inside space-y-1 text-[var(--text)] font-medium">
+                {updateResult.data.changelog.map((c, i) => (
+                  <li key={i}>{c}</li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <div className="text-[12px] font-bold text-[var(--text)] mb-2">Direct Platform Downloads:</div>
+              <div className="grid grid-cols-2 gap-2">
+                {updateResult.data.downloads.windows && (
+                  <a
+                    href={updateResult.data.downloads.windows}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
+                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
+                  >
+                    <span>Windows (.exe)</span>
+                    <Download size={13} style={{ color: "var(--accent)" }} />
+                  </a>
+                )}
+                {updateResult.data.downloads.mac && (
+                  <a
+                    href={updateResult.data.downloads.mac}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
+                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
+                  >
+                    <span>macOS (.dmg)</span>
+                    <Download size={13} style={{ color: "var(--accent)" }} />
+                  </a>
+                )}
+                {updateResult.data.downloads.linux && (
+                  <a
+                    href={updateResult.data.downloads.linux}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
+                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
+                  >
+                    <span>Linux (.AppImage)</span>
+                    <Download size={13} style={{ color: "var(--accent)" }} />
+                  </a>
+                )}
+                {updateResult.data.downloads.android && (
+                  <a
+                    href={updateResult.data.downloads.android}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
+                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
+                  >
+                    <span>Android (.apk)</span>
+                    <Download size={13} style={{ color: "var(--accent)" }} />
+                  </a>
+                )}
+              </div>
+            </div>
+
+            <div className="text-[11px] text-[var(--mut)] font-medium">
+              You can also download signed checksums and source archives on the{" "}
+              <a
+                href="https://github.com/Krrish1411/Lifelog-Releases/releases"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[var(--accent)] underline font-bold"
+              >
+                GitHub Releases page
+              </a>.
+            </div>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

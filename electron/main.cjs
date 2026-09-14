@@ -57,7 +57,7 @@ function createMainWindow() {
       createTimerPopoutWindow();
       return { action: 'deny' };
     }
-    if (url.startsWith('http:') || url.startsWith('https:')) {
+    if (url.startsWith('http:') || url.startsWith('https:') || url.startsWith('mailto:')) {
       shell.openExternal(url);
       return { action: 'deny' };
     }

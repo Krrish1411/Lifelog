@@ -198,6 +198,9 @@ export interface Settings {
   timeFormat?: "12h" | "24h";
   /* User-defined LifeLog categories */
   customLifeLogCategories?: LifeLogCategory[];
+  /* Gentle Milestone Support Coffee Prompt */
+  lastSupportPromptShownAt?: number;
+  muteSupportPrompt?: boolean;
 }
 
 /** Standard project ID dedicated to general life tracking / vibe coding / entertainment / learning */
@@ -358,7 +361,25 @@ export const DEFAULT_SETTINGS: Settings = {
   highContrast: false,
   timeFormat: "12h",
   customLifeLogCategories: [],
+  muteSupportPrompt: false,
+  lastSupportPromptShownAt: 0,
 };
+
+export const APP_VERSION = "1.0.0";
+
+export interface AppVersionInfo {
+  version: string;
+  releaseDate: string;
+  minRequiredVersion?: string;
+  changelog: string[];
+  downloads: {
+    windows?: string;
+    windowsPortable?: string;
+    mac?: string;
+    linux?: string;
+    android?: string;
+  };
+}
 
 export const STATE_VERSION = 1;
 

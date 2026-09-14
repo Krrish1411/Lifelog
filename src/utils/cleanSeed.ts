@@ -1,6 +1,7 @@
 import type { Habit, Note, Project, Session, State, Task } from "../types";
 
 export const SEED_TASK_TITLES = new Set([
+  // Legacy demo tasks
   "hero section redesign",
   "timer engine — pause/resume edge cases",
   "read: deep work — chapter 4",
@@ -17,14 +18,38 @@ export const SEED_TASK_TITLES = new Set([
   "file q3 receipts",
   "accessibility audit — contrast pass",
   "first lifelog sketch on paper",
+  // Guided Onboarding tasks
+  "welcome to lifelog! complete your first 3-minute setup",
+  "explore notes: discover your sovereign second brain",
+  "try a 25-minute pomodoro or flow focus session",
+  "schedule your afternoon by dragging a task onto the calendar",
+  "pair a second device using zero-cloud p2p sync",
+  "draft weekly project sprint goals",
+  "review client design deliverables",
+  "afternoon 20-minute walk & recharge",
+  "read 15 pages of non-fiction",
+  "installed lifelog v1.0.0 sovereign edition",
+  "configured local encrypted vault",
+  "explored 5 visual layout engines",
 ]);
 
-export const SEED_PROJECT_IDS = new Set(["p-atlas", "p-lifelog", "p-home", "p-learn"]);
+export const SEED_PROJECT_IDS = new Set([
+  "p-atlas",
+  "p-lifelog",
+  "p-home",
+  "p-learn",
+  "p-onboarding",
+  "p-work",
+  "p-life",
+]);
 export const SEED_PROJECT_NAMES = new Set([
   "atlas — client website",
   "lifelog app",
   "home & admin",
   "learning",
+  "getting started with lifelog",
+  "deep work & projects",
+  "personal & wellness",
 ]);
 
 export const SEED_HABIT_IDS = new Set(["h-read", "h-run", "h-med"]);
@@ -37,6 +62,9 @@ export const SEED_HABIT_NAMES = new Set([
 export const SEED_NOTE_TITLES = new Set([
   "app ideas",
   "reading queue",
+  "welcome to lifelog: the sovereign workspace guide",
+  "power user guide: mentions, wiki-links & shortcuts",
+  "zero-cloud architecture & cryptographic sovereignty",
 ]);
 
 export interface SeedCleanResult {

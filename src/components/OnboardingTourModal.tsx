@@ -3,8 +3,10 @@ import {
   Sparkles,
   Layers,
   Clock,
+  Timer,
   Lock,
   Radio,
+  Heart,
   ChevronRight,
   ChevronLeft,
   X,
@@ -24,118 +26,114 @@ interface Slide {
 
 const TOUR_SLIDES: Slide[] = [
   {
-    badge: "Sovereign OS",
-    title: "Welcome to LifeLog",
-    tagline: "Your offline-first, mathematically private personal operating system.",
+    badge: "Start Calm",
+    title: "Welcome to LifeLog! Take a Breath",
+    tagline: "LifeLog has lots of powerful tools, but please don't feel overwhelmed. You don't have to use everything right away.",
     icon: Sparkles,
-    accentColor: "#dc2626",
+    accentColor: "#6366f1",
     highlights: [
       {
-        title: "100% Local-First & Sovereign",
-        desc: "All state resides in IndexedDB on your device. Zero external tracking servers, zero forced cloud accounts.",
+        title: "Start With Just One Task",
+        desc: "You don't need a complicated setup. Just write down what matters today, check it off when done, and let your mind rest.",
       },
       {
-        title: "True 24-Hour Life Tracking",
-        desc: "Integrates deep work pomodoros, life routines, habit consistency, and overnight sleep into a unified daily log.",
+        title: "Use Only What You Need",
+        desc: "Ignore the timer, calendar, or habit heatmaps until you genuinely want them. LifeLog adapts to your style, not the other way around.",
       },
       {
-        title: "Crafted with Precision",
-        desc: "Designed and engineered by Krish Patel to serve as a benchmark 10/10 productivity powerhouse.",
+        title: "Everything Stays on Your Machine",
+        desc: "No signups, no cloud accounts, and zero tracking. Your personal life and thoughts belong to you alone.",
       },
     ],
-    tip: "Press '?' anytime to see global hotkeys, or Cmd/Ctrl+K for the omni-search command palette.",
+    tip: "Look at your Today list first. We added a few friendly tutorial tasks to help you get your footing!",
   },
   {
-    badge: "Adaptive Ergonomics",
-    title: "5 Dynamic Visual Engines",
-    tagline: "Tailor your workspace canvas to your exact psychological state.",
+    badge: "Simple Routine",
+    title: "How Your Day Flows in LifeLog",
+    tagline: "A gentle 3-step rhythm from morning intentions to evening unwinding.",
+    icon: Clock,
+    accentColor: "#10b981",
+    highlights: [
+      {
+        title: "1. Morning Plan (Cockpit & Tasks)",
+        desc: "Quickly note 2–3 priorities for the day. Group them into projects if you like, or keep them loose.",
+      },
+      {
+        title: "2. Mid-day Focus (Deep Work Stage)",
+        desc: "Pick a priority and tap the timer icon. The distraction-free focus screen keeps you immersed and tracks real progress.",
+      },
+      {
+        title: "3. Evening Reflection (Daily Log)",
+        desc: "Take 30 seconds to rate your energy and log a quick note. LifeLog automatically preserves your honest timeline.",
+      },
+    ],
+    tip: "Press 'Ctrl + K' (or Cmd+K) anywhere to quickly search, switch views, or run actions.",
+  },
+  {
+    badge: "Deep Work",
+    title: "Focus Studio: Your Quiet Zone",
+    tagline: "Eliminate distractions and get into the zone with built-in soundscapes and timers.",
+    icon: Timer,
+    accentColor: "#f59e0b",
+    highlights: [
+      {
+        title: "Pomodoro, Countdown, or Flow",
+        desc: "Choose the classic 25-minute cadence, set a custom countdown, or use the open-ended flow stopwatch.",
+      },
+      {
+        title: "Built-In Ambient Soundscapes",
+        desc: "Switch on gentle rain, ocean waves, white, pink, or brown noise directly inside the app to block background noise.",
+      },
+      {
+        title: "Honest Pause Tracking",
+        desc: "If you take a coffee break or step away, pauses are logged transparently so your focus history reflects reality.",
+      },
+    ],
+    tip: "Tap Spacebar to pause or resume your active focus timer without touching the mouse.",
+  },
+  {
+    badge: "Second Brain & Schedule",
+    title: "Notes, Calendar & Quick Mentions",
+    tagline: "Connect what you think with what you do — with zero friction.",
     icon: Layers,
     accentColor: "#3b82f6",
     highlights: [
       {
-        title: "Liquid Glass (Modern OS)",
-        desc: "Adaptive translucent frosted acrylic with depth layering and dynamic ambient refraction.",
+        title: "Dynamic Mentions (@, #, [)",
+        desc: "Type '@' in any note to link a task, '#' to link a project, or '[' to wiki-link another note. Instant dropdowns do the searching for you.",
       },
       {
-        title: "Desk Suite (Pro Station)",
-        desc: "Dedicated persistent desktop side navigation inspired by classic workstation environments.",
+        title: "Drag-and-Drop Visual Calendar",
+        desc: "Drag unscheduled tasks directly into time slots on the day grid. Drag them back to the top bar anytime if your day changes.",
       },
       {
-        title: "Planify & Control",
-        desc: "Todoist-inspired clean split columns or a compact command bar with persistent bottom telemetry.",
-      },
-      {
-        title: "Zen Canvas",
-        desc: "Minimalist, distraction-free environment for pure flow state with zero visual clutter.",
+        title: "Rich Markdown Knowledge Base",
+        desc: "Write notes, attach files or images, and organize folders. Everything is protected with device-bound encryption.",
       },
     ],
-    tip: "Toggle layout engines instantly in Settings or cycle themes in the top navigation bar.",
+    tip: "Check the 'Guides & Principles' folder in Notes for in-depth tutorials and markdown examples.",
   },
   {
-    badge: "Circadian Rhythm",
-    title: "24-Hour Balance & Sleep Attribution",
-    tagline: "Accurately maps your whole day across midnight boundaries.",
-    icon: Clock,
-    accentColor: "#8b5cf6",
+    badge: "Sovereign & Free",
+    title: "Yours Forever, No Subscriptions",
+    tagline: "Independent software engineered for longevity, privacy, and calm.",
+    icon: Heart,
+    accentColor: "#ec4899",
     highlights: [
       {
-        title: "Cross-Midnight Sleep Partitioning",
-        desc: "Sleep logged from 23:00 to 07:00 automatically credits 1h to yesterday and 7h to today without splitting tasks.",
+        title: "Runs 100% Offline",
+        desc: "Powered by a native SQLite / IndexedDB engine. Works flawlessly in airplane mode, off-grid cabins, and subway commutes.",
       },
       {
-        title: "Balanced Daily Budget",
-        desc: "24-hour visual progress bar tracks Sleep (indigo), Focus (crimson), Routines (emerald), and Unallocated time.",
+        title: "Direct Peer-to-Peer Device Sync",
+        desc: "Sync laptop and phone directly over your local Wi-Fi without any third-party cloud server or monthly subscription.",
       },
       {
-        title: "Automated Daily Standup",
-        desc: "One click compiles your entire day into formatted Markdown ready to paste into Slack, GitHub, or your team chat.",
+        title: "Crafted by Krish Patel",
+        desc: "Built as an independent, transparent personal operating system. If you love it, support ongoing development on Buy Me a Coffee!",
       },
     ],
-    tip: "Habits scheduled for today appear as reminder blocks on your timeline and task streams.",
-  },
-  {
-    badge: "Hardware Cryptography",
-    title: "Encrypted Notes & Wiki Backlinks",
-    tagline: "PBKDF2 + AES-256-GCM hardware encryption with bi-directional knowledge graphs.",
-    icon: Lock,
-    accentColor: "#10b981",
-    highlights: [
-      {
-        title: "Zero-Knowledge Encryption",
-        desc: "Notes are encrypted before touching disk. Only your hardware device passkey can decrypt the plaintext.",
-      },
-      {
-        title: "Bi-Directional Wiki Backlinks",
-        desc: "Type [[Note Title]] to cross-reference notes, #Project to link tasks, and @Task to create direct references.",
-      },
-      {
-        title: "KaTeX Math & Markdown",
-        desc: "Full LaTeX mathematical equations ($...$ and $$...$$), tables, code syntax highlighting, and media attachments.",
-      },
-    ],
-    tip: "Referenced tasks automatically show interactive note badges in your task planner.",
-  },
-  {
-    badge: "Peer-to-Peer Fabric",
-    title: "P2P WebRTC Sync & Focus Streaks",
-    tagline: "Direct device-to-device replication without cloud intermediaries.",
-    icon: Radio,
-    accentColor: "#f59e0b",
-    highlights: [
-      {
-        title: "Decentralized WebRTC DataChannels",
-        desc: "Pair phone and laptop via one-time QR codes or short tokens. Syncs encrypted envelopes directly.",
-      },
-      {
-        title: "Primary Authority & 3-Way Diff",
-        desc: "Designate your primary device at first sync to prevent conflicts, or inspect diffs with 3-way visual resolution.",
-      },
-      {
-        title: "Focus Day Streak Engine",
-        desc: "Top bar streak counts genuine deep focus days — protecting your flow and compounding your daily momentum.",
-      },
-    ],
-    tip: "Support continuous development using the 'Buy Me a Coffee' button in the top navigation bar!",
+    tip: "You can revisit this tour or the full Welcome Guide anytime from Settings > General.",
   },
 ];
 

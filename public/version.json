@@ -1,0 +1,22 @@
+{
+  "version": "1.0.0",
+  "releaseDate": "2026-09-14",
+  "minRequiredVersion": "1.0.0",
+  "changelog": [
+    "Native SQLite WAL database engine with sub-millisecond query performance",
+    "Hardware device-bound AES-256-GCM authenticated row-level encryption",
+    "Pure Sovereign P2P sync over WebRTC DTLS data channels (Zero Central Cloud)",
+    "Dynamic mention autocompletion for Tasks (@), Projects (#), and Notes ([[)",
+    "Calendar habit slotting and drag-to-tray unscheduling",
+    "High-contrast exact-color PDF export engine with Executive Summary modes",
+    "Portal-mounted visual 3-way sync conflict resolver",
+    "Comprehensive guided onboarding tour and Second Brain starter notes"
+  ],
+  "downloads": {
+    "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Setup-1.0.0.exe",
+    "windowsPortable": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Portable-1.0.0.exe",
+    "mac": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-1.0.0.dmg",
+    "linux": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-1.0.0.AppImage",
+    "android": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/lifelog-release.apk"
+  }
+}
