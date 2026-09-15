@@ -108,6 +108,8 @@ import {
   testNotificationAlert,
   triggerHaptic,
 } from "../utils/native";
+import { UpdateModal } from "../components/UpdateModal";
+import { fetchRemoteVersionInfo, isNewerVersion } from "../utils/updater";
 
 const LS_KEY = "lifelog.state.v1";
 
@@ -222,33 +224,12 @@ export function SettingsView() {
     }
   }, [isBrowser]);
 
-  const isNewerVersion = (remote: string, current: string): boolean => {
-    const rParts = remote.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
-    const cParts = current.replace(/^v/, "").split(".").map((n) => parseInt(n, 10) || 0);
-    for (let i = 0; i < Math.max(rParts.length, cParts.length); i++) {
-      const r = rParts[i] ?? 0;
-      const c = cParts[i] ?? 0;
-      if (r > c) return true;
-      if (r < c) return false;
-    }
-    return false;
-  };
-
   const checkForUpdates = async () => {
     setUpdateChecking(true);
     setUpdateResult({ status: "idle" });
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
 
     try {
-      const res = await fetch("https://raw.githubusercontent.com/Krrish1411/Lifelog-Releases/main/version.json", {
-        signal: controller.signal,
-        headers: { "Cache-Control": "no-cache" },
-      });
-      clearTimeout(timeoutId);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: AppVersionInfo = await res.json();
-
+      const data = await fetchRemoteVersionInfo();
       if (isNewerVersion(data.version, APP_VERSION)) {
         setUpdateResult({ status: "available", data });
         setShowUpdateModal(true);
@@ -257,12 +238,9 @@ export function SettingsView() {
         toast(`LifeLog is up to date (v${APP_VERSION})`, "ok");
       }
     } catch (err: any) {
-      clearTimeout(timeoutId);
       setUpdateResult({
         status: "error",
-        errorMsg: err.name === "AbortError"
-          ? "Update check timed out. You may be offline or the connection was slow."
-          : "Could not reach the releases server. Verify your connection.",
+        errorMsg: err.message || "Could not reach the releases server. Verify your connection.",
       });
     } finally {
       setUpdateChecking(false);
@@ -2633,102 +2611,12 @@ export function SettingsView() {
         )}
       </Modal>
 
-      {/* Update Available / Details Modal */}
-      {updateResult.data && (
-        <Modal
-          open={showUpdateModal}
-          onClose={() => setShowUpdateModal(false)}
-          title={`🚀 LifeLog v${updateResult.data.version} Available`}
-          width={520}
-          footer={
-            <div className="flex items-center justify-between w-full">
-              <span className="text-[11px] font-mono text-[var(--mut)]">
-                Released {updateResult.data.releaseDate}
-              </span>
-              <Btn variant="primary" onClick={() => setShowUpdateModal(false)} className="font-bold">
-                Close
-              </Btn>
-            </div>
-          }
-        >
-          <div className="space-y-4">
-            <div className="p-3 rounded-xl border border-indigo-500/30 bg-indigo-500/10 text-xs text-[var(--text)]">
-              <div className="font-bold text-indigo-400 mb-1">What's New in v{updateResult.data.version}:</div>
-              <ul className="list-disc list-inside space-y-1 text-[var(--text)] font-medium">
-                {updateResult.data.changelog.map((c, i) => (
-                  <li key={i}>{c}</li>
-                ))}
-              </ul>
-            </div>
-
-            <div>
-              <div className="text-[12px] font-bold text-[var(--text)] mb-2">Direct Platform Downloads:</div>
-              <div className="grid grid-cols-2 gap-2">
-                {updateResult.data.downloads.windows && (
-                  <a
-                    href={updateResult.data.downloads.windows}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
-                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
-                  >
-                    <span>Windows (.exe)</span>
-                    <Download size={13} style={{ color: "var(--accent)" }} />
-                  </a>
-                )}
-                {updateResult.data.downloads.mac && (
-                  <a
-                    href={updateResult.data.downloads.mac}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
-                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
-                  >
-                    <span>macOS (.dmg)</span>
-                    <Download size={13} style={{ color: "var(--accent)" }} />
-                  </a>
-                )}
-                {updateResult.data.downloads.linux && (
-                  <a
-                    href={updateResult.data.downloads.linux}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
-                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
-                  >
-                    <span>Linux (.AppImage)</span>
-                    <Download size={13} style={{ color: "var(--accent)" }} />
-                  </a>
-                )}
-                {updateResult.data.downloads.android && (
-                  <a
-                    href={updateResult.data.downloads.android}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-2.5 rounded-lg border text-xs font-bold hover:border-[var(--accent)]"
-                    style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
-                  >
-                    <span>Android (.apk)</span>
-                    <Download size={13} style={{ color: "var(--accent)" }} />
-                  </a>
-                )}
-              </div>
-            </div>
-
-            <div className="text-[11px] text-[var(--mut)] font-medium">
-              You can also download signed checksums and source archives on the{" "}
-              <a
-                href="https://github.com/Krrish1411/Lifelog-Releases/releases"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[var(--accent)] underline font-bold"
-              >
-                GitHub Releases page
-              </a>.
-            </div>
-          </div>
-        </Modal>
-      )}
+      {/* Update Available / Details Modal with Smart Platform Targeting */}
+      <UpdateModal
+        open={showUpdateModal}
+        onClose={() => setShowUpdateModal(false)}
+        data={updateResult.data || null}
+      />
     </div>
   );
 }

@@ -14,6 +14,41 @@ const ua = typeof navigator !== "undefined" ? navigator.userAgent.toLowerCase() 
 export const isLinux = typeof window !== "undefined" && ua.includes("linux") && !ua.includes("android");
 export const isLinuxDesktop = isElectron && isLinux;
 
+export type AppDistribution =
+  | "windows-setup"
+  | "windows-portable"
+  | "linux-appimage"
+  | "linux-deb"
+  | "mac"
+  | "android"
+  | "web";
+
+export async function detectDistribution(): Promise<AppDistribution> {
+  if (isNativeMobile) return "android";
+  if (isElectron) {
+    try {
+      const electronAPI = (window as any).electronAPI;
+      if (electronAPI?.getStorageInfo) {
+        const info = await electronAPI.getStorageInfo();
+        if (info?.platform === "win32") {
+          return info.isPortable ? "windows-portable" : "windows-setup";
+        }
+        if (info?.platform === "linux") {
+          return info.isAppImage ? "linux-appimage" : "linux-deb";
+        }
+        if (info?.platform === "darwin") {
+          return "mac";
+        }
+      }
+    } catch {}
+    if (ua.includes("win")) return "windows-setup";
+    if (ua.includes("linux")) return "linux-appimage";
+    if (ua.includes("mac")) return "mac";
+  }
+  return "web";
+}
+
+
 /**
  * Send desktop / web notification via standard Web Notification API.
  */

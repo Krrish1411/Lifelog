@@ -30,7 +30,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import type { Priority, TokenKey, ViewId } from "../types";
-import { FONT_PAIRS, LIFE_LOG_PROJECT_ID, QUOTES, SHORTCUT_ACTIONS } from "../types";
+import { FONT_PAIRS, LIFE_LOG_PROJECT_ID, QUOTES, SHORTCUT_ACTIONS, APP_VERSION } from "../types";
 import { useApp } from "../store";
 import { syncEngine } from "../sync/syncEngine";
 import {
@@ -56,6 +56,8 @@ import { useApplyTheme } from "../utils/useApplyTheme";
 import { Btn, Modal, TextInput, Toggle, cn } from "./ui";
 import { TaskDialog } from "./TaskDialog";
 import { SyncDialog } from "./SyncDialog";
+import { UpdateModal } from "./UpdateModal";
+import { checkDailyUpdate } from "../utils/updater";
 import { OnboardingTourModal } from "./OnboardingTourModal";
 import { SupportCoffeeModal } from "./SupportCoffeeModal";
 import { CommandPalette } from "./CommandPalette";
@@ -1687,6 +1689,18 @@ function Overlays({
   const [tourOpen, setTourOpen] = useState(false);
   const [supportModalOpen, setSupportModalOpen] = useState(false);
   const [namePromptInput, setNamePromptInput] = useState(state.settings.profileName || "");
+  const [autoUpdateData, setAutoUpdateData] = useState<any>(null);
+  const [showAutoUpdateModal, setShowAutoUpdateModal] = useState(false);
+
+  // Daily Background Update Check (silently runs on startup; opens modal if new version exists)
+  useEffect(() => {
+    checkDailyUpdate(APP_VERSION).then((info) => {
+      if (info) {
+        setAutoUpdateData(info);
+        setShowAutoUpdateModal(true);
+      }
+    });
+  }, []);
 
   const completedTasksCount = useMemo(
     () => state.tasks.filter((t) => t.done).length,
@@ -2045,6 +2059,11 @@ function Overlays({
 
       <TaskDialog />
       <SyncDialog open={syncDialogOpen} onClose={closeSyncDialog} />
+      <UpdateModal
+        open={showAutoUpdateModal}
+        onClose={() => setShowAutoUpdateModal(false)}
+        data={autoUpdateData}
+      />
       <LiveAnnouncer />
 
       <CommandPalette

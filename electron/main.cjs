@@ -261,6 +261,8 @@ ipcMain.handle('lifelog:get-storage-info', async () => {
     sqliteFile: paths.sqliteFile,
     attachmentsDir: paths.attachmentsDir,
     platform: process.platform,
+    isPortable: !!process.env.PORTABLE_EXECUTABLE_DIR,
+    isAppImage: !!process.env.APPIMAGE,
   };
 });
 

@@ -4,6 +4,21 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.1 — Smart Platform-Filtered Updates, Daily Auto-Check & Release Sync (2026-09-15)
+
+### 🎯 1. Smart Platform-Filtered Update Detection
+- **Distribution-Specific Update Targeting:** LifeLog now detects your exact operating system and application distribution (`windows-portable`, `windows-setup`, `linux-appimage`, `linux-deb`, `mac`, `android`, or `web`).
+- **Single-Click Matching Binary:** Instead of overwhelming users with multi-platform download lists, the update modal displays **only the exact binary matching your current installation** (e.g. Windows Portable users see a single dedicated button to download the Portable executable).
+- **Universal Release Hub Navigation:** Direct link to the complete GitHub Releases page (`https://github.com/Krrish1411/Lifelog-Releases/releases/latest`) for users seeking checksums, source archives, or alternative formats.
+
+### ⏰ 2. Automated Daily Update Check & Auto-Popup
+- **Silent Background Verification:** LifeLog automatically checks for new releases on startup once every 24 hours without sending tracking data or telemetry.
+- **Automatic Pop-up Notification:** When a new version is detected, the **Update Available window automatically pops up on screen** with the latest changelog and the matching download button.
+- **Unified Checker Architecture:** The manual "Check for Updates" button in Settings and the daily startup check share the same robust, timeout-guarded update engine (`src/utils/updater.ts`).
+
+### 🔗 3. Canonical Releases Repository Synchronization
+- **Live Branch Sync:** Synchronized `version.json` on the `main` branch of `Krrish1411/Lifelog-Releases` with verified asset filenames, resolving legacy 404 errors for all existing v1.0.0 and v1.0.2 users.
+
 ---
 
 ## 🌟 v1.1.0 — Open Source Milestone, Mobile Responsive Focus Scroll & Clean Multi-Platform Binaries (2026-09-15)
