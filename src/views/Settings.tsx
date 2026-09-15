@@ -2145,23 +2145,23 @@ export function SettingsView() {
                     className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border"
                     style={{ borderColor: "var(--line)", background: "var(--bg)" }}
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border shrink-0" style={{ borderColor: "var(--line)", background: "var(--panel2)" }}>
+                    <div className="flex items-start sm:items-center gap-3 min-w-0 flex-1">
+                      <div className="w-9 h-9 rounded-lg flex items-center justify-center border shrink-0 mt-0.5 sm:mt-0" style={{ borderColor: "var(--line)", background: "var(--panel2)" }}>
                         <Sparkles size={18} style={{ color: "var(--accent)" }} />
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="text-[13.5px] font-bold">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                          <span className="text-[13.5px] font-bold shrink-0">
                             {isBrowser ? "LifeLog Web Edition" : "LifeLog Desktop & Mobile"}
                           </span>
-                          <span className="chip !py-0.5 text-[10.5px] font-mono" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
+                          <span className="chip !py-0.5 text-[10.5px] font-mono shrink-0" style={{ borderColor: "var(--accent)", color: "var(--accent)" }}>
                             {isBrowser ? `v${currentAppVersion} · Always Up to Date` : `v${currentAppVersion} Sovereign`}
                           </span>
-                          <span className="chip !py-0.5 text-[10.5px] font-mono border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10">
+                          <span className="chip !py-0.5 text-[10.5px] font-mono border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 shrink-0">
                             100% Open Source
                           </span>
                         </div>
-                        <div className="text-[11px] font-semibold mt-0.5" style={{ color: "var(--mut)" }}>
+                        <div className="text-[11px] font-semibold mt-0.5 break-words" style={{ color: "var(--mut)" }}>
                           {isBrowser
                             ? "Sandboxed Browser Storage · Zero-Cloud P2P · Always Up to Date"
                             : "Cryptographic offline vault · Native SQLite WAL · P2P DTLS Sync"}
@@ -2169,7 +2169,7 @@ export function SettingsView() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap w-full sm:w-auto">
                       <a
                         href="https://github.com/Krrish1411/Lifelog"
                         target="_blank"
@@ -2246,16 +2246,16 @@ export function SettingsView() {
                   )}
 
                   {!isBrowser && updateResult.status === "available" && updateResult.data && (
-                    <div className="flex items-center justify-between gap-2 p-3 rounded-xl border text-[12px]" style={{ borderColor: "var(--accent)", background: "rgba(99, 102, 241, 0.08)" }}>
-                      <div>
-                        <div className="font-bold text-[var(--accent)] flex items-center gap-1.5">
-                          <Sparkles size={14} /> LifeLog v{updateResult.data.version} is now available!
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl border text-[12px]" style={{ borderColor: "var(--accent)", background: "rgba(99, 102, 241, 0.08)" }}>
+                      <div className="min-w-0 flex-1">
+                        <div className="font-bold text-[var(--accent)] flex items-center gap-1.5 flex-wrap">
+                          <Sparkles size={14} className="shrink-0" /> LifeLog v{updateResult.data.version} is now available!
                         </div>
-                        <div className="text-[11px] text-[var(--mut)] mt-0.5 font-medium">
+                        <div className="text-[11px] text-[var(--mut)] mt-0.5 font-medium break-words">
                           Released on {updateResult.data.releaseDate}. Click to view changelog and platform binaries.
                         </div>
                       </div>
-                      <Btn variant="primary" size="sm" onClick={() => setShowUpdateModal(true)}>
+                      <Btn variant="primary" size="sm" onClick={() => setShowUpdateModal(true)} className="self-start sm:self-auto shrink-0 font-bold">
                         View Update
                       </Btn>
                     </div>
@@ -2335,26 +2335,26 @@ export function SettingsView() {
               (
                 <div className="flex flex-col gap-3">
                   <div
-                    className="flex items-center justify-between p-3.5 rounded-xl border"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3.5 rounded-xl border"
                     style={{ borderColor: "var(--line)", background: "var(--panel2)" }}
                   >
-                    <div>
+                    <div className="min-w-0">
                       <div className="text-[14.5px] font-bold">LifeLog</div>
-                      <div className="text-[12px] font-semibold mt-0.5" style={{ color: "var(--mut)" }}>
+                      <div className="text-[12px] font-semibold mt-0.5 break-words" style={{ color: "var(--mut)" }}>
                         Crafted with precision by <span className="font-extrabold text-[var(--accent)] tracking-tight">Krish Patel</span>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <a
                         href="https://github.com/Krrish1411/Lifelog"
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="chip text-[11px] font-mono border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer"
+                        className="chip text-[11px] font-mono border-emerald-500/40 text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 hover:bg-emerald-500/20 transition-colors cursor-pointer shrink-0"
                         title="100% Free & Open Source under the MIT License"
                       >
                         ⭐ Open Source (MIT)
                       </a>
-                      <span className="chip text-[11px] font-mono">v{currentAppVersion} Sovereign</span>
+                      <span className="chip text-[11px] font-mono shrink-0">v{currentAppVersion} Sovereign</span>
                     </div>
                   </div>
                   <div className="text-[11px] font-medium leading-relaxed" style={{ color: "var(--mut)" }}>

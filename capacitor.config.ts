@@ -13,6 +13,9 @@ const config: CapacitorConfig = {
     webContentsDebuggingEnabled: false,
   },
   plugins: {
+    CapacitorHttp: {
+      enabled: true,
+    },
     StatusBar: {
       style: "DARK",
       backgroundColor: "#080b09",

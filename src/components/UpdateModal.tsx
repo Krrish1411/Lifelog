@@ -87,11 +87,11 @@ export function UpdateModal({ open, onClose, data }: UpdateModalProps) {
       }
       width={520}
       footer={
-        <div className="flex items-center justify-between w-full">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 w-full">
           <span className="text-[11px] font-mono text-[var(--mut)]">
             Released {data.releaseDate} • Running v{APP_VERSION}
           </span>
-          <Btn variant="ghost" onClick={onClose} className="font-semibold text-xs">
+          <Btn variant="ghost" onClick={onClose} className="font-semibold text-xs self-end sm:self-auto">
             Close
           </Btn>
         </div>
@@ -163,7 +163,7 @@ export function UpdateModal({ open, onClose, data }: UpdateModalProps) {
         </div>
 
         {/* Universal GitHub Release Hub Link */}
-        <div className="pt-2 border-t border-[var(--line)] flex items-center justify-between text-[11px]">
+        <div className="pt-2 border-t border-[var(--line)] flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 text-[11px]">
           <span className="text-[var(--mut)] font-medium">Need another OS or checksums?</span>
           <a
             href={githubReleaseUrl}

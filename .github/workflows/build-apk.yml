@@ -58,21 +58,25 @@ jobs:
           retention-days: 1
 
       - name: Extract Changelog for Release
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         run: |
           TAG="${GITHUB_REF_NAME}"
+          if [ -z "$TAG" ] || [ "$TAG" = "main" ]; then
+            TAG="v1.1.1"
+          fi
           sed -n "/^## 🌟 ${TAG}/,/^---/p" RELEASE.md > RELEASE_BODY.md
           if [ ! -s RELEASE_BODY.md ]; then
             head -n 50 RELEASE.md > RELEASE_BODY.md
           fi
 
       - name: Attach APK to Lifelog-Releases
-        if: startsWith(github.ref, 'refs/tags/v')
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
           repository: Krrish1411/Lifelog-Releases
           token: ${{ secrets.RELEASES_TOKEN || secrets.GITHUB_TOKEN }}
-          name: LifeLog ${{ github.ref_name }} — Sovereign Release
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.1.1' }}
+          name: LifeLog ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || 'v1.1.1' }} — Sovereign Release
           body_path: RELEASE_BODY.md
           files: |
             android/app/build/outputs/apk/release/LifeLog-Android.apk

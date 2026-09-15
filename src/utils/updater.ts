@@ -1,7 +1,10 @@
 import { AppVersionInfo, APP_VERSION } from "../types";
+import { Capacitor, CapacitorHttp } from "@capacitor/core";
 
 const REMOTE_VERSION_URL =
   "https://raw.githubusercontent.com/Krrish1411/Lifelog-Releases/main/version.json";
+const FALLBACK_VERSION_URL =
+  "https://krrish1411.github.io/Lifelog-Releases/version.json";
 const LAST_CHECK_KEY = "lifelog_last_update_check";
 const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
@@ -23,27 +26,70 @@ export function isNewerVersion(remote: string, current: string): boolean {
 
 /**
  * Fetch the latest release descriptor from the canonical public releases repository.
+ * Uses native CapacitorHttp on Android (bypasses WebView CORS completely).
+ * Uses simple GET without preflight headers on Web/Electron.
  */
 export async function fetchRemoteVersionInfo(): Promise<AppVersionInfo> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 6000);
+  const ts = Date.now();
+  const primaryUrl = `${REMOTE_VERSION_URL}?_t=${ts}`;
+  const fallbackUrl = `${FALLBACK_VERSION_URL}?_t=${ts}`;
 
-  try {
-    const res = await fetch(REMOTE_VERSION_URL, {
-      signal: controller.signal,
-      headers: { "Cache-Control": "no-cache" },
-    });
-    clearTimeout(timeoutId);
-    if (!res.ok) throw new Error(`HTTP ${res.status}`);
-    const data: AppVersionInfo = await res.json();
-    return data;
-  } catch (err: any) {
-    clearTimeout(timeoutId);
-    if (err.name === "AbortError") {
-      throw new Error("Update check timed out. You may be offline or connection was slow.");
-    }
-    throw new Error("Could not reach releases server. Verify your connection.");
+  // 1. On Native Android / iOS, try native CapacitorHttp (bypasses WebView CORS completely)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const response = await CapacitorHttp.get({
+        url: primaryUrl,
+        connectTimeout: 9000,
+        readTimeout: 9000,
+      });
+      if (response.status === 200 && response.data) {
+        return typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+      }
+    } catch {}
+
+    try {
+      const response = await CapacitorHttp.get({
+        url: fallbackUrl,
+        connectTimeout: 9000,
+        readTimeout: 9000,
+      });
+      if (response.status === 200 && response.data) {
+        return typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+      }
+    } catch {}
   }
+
+  // Helper for web/electron fetch with individual timeout and no custom headers (avoids CORS preflight)
+  const fetchWithTimeout = async (url: string, timeoutMs: number = 8000) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, {
+        method: "GET",
+        signal: controller.signal,
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      return await res.json();
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  // 2. Primary GitHub raw content fetch
+  try {
+    return await fetchWithTimeout(primaryUrl, 7000);
+  } catch {}
+
+  // 3. Fallback to GitHub Pages
+  try {
+    return await fetchWithTimeout(fallbackUrl, 7000);
+  } catch (err: any) {
+    if (err?.name === "AbortError") {
+      throw new Error("Update check timed out. Verify your internet connection.");
+    }
+  }
+
+  throw new Error("Could not reach the releases server. Verify your internet connection.");
 }
 
 /**
