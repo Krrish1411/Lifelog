@@ -37,7 +37,9 @@ jobs:
           cp dist/index.html dist/404.html
 
       - name: Deploy to Public Lifelog-Releases (gh-pages)
-        if: ${{ secrets.RELEASES_TOKEN != '' }}
+        env:
+          RELEASES_TOKEN: ${{ secrets.RELEASES_TOKEN }}
+        if: env.RELEASES_TOKEN != ''
         uses: peaceiris/actions-gh-pages@v4
         with:
           personal_token: ${{ secrets.RELEASES_TOKEN }}
