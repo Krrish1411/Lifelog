@@ -8,30 +8,66 @@
 
 **Crafted with precision by Krish Patel**
 
-[![Release](https://img.shields.io/badge/Release-v1.0.0_Sovereign-6366f1?style=for-the-badge)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest)
-[![Zero-Cloud](https://img.shields.io/badge/Privacy-100%25_Zero_Cloud-10b981?style=for-the-badge)](#-zero-cloud-sovereignty-guarantee)
-[![License](https://img.shields.io/badge/License-MIT-3b82f6?style=for-the-badge)](#license)
+[![Release](https://img.shields.io/badge/Release-v1.0.2_Sovereign-6366f1?style=for-the-badge)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest)
+[![Open Source](https://img.shields.io/badge/Open_Source-100%25_MIT-10b981?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://github.com/Krrish1411/Lifelog)
+[![Zero-Cloud](https://img.shields.io/badge/Privacy-100%25_Zero_Cloud-0ea5e9?style=for-the-badge)](#-zero-cloud-sovereignty-guarantee)
 [![Support](https://img.shields.io/badge/Support-Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/Krrish1411)
 
 <br/>
 
-**[🚀 Launch Live Web App](https://krrish1411.github.io/Lifelog-Releases/)** • **[📦 Download Desktop & Mobile](#-official-downloads)** • **[🛡️ Security Architecture](#-zero-cloud-sovereignty-guarantee)** • **[🐛 Report an Issue](https://github.com/Krrish1411/Lifelog-Releases/issues)**
+**[🚀 Launch Live Web App](https://krrish1411.github.io/Lifelog-Releases/)** • **[⭐ Source Code (GitHub)](https://github.com/Krrish1411/Lifelog)** • **[📦 Download Desktop & Mobile](#-official-downloads)** • **[🛡️ Security Architecture](#-zero-cloud-sovereignty-guarantee)** • **[🐛 Report an Issue](https://github.com/Krrish1411/Lifelog/issues)**
 
 </div>
 
 ---
 
-## 📦 Official Downloads (v1.0.0 Sovereign Edition)
+## 🌐 100% Free & Open Source Software (FOSS)
+
+LifeLog is proudly **100% Free and Open Source** under the permissive **[MIT License](LICENSE)**. 
+
+We believe that software designed to organize your personal schedule, thoughts, habits, and life work should belong completely to you — transparent, auditable, and never trapped inside proprietary corporate silos.
+
+* **Main Source Code Repository:** [https://github.com/Krrish1411/Lifelog](https://github.com/Krrish1411/Lifelog)
+* **Releases & Binary Distribution Repository:** [https://github.com/Krrish1411/Lifelog-Releases](https://github.com/Krrish1411/Lifelog-Releases)
+* **Live Web App Deployment:** [https://krrish1411.github.io/Lifelog-Releases/](https://krrish1411.github.io/Lifelog-Releases/)
+* **Issue Tracker & Discussions:** [https://github.com/Krrish1411/Lifelog/issues](https://github.com/Krrish1411/Lifelog/issues)
+
+### 🛠️ Developer Setup & Building From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/Krrish1411/Lifelog.git
+cd Lifelog
+
+# Install dependencies
+npm install
+
+# Run the local development server (Vite)
+npm run dev
+
+# Build the production web bundle
+npm run build
+
+# Run desktop app locally in Electron
+npm run electron:dev
+```
+
+---
+
+## 📦 Official Downloads (v1.1.0 Sovereign Edition)
 
 Download official, standalone binaries for your operating system. Every package runs 100% locally with zero external network dependencies:
 
 | Platform | Format | Package Type | Direct Download Link |
 |---|---|---|---|
-| **Windows** | `.exe` | 64-bit Installer | [Download LifeLog Setup (Windows)](https://github.com/Krrish1411/Lifelog-Releases/releases/download/v1.0.0/LifeLog-Setup-1.0.0.exe) |
-| **Windows** | `.exe` | Portable (No Install) | [Download LifeLog Portable (Windows)](https://github.com/Krrish1411/Lifelog-Releases/releases/download/v1.0.0/LifeLog-1.0.0-portable.exe) |
-| **macOS** | `.dmg` | Universal (Apple Silicon & Intel) | [Download LifeLog DMG (macOS)](https://github.com/Krrish1411/Lifelog-Releases/releases/download/v1.0.0/LifeLog-1.0.0.dmg) |
-| **Linux** | `.AppImage` | Universal Linux Executable | [Download LifeLog AppImage (Linux)](https://github.com/Krrish1411/Lifelog-Releases/releases/download/v1.0.0/LifeLog-1.0.0.AppImage) |
-| **Android** | `.apk` | Arm64 Release APK (0/70 Clean) | [Download LifeLog APK (Android)](https://github.com/Krrish1411/Lifelog-Releases/releases/download/v1.0.0/LifeLog-1.0.0.apk) |
+| **Windows** | `.exe` | 64-bit Installer | [Download LifeLog Setup (Windows)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Setup-Windows.exe) |
+| **Windows** | `.exe` | Portable (No Install) | [Download LifeLog Portable (Windows)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Portable-Windows.exe) |
+| **macOS** | `.dmg` | Disk Image (Universal) | [Download LifeLog DMG (macOS)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-macOS.dmg) |
+| **macOS** | `.zip` | Portable Zip (Universal) | [Download LifeLog ZIP (macOS)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-macOS.zip) |
+| **Linux** | `.deb` | Debian / Ubuntu / Mint | [Download LifeLog DEB (Linux)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Linux.deb) |
+| **Linux** | `.AppImage` | Universal Executable | [Download LifeLog AppImage (Linux)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Linux.AppImage) |
+| **Linux** | `.tar.gz` | Portable Tarball | [Download LifeLog Tarball (Linux)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Linux.tar.gz) |
+| **Android** | `.apk` | Signed Release APK (0/70 Clean) | [Download LifeLog APK (Android)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Android.apk) |
 | **iOS / iPadOS** | Safari PWA | Zero-Install Standalone App | [Open Web App](https://krrish1411.github.io/Lifelog-Releases/) (Share > Add to Home Screen) |
 | **Web Browser** | Sandboxed PWA | Zero-Install Client PWA | [Open Sovereign Web App](https://krrish1411.github.io/Lifelog-Releases/) |
 

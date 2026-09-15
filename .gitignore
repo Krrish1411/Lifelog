@@ -28,3 +28,7 @@ Lifelog-Android/
 # OS metadata
 .DS_Store
 Thumbs.db
+
+# Temporary directories
+Dump/
+ss/

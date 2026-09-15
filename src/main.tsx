@@ -23,6 +23,14 @@ ReactDOM.createRoot(rootElement).render(
 if ("serviceWorker" in navigator && window.location.protocol.startsWith("http")) {
   window.addEventListener("load", () => {
     const swPath = "./sw.js";
+    let refreshing = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => {
+      if (!refreshing) {
+        refreshing = true;
+        window.location.reload();
+      }
+    });
+
     navigator.serviceWorker
       .register(swPath)
       .then((reg) => {

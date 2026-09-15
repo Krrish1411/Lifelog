@@ -1,19 +1,22 @@
 {
-  "version": "1.0.2",
-  "releaseDate": "2026-09-14",
+  "version": "1.1.0",
+  "releaseDate": "2026-09-15",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "📱 Mobile-First Focus Layout: Timer positioned at top on mobile devices with smooth natural scrolling",
-    "📜 Universal Touch Scrolling Architecture: Scoped overscroll-behavior to prevent touch-trapping and screen lock on Android",
-    "🔄 Dynamic Version Synchronization: Unified build-time injection and live version auto-detection in browser",
-    "⚡ Instant PWA Service Worker Cache Invalidation (v1.0.2) for automatic refresh across all mobile & web clients",
-    "🚀 Zero-Bandwidth Cloud Release Pipeline: Automated build and release asset attachment via GitHub Actions"
+    "🌐 100% Free & Open Source: Complete open-source transition under permissive MIT License with public GitHub repository",
+    "📱 Mobile Touch Scrolling Architecture: Fixed focus screen 3-card touch interception, enabling smooth native page scrolling on mobile browsers",
+    "📦 Multi-Platform Packaging: Separate and cleanly labeled Linux (deb, AppImage, tar.gz), Windows (Installer, Portable), macOS (dmg, zip), and Android (apk)",
+    "⚡ Instant Service Worker Cache Invalidation (v1.1.0) with automatic controllerchange reload across mobile & web clients",
+    "🧹 Automated 1-Day Storage Optimization: Cleaned past storage bloat and enforced 1-day retention to keep GitHub Actions quota free"
   ],
   "downloads": {
-    "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Setup-1.0.0.exe",
-    "windowsPortable": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Portable-1.0.0.exe",
-    "mac": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-1.0.0.dmg",
-    "linux": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-1.0.0.AppImage",
-    "android": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/lifelog-release.apk"
+    "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Setup-Windows.exe",
+    "windowsPortable": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Portable-Windows.exe",
+    "mac": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-macOS.dmg",
+    "macZip": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-macOS.zip",
+    "linuxDeb": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Linux.deb",
+    "linuxAppImage": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Linux.AppImage",
+    "linuxTar": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Linux.tar.gz",
+    "android": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Android.apk"
   }
 }

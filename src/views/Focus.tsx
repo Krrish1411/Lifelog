@@ -572,7 +572,7 @@ export function FocusView() {
 
   /* ================= normal focus view ================= */
   return (
-    <div className="flex flex-col gap-4 w-full min-h-full pb-16 lg:pb-0 lg:h-[calc(100vh-140px)]">
+    <div className="flex flex-col gap-4 w-full min-h-full pb-16 lg:pb-0 lg:h-[calc(100vh-140px)] touch-pan-y" style={{ touchAction: "pan-y" }}>
       <div className="flex flex-wrap items-center justify-between gap-3 shrink-0">
         <div>
           <h1 className="font-display text-[24px] font-bold tracking-tight">Focus</h1>
@@ -668,16 +668,22 @@ export function FocusView() {
         </div>
       )}
 
-      <div className="grid flex-1 gap-4 lg:grid-cols-[310px_1fr_290px] min-h-0 items-stretch">
+      <div className="grid flex-1 gap-4 lg:grid-cols-[310px_1fr_290px] min-h-0 items-stretch touch-pan-y" style={{ touchAction: "pan-y" }}>
         {/* task picker */}
-        <div className="order-2 lg:order-1 card engine-panel flex flex-col p-3 overflow-hidden h-auto lg:h-full max-h-[380px] lg:max-h-none min-h-[260px] lg:min-h-[420px]">
+        <div
+          className="order-2 lg:order-1 card engine-panel flex flex-col p-3 overflow-visible lg:overflow-hidden h-auto lg:h-full max-h-none lg:max-h-none min-h-[260px] lg:min-h-[420px] touch-pan-y"
+          style={{ touchAction: "pan-y" }}
+        >
           <SearchInput
             value={query}
             onChange={setQuery}
             placeholder="Find a task…"
             width="100%"
           />
-          <div className="mt-2 flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto pr-1">
+          <div
+            className="mt-2 flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto max-h-[300px] lg:max-h-none pr-1 touch-pan-y"
+            style={{ touchAction: "pan-y", overscrollBehaviorY: "auto" }}
+          >
             {tasks.length === 0 && (
               <div className="px-2 py-4 text-center text-[12px]" style={{ color: "var(--mut)" }}>
                 No open tasks match.
@@ -695,11 +701,11 @@ export function FocusView() {
                     setSelSubtaskId(null);
                     setSelBlockId(null);
                   }}
-                  className="flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-all disabled:opacity-50"
+                  className="flex items-center gap-2 rounded-xl border px-2.5 py-2 text-left transition-all disabled:opacity-50 touch-pan-y"
                   style={
                     active
-                      ? { borderColor: "var(--accent)", background: "var(--accent-soft)" }
-                      : { borderColor: "var(--line)", cursor: "pointer" }
+                      ? { borderColor: "var(--accent)", background: "var(--accent-soft)", touchAction: "pan-y" }
+                      : { borderColor: "var(--line)", cursor: "pointer", touchAction: "pan-y" }
                   }
                 >
                   <span
@@ -804,7 +810,10 @@ export function FocusView() {
         </div>
 
         {/* timer main card */}
-        <div className="order-1 lg:order-2 card engine-panel relative flex flex-col items-center justify-center p-5 sm:p-6 lg:p-8 min-h-[380px] lg:min-h-[420px] lg:h-full lg:overflow-y-auto">
+        <div
+          className="order-1 lg:order-2 card engine-panel relative flex flex-col items-center justify-center p-5 sm:p-6 lg:p-8 min-h-[380px] lg:min-h-[420px] lg:h-full lg:overflow-y-auto touch-pan-y"
+          style={{ touchAction: "pan-y" }}
+        >
           <Seg
             options={[
               { value: "pomodoro", label: `Pomodoro · ${settings.pomodoroMin}m` },
@@ -840,8 +849,14 @@ export function FocusView() {
             </div>
           )}
 
-          <div className="relative mt-6">
-            <svg width={240} height={240} viewBox="0 0 240 240" className="rotate-[-90deg]">
+          <div className="relative mt-6 touch-pan-y" style={{ touchAction: "pan-y" }}>
+            <svg
+              width={240}
+              height={240}
+              viewBox="0 0 240 240"
+              className="rotate-[-90deg] pointer-events-none select-none touch-pan-y"
+              style={{ pointerEvents: "none", touchAction: "pan-y" }}
+            >
               <circle cx="120" cy="120" r="104" fill="none" stroke="var(--line)" strokeWidth="12" />
               <circle
                 cx="120"
@@ -856,7 +871,10 @@ export function FocusView() {
                 style={{ transition: "stroke-dashoffset 0.4s linear" }}
               />
             </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <div
+              className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none select-none"
+              style={{ pointerEvents: "none" }}
+            >
               <div
                 className="stage-num font-mono text-[42px] font-bold"
                 style={{ color: live ? "var(--text)" : "var(--mut)" }}
@@ -936,14 +954,20 @@ export function FocusView() {
         </div>
 
         {/* today history */}
-        <div className="order-3 lg:order-3 card engine-panel flex flex-col p-4 overflow-hidden h-auto lg:h-full max-h-[380px] lg:max-h-none min-h-[220px] lg:min-h-[420px]">
+        <div
+          className="order-3 lg:order-3 card engine-panel flex flex-col p-4 overflow-visible lg:overflow-hidden h-auto lg:h-full max-h-none lg:max-h-none min-h-[220px] lg:min-h-[420px] touch-pan-y"
+          style={{ touchAction: "pan-y" }}
+        >
           <div className="flex items-baseline justify-between shrink-0">
             <span className="font-display text-[14.5px] font-bold">Today</span>
             <span className="font-mono text-[15px] font-bold tnum" style={{ color: "var(--accent)" }}>
               {fmtDur(todayTotal)}
             </span>
           </div>
-          <div className="mt-2 flex flex-1 min-h-0 flex-col gap-1.5 overflow-y-auto pr-1">
+          <div
+            className="mt-2 flex flex-1 min-h-0 flex-col gap-1.5 overflow-y-auto max-h-[300px] lg:max-h-none pr-1 touch-pan-y"
+            style={{ touchAction: "pan-y", overscrollBehaviorY: "auto" }}
+          >
             {todaySessions.length === 0 && (
               <EmptyState
                 icon={Target}

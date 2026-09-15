@@ -6,6 +6,31 @@ Official release documentation and changelogs for **LifeLog** — the offline-fi
 
 ---
 
+## 🌟 v1.1.0 — Open Source Milestone, Mobile Responsive Focus Scroll & Clean Multi-Platform Binaries (2026-09-15)
+
+### 🌐 1. 100% Free & Open Source Milestone (MIT License)
+- **Public Core Codebase:** LifeLog is now 100% free and open source under the permissive MIT License. Full source code, build toolchains, and issue discussions are publicly accessible at [https://github.com/Krrish1411/Lifelog](https://github.com/Krrish1411/Lifelog).
+- **Public Audibility & Zero Telemetry:** Verify independently that zero tracking SDKs, zero ads, zero telemetry, and zero remote database connections exist in the codebase.
+- **Developer Quickstart:** Added developer clone, local build, and testing documentation in `README.md` (`npm run dev`, `npm run build`, `npm run electron:dev`).
+
+### 📱 2. Mobile Responsive Touch Scrolling on Focus Screen
+- **Full-Screen Touch Response:** Fixed touch-gesture interception on mobile screens across all 3 focus cards. Swiping or dragging with a finger anywhere inside the Focus cards (including the 240px SVG timer circle and task lists) now scrolls the page naturally.
+- **Touch-Action Scoping:** Declared `touch-action: pan-y` across card components and `.engine-panel` in `index.css`, preventing browser gesture locks and overscroll trapping.
+- **Pointer Events Optimization:** Set `pointer-events: none` on the non-interactive SVG timer dial and center digit overlay, ensuring vertical swipes seamlessly pass through to document scrolling on phones.
+
+### 📦 3. Clean Multi-Platform Binary Separation
+- **Distinct Platform Packages:** Binaries are now built, clearly named, and published separately so users can download their exact preference:
+  - **Linux:** `.deb` (Debian/Ubuntu/Mint), `.AppImage` (Universal Linux), `.tar.gz` (Portable Linux).
+  - **Windows:** `LifeLog-Setup-Windows.exe` (Installer), `LifeLog-Portable-Windows.exe` (Standalone Portable).
+  - **macOS:** `LifeLog-macOS.dmg` (Disk Image), `LifeLog-macOS.zip` (Portable Archive).
+  - **Android:** `LifeLog-Android.apk` (Signed Release APK).
+
+### ⚡ 4. Service Worker Cache Update & Storage Quota Protection
+- **Instant PWA Cache Invalidation:** Bumped service worker cache key to `lifelog-pwa-v1.1.0` with active `controllerchange` listener for seamless automatic browser refreshes.
+- **1-Day Storage Retention:** All CI build workflows configured with `retention-days: 1` to keep Actions artifact storage at zero bloat.
+
+---
+
 ## 🌟 v1.0.2 — Mobile Scroll Architecture, Version Dynamic Sync & Cloud Automation (2026-09-14)
 
 ### 📱 1. Mobile Touch Architecture & Focus Page Fluid Scrolling
