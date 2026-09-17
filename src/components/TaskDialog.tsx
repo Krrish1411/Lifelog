@@ -18,6 +18,7 @@ import {
 import type { Priority, Recurrence, Subtask, Task, TaskTimeBlock, LifeLogCategory } from "../types";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
+import { deleteFromDb } from "../db/database";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
 import {
   WEEKDAYS_SHORT,
@@ -310,7 +311,16 @@ export function TaskDialog() {
       danger: true,
     });
     if (!ok) return;
-    set((s) => ({ ...s, tasks: s.tasks.filter((t) => t.id !== editing.id) }));
+    const now = Date.now();
+    set((s) => ({
+      ...s,
+      tasks: s.tasks.filter((t) => t.id !== editing.id),
+      deleted: {
+        ...s.deleted,
+        tasks: { ...(s.deleted?.tasks ?? {}), [editing.id]: now },
+      },
+    }));
+    deleteFromDb("tasks", editing.id).catch(() => {});
     toast("Task deleted", "ok");
     closeTaskDialog();
   };

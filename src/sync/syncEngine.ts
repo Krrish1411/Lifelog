@@ -71,10 +71,16 @@ class WebRTCSyncEngine {
   constructor() {
     if (typeof window !== "undefined") {
       setTimeout(() => this.tryAutoReconnect(), 600);
+      setInterval(() => {
+        if (this.status === "idle" && typeof localStorage !== "undefined" && localStorage.getItem(SYNC_STORAGE_KEY)) {
+          this.tryAutoReconnect();
+        }
+      }, 15000);
     }
   }
 
   public tryAutoReconnect(): void {
+    if (this.status === "connected" || this.status === "syncing") return;
     try {
       const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SYNC_STORAGE_KEY) : null;
       if (!raw) return;
@@ -183,8 +189,8 @@ class WebRTCSyncEngine {
       }
       this.sendMessage({ type: "PING", timestamp: Date.now() }).catch(() => {});
       if (Date.now() - this.lastHeartbeatReceived > 26000) {
-        console.warn("[Sync] Heartbeat timeout: peer silent for >26s. Resetting.");
-        this.disconnect(false).catch(() => {});
+        console.warn("[Sync] Heartbeat timeout: peer silent for >26s. Resetting connection while preserving saved pairing.");
+        this.disconnect(false, false).catch(() => {});
       }
     }, 10000);
   }
@@ -706,6 +712,9 @@ class WebRTCSyncEngine {
 
   private async handleIncomingMessage(msg: SyncMessage, selfPeer?: SyncPeerInfo) {
     this.lastHeartbeatReceived = Date.now();
+    if (this.status === "idle" || this.status === "connecting") {
+      this.setStatus("connected", this.connectedPeer);
+    }
 
     if (msg.type === "PING") {
       this.sendMessage({ type: "PONG", timestamp: Date.now() }).catch(() => {});
@@ -770,7 +779,7 @@ class WebRTCSyncEngine {
     } else if (msg.type === "DELTA_STATE") {
       this.dispatchStateMerge((local) => mergeDelta(local, msg.delta));
     } else if (msg.type === "DISCONNECT") {
-      await this.disconnect(false);
+      await this.disconnect(false, false);
       for (const l of this.peerDisconnectListeners) {
         try { l(); } catch {}
       }
@@ -783,7 +792,7 @@ class WebRTCSyncEngine {
     }
   }
 
-  public async disconnect(notifyPeer: boolean = true): Promise<void> {
+  public async disconnect(notifyPeer: boolean = true, forgetSession: boolean = false): Promise<void> {
     this.stopHeartbeat();
 
     if (notifyPeer && (this.status === "connected" || this.status === "syncing") && this.outgoingTopic && this.sharedSecret) {
@@ -812,7 +821,7 @@ class WebRTCSyncEngine {
       this.pc = null;
     }
 
-    if (typeof localStorage !== "undefined") {
+    if (forgetSession && typeof localStorage !== "undefined") {
       try {
         localStorage.removeItem(SYNC_STORAGE_KEY);
         localStorage.removeItem("lifelog.sync.masterEstablished");

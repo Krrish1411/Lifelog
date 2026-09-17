@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { Check, Flame, Lock, Pencil, Plus, Trash2, X } from "lucide-react";
 import type { Habit } from "../types";
 import { useApp } from "../store";
+import { deleteFromDb } from "../db/database";
 import { addDaysIso, fmtDayShort, fmtNoteName, streakStats, todayIso, uid, weekStartIso } from "../utils/core";
 import { playHabitChime, playTimerToggleSound } from "../utils/audio";
 import { Btn, ColorPicker, EmojiPicker, EmptyState, Labeled, Modal, TextInput, cn } from "../components/ui";
@@ -46,7 +47,16 @@ export function HabitsView() {
       confirmLabel: "Delete", danger: true,
     });
     if (!ok) return;
-    set((s) => ({ ...s, habits: s.habits.filter((x) => x.id !== h.id) }));
+    const now = Date.now();
+    set((s) => ({
+      ...s,
+      habits: s.habits.filter((x) => x.id !== h.id),
+      deleted: {
+        ...s.deleted,
+        habits: { ...(s.deleted?.habits ?? {}), [h.id]: now },
+      },
+    }));
+    deleteFromDb("habits", h.id).catch(() => {});
     toast("Habit deleted", "warn");
   };
 

@@ -369,7 +369,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.1";
+export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.2";
 
 export interface AppVersionInfo {
   version: string;
@@ -449,6 +449,8 @@ export interface ElectronAPI {
   dbSaveRow: (table: string, row: Record<string, unknown>) => Promise<{ success: boolean; error?: string }>;
   dbDeleteRow: (table: string, id: string) => Promise<{ success: boolean; error?: string }>;
   dbBatchSave: (table: string, rows: Record<string, unknown>[]) => Promise<{ success: boolean; error?: string }>;
+  dbReconcile: (table: string, activeIds: string[], idCol?: string) => Promise<{ success: boolean; error?: string }>;
+  dbWipeAll: () => Promise<{ success: boolean; error?: string }>;
   dbExec: (sql: string) => Promise<{ success: boolean; error?: string }>;
   dbQuery: <T = unknown>(sql: string, params?: unknown[]) => Promise<T[]>;
   dbExportBackup: (customPath?: string) => Promise<{ success?: boolean; path?: string; canceled?: boolean; error?: string }>;

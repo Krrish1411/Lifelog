@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   dbSaveRow: (table, row) => ipcRenderer.invoke('lifelog:db-save-row', { table, row }),
   dbDeleteRow: (table, id) => ipcRenderer.invoke('lifelog:db-delete-row', { table, id }),
   dbBatchSave: (table, rows) => ipcRenderer.invoke('lifelog:db-batch-save', { table, rows }),
+  dbReconcile: (table, activeIds, idCol) => ipcRenderer.invoke('lifelog:db-reconcile', { table, activeIds, idCol }),
+  dbWipeAll: () => ipcRenderer.invoke('lifelog:db-wipe-all'),
   dbExec: (sql) => ipcRenderer.invoke('lifelog:db-exec', sql),
   dbQuery: (sql, params) => ipcRenderer.invoke('lifelog:db-query', { sql, params }),
   dbExportBackup: (customPath) => ipcRenderer.invoke('lifelog:db-export-backup', customPath),

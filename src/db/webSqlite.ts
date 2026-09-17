@@ -239,6 +239,54 @@ export function webBatchSave(table: string, rows: Record<string, unknown>[]): vo
   schedulePersistence();
 }
 
+export function webReconcileTable(table: string, activeIds: string[], idCol = "id"): void {
+  const db = getWebDb();
+  if (!activeIds || activeIds.length === 0) {
+    db.run(`DELETE FROM ${table};`);
+    if (table === "notes") {
+      db.run("DELETE FROM attachments;");
+    }
+    schedulePersistence();
+    return;
+  }
+  const activeSet = new Set(activeIds);
+  const rows = webQueryAll<{ [key: string]: string }>(`SELECT ${idCol} FROM ${table};`);
+  const toDelete = rows.filter((r) => !activeSet.has(r[idCol]));
+  if (toDelete.length > 0) {
+    db.run("BEGIN TRANSACTION;");
+    try {
+      for (const r of toDelete) {
+        db.run(`DELETE FROM ${table} WHERE ${idCol} = ?;`, [r[idCol]]);
+        if (table === "notes") {
+          db.run("DELETE FROM attachments WHERE note_id = ?;", [r[idCol]]);
+        }
+      }
+      db.run("COMMIT;");
+    } catch (e) {
+      db.run("ROLLBACK;");
+      throw e;
+    }
+    schedulePersistence();
+  }
+}
+
+export function webWipeDatabase(): void {
+  const db = getWebDb();
+  db.run(`
+    DELETE FROM notes;
+    DELETE FROM attachments;
+    DELETE FROM tasks;
+    DELETE FROM habits;
+    DELETE FROM projects;
+    DELETE FROM folders;
+    DELETE FROM sessions;
+    DELETE FROM day_logs;
+    DELETE FROM app_settings;
+    DELETE FROM meta;
+  `);
+  schedulePersistence();
+}
+
 export function webQueryAll<T = Record<string, unknown>>(
   sql: string,
   params: (string | number | null | Uint8Array)[] = []

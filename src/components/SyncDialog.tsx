@@ -320,7 +320,7 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
   const handleDisconnect = async () => {
     triggerHaptic("warning");
     handleStopPinHost();
-    await syncEngine.disconnect(true);
+    await syncEngine.disconnect(true, true);
     if (typeof localStorage !== "undefined") {
       localStorage.removeItem(MASTER_KEY);
       localStorage.removeItem(MASTER_ROLE_KEY);

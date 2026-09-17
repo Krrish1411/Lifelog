@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import type { Attachment, Note } from "../types";
 import { useApp } from "../store";
+import { deleteFromDb } from "../db/database";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
 import { fmtClock, fmtDayShort, fmtNoteName, todayIso, uid, extractWikiLinks } from "../utils/core";
 import { applyLinePrefix, applyWrap, renderMarkdown } from "../utils/markdown";
@@ -281,7 +282,16 @@ export function NotesView() {
       compact: true,
     });
     if (!ok) return;
-    set((s) => ({ ...s, notes: s.notes.filter((x) => x.id !== n.id) }));
+    const now = Date.now();
+    set((s) => ({
+      ...s,
+      notes: s.notes.filter((x) => x.id !== n.id),
+      deleted: {
+        ...s.deleted,
+        notes: { ...(s.deleted?.notes ?? {}), [n.id]: now },
+      },
+    }));
+    deleteFromDb("notes", n.id).catch(() => {});
     if (selId === n.id) {
       const remaining = state.notes.filter((x) => x.id !== n.id);
       setSelId(remaining[0]?.id ?? null);

@@ -350,6 +350,31 @@ ipcMain.handle('lifelog:db-query', async (_event, { sql, params }) => {
   }
 });
 
+ipcMain.handle('lifelog:db-reconcile', async (_event, { table, activeIds, idCol }) => {
+  try {
+    dbManager.reconcileTable(table, activeIds, idCol);
+    return { success: true };
+  } catch (err) {
+    console.error(`Database reconcile error for ${table}:`, err);
+    return { success: false, error: String(err) };
+  }
+});
+
+ipcMain.handle('lifelog:db-wipe-all', async () => {
+  try {
+    dbManager.wipeDatabase();
+    const { file } = getStoragePaths();
+    if (fs.existsSync(file)) {
+      try { fs.unlinkSync(file); } catch {}
+    }
+    return { success: true };
+  } catch (err) {
+    console.error('Database wipe error:', err);
+    return { success: false, error: String(err) };
+  }
+});
+
+
 // 9. Export portable encrypted backup (.lifelog or .sqlite3)
 ipcMain.handle('lifelog:db-export-backup', async (_event, customPath) => {
   try {

@@ -1,13 +1,13 @@
 {
-  "version": "1.1.1",
-  "releaseDate": "2026-09-15",
+  "version": "1.1.2",
+  "releaseDate": "2026-09-17",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "🎯 Smart Platform-Filtered Updates: App detects your exact OS/distribution and presents the single matching binary download",
-    "⏰ Automated Daily Update Check: On launch once per day, LifeLog silently checks for new releases and pops up the update window",
-    "🔗 Universal Release Page Link: Direct one-click access to full GitHub Releases for all platforms and checksums",
-    "🌐 100% Free & Open Source Milestone under MIT License with public GitHub repository",
-    "📱 Mobile Focus Screen Touch Scrolling Architecture: Fluid responsive touch scrolling across all 3 cards"
+    "🛡️ Permanent Database Deletion & Anti-Resurrection: Deleted notes, tasks, habits, and projects are now immediately and atomically purged from SQLite, guaranteeing they never resurrect on app relaunch",
+    "🔄 Cross-Platform SQLite Reconciliation: Universal multi-layer reconciliation synchronizes database rows across Linux AppImage, Electron Desktop, Android APK, and Web",
+    "⚡ Persistent Sync Pairing Across Sessions: Heartbeat timeouts and browser restarts no longer wipe pairing credentials; devices stay permanently linked and auto-reconnect silently",
+    "🧹 Total Database Wipe Support: 'Erase LifeLog on this device' in Settings now cleanly resets all SQLite tables and cleans disk vaults",
+    "💀 Tombstone Sync Architecture: Deletions generate deterministic cryptographic tombstones preventing peer syncing from reviving deleted items"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Windows-Setup.exe",
@@ -20,3 +20,4 @@
     "android": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Android.apk"
   }
 }
+

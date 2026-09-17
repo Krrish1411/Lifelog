@@ -25,6 +25,8 @@ import {
   webSaveRow,
   webDeleteRow,
   webBatchSave,
+  webReconcileTable,
+  webWipeDatabase,
   webLoadAllData,
   webExportDatabase,
   webImportDatabase,
@@ -55,6 +57,30 @@ async function batchSave(table: string, rows: Record<string, unknown>[]): Promis
     await window.electronAPI.dbBatchSave(table, rows);
   } else {
     webBatchSave(table, rows);
+  }
+}
+
+export async function reconcileDbTable(table: string, activeIds: string[], idCol: string = "id"): Promise<void> {
+  if (isElectron && window.electronAPI) {
+    await window.electronAPI.dbReconcile(table, activeIds, idCol);
+  } else {
+    webReconcileTable(table, activeIds, idCol);
+  }
+}
+
+export async function deleteFromDb(table: string, id: string): Promise<void> {
+  if (isElectron && window.electronAPI) {
+    await window.electronAPI.dbDeleteRow(table, id);
+  } else {
+    webDeleteRow(table, id);
+  }
+}
+
+export async function wipeAllDatabaseData(): Promise<void> {
+  if (isElectron && window.electronAPI) {
+    await window.electronAPI.dbWipeAll();
+  } else {
+    webWipeDatabase();
   }
 }
 
@@ -236,7 +262,10 @@ export async function saveFullStateToDb(state: State): Promise<void> {
       encrypted_payload: enc,
     });
   }
-  await batchSave("tasks", taskRows);
+  if (taskRows.length > 0) {
+    await batchSave("tasks", taskRows);
+  }
+  await reconcileDbTable("tasks", state.tasks.map((t) => t.id));
 
   // 2. Prepare notes & attachments
   const noteRows: Record<string, unknown>[] = [];
@@ -264,10 +293,15 @@ export async function saveFullStateToDb(state: State): Promise<void> {
       }
     }
   }
-  await batchSave("notes", noteRows);
+  if (noteRows.length > 0) {
+    await batchSave("notes", noteRows);
+  }
+  await reconcileDbTable("notes", state.notes.map((n) => n.id));
+
   if (attachmentRows.length > 0) {
     await batchSave("attachments", attachmentRows);
   }
+  await reconcileDbTable("attachments", attachmentRows.map((a) => a.id as string));
 
   // 3. Prepare habits
   const habitRows: Record<string, unknown>[] = [];
@@ -280,7 +314,10 @@ export async function saveFullStateToDb(state: State): Promise<void> {
       encrypted_payload: enc,
     });
   }
-  await batchSave("habits", habitRows);
+  if (habitRows.length > 0) {
+    await batchSave("habits", habitRows);
+  }
+  await reconcileDbTable("habits", state.habits.map((h) => h.id));
 
   // 4. Prepare projects
   const projectRows: Record<string, unknown>[] = [];
@@ -293,7 +330,10 @@ export async function saveFullStateToDb(state: State): Promise<void> {
       encrypted_payload: enc,
     });
   }
-  await batchSave("projects", projectRows);
+  if (projectRows.length > 0) {
+    await batchSave("projects", projectRows);
+  }
+  await reconcileDbTable("projects", state.projects.map((p) => p.id));
 
   // 5. Prepare folders
   const folderRows: Record<string, unknown>[] = [];
@@ -305,7 +345,10 @@ export async function saveFullStateToDb(state: State): Promise<void> {
       encrypted_payload: enc,
     });
   }
-  await batchSave("folders", folderRows);
+  if (folderRows.length > 0) {
+    await batchSave("folders", folderRows);
+  }
+  await reconcileDbTable("folders", state.folders.map((f) => f.id));
 
   // 6. Prepare sessions
   const sessionRows: Record<string, unknown>[] = [];
@@ -318,11 +361,16 @@ export async function saveFullStateToDb(state: State): Promise<void> {
       encrypted_payload: enc,
     });
   }
-  await batchSave("sessions", sessionRows);
+  if (sessionRows.length > 0) {
+    await batchSave("sessions", sessionRows);
+  }
+  await reconcileDbTable("sessions", state.sessions.map((s) => s.id));
 
   // 7. Prepare day logs
   const dayLogRows: Record<string, unknown>[] = [];
-  for (const [dayIso, dayLog] of Object.entries(state.dayLogs)) {
+  const activeDayIsos: string[] = [];
+  for (const [dayIso, dayLog] of Object.entries(state.dayLogs || {})) {
+    activeDayIsos.push(dayIso);
     const enc = await encryptData(key, dayLog);
     dayLogRows.push({
       day_iso: dayIso,
@@ -330,7 +378,10 @@ export async function saveFullStateToDb(state: State): Promise<void> {
       encrypted_payload: enc,
     });
   }
-  await batchSave("day_logs", dayLogRows);
+  if (dayLogRows.length > 0) {
+    await batchSave("day_logs", dayLogRows);
+  }
+  await reconcileDbTable("day_logs", activeDayIsos, "day_iso");
 
   // 8. Prepare app settings & meta
   const settingsEnc = await encryptData(key, state.settings);

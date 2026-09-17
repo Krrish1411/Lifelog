@@ -1,5 +1,5 @@
 // LifeLog Sovereign Service Worker (PWA Offline Engine)
-const CACHE_NAME = "lifelog-pwa-v1.1.1";
+const CACHE_NAME = "lifelog-pwa-v1.1.2";
 
 const PRECACHE_ASSETS = [
   "./",

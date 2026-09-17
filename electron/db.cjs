@@ -245,6 +245,62 @@ function importBackup(sourcePath) {
   return { success: true };
 }
 
+/**
+ * Reconcile a table against a list of active IDs.
+ * Any row in SQLite whose key is not in activeIds will be deleted.
+ * For 'notes', any child attachments are also cleaned up.
+ */
+function reconcileTable(table, activeIds, idCol = 'id') {
+  const db = getDb();
+  if (!activeIds || activeIds.length === 0) {
+    db.prepare(`DELETE FROM ${table}`).run();
+    if (table === 'notes') {
+      db.prepare(`DELETE FROM attachments`).run();
+    }
+    return;
+  }
+  const activeSet = new Set(activeIds);
+  const rows = db.prepare(`SELECT ${idCol} FROM ${table}`).all();
+  const toDelete = rows.filter(r => !activeSet.has(r[idCol]));
+  if (toDelete.length > 0) {
+    const deleteStmt = db.prepare(`DELETE FROM ${table} WHERE ${idCol} = ?`);
+    const deleteAttStmt = table === 'notes' ? db.prepare('DELETE FROM attachments WHERE note_id = ?') : null;
+    db.exec('BEGIN IMMEDIATE TRANSACTION;');
+    try {
+      for (const r of toDelete) {
+        deleteStmt.run(r[idCol]);
+        if (deleteAttStmt) {
+          deleteAttStmt.run(r[idCol]);
+        }
+      }
+      db.exec('COMMIT;');
+    } catch (err) {
+      db.exec('ROLLBACK;');
+      throw err;
+    }
+  }
+}
+
+/**
+ * Completely wipe all data tables and run VACUUM
+ */
+function wipeDatabase() {
+  const db = getDb();
+  db.exec(`
+    DELETE FROM notes;
+    DELETE FROM attachments;
+    DELETE FROM tasks;
+    DELETE FROM habits;
+    DELETE FROM projects;
+    DELETE FROM folders;
+    DELETE FROM sessions;
+    DELETE FROM day_logs;
+    DELETE FROM app_settings;
+    DELETE FROM meta;
+    VACUUM;
+  `);
+}
+
 module.exports = {
   initDatabase,
   getDb,
@@ -256,6 +312,9 @@ module.exports = {
   deleteRow,
   loadAllData,
   batchSave,
+  reconcileTable,
+  wipeDatabase,
   exportBackup,
   importBackup,
 };
+

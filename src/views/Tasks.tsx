@@ -30,6 +30,7 @@ import {
 import type { Priority, Project, Subtask, Task, LifeLogCategory } from "../types";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
+import { deleteFromDb } from "../db/database";
 import {
   describeRecurrence,
   fmtClock,
@@ -714,10 +715,23 @@ export function TasksView({
       requireText: p.name,
     });
     if (!ok) return;
+    const deletedTaskIds = state.tasks.filter((t) => t.projectId === p.id).map((t) => t.id);
+    const now = Date.now();
+    const taskTombstones: Record<string, number> = {};
+    for (const tid of deletedTaskIds) {
+      taskTombstones[tid] = now;
+      deleteFromDb("tasks", tid).catch(() => {});
+    }
+    deleteFromDb("projects", p.id).catch(() => {});
     set((s) => ({
       ...s,
       projects: s.projects.filter((x) => x.id !== p.id),
       tasks: s.tasks.filter((t) => t.projectId !== p.id),
+      deleted: {
+        ...s.deleted,
+        projects: { ...(s.deleted?.projects ?? {}), [p.id]: now },
+        tasks: { ...(s.deleted?.tasks ?? {}), ...taskTombstones },
+      },
     }));
     setProjDialog({ open: false, project: null });
     setSel("today");

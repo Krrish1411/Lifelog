@@ -4,6 +4,25 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.2 — Database Anti-Resurrection, Cross-Platform SQLite Reconciliation & Persistent P2P Sync (2026-09-17)
+
+### 🛡️ 1. Permanent SQLite Deletion & Anti-Resurrection Architecture
+- **Atomic Deletion Purging:** Resolved critical database persistence flaw where deleting notes, tasks, habits, projects, or folders in the UI only updated in-memory state while SQLite indefinitely preserved orphaned rows with `is_deleted = 0`.
+- **Universal Multi-Layer Reconciliation:** On every persist cycle, `saveFullStateToDb` reconciles every SQLite table (`tasks`, `notes`, `attachments`, `habits`, `projects`, `folders`, `sessions`, `day_logs`) against active application state, atomically deleting all deleted rows.
+- **Immediate UI Deletion Routing:** Frontend deletion actions across all views immediately invoke `deleteFromDb` to purge records from SQLite before debouncing.
+- **Cascading Attachment Cleanup:** Deleting a note automatically cascades to purge its encrypted binary attachments from SQLite storage.
+
+### 🔄 2. Persistent P2P Device Sync & Auto-Reconnect Architecture
+- **Non-Destructive Background Heartbeat:** Heartbeat timeouts (>26s peer silence) and background network drops no longer destroy saved pairing credentials (`SYNC_STORAGE_KEY`). Devices remain paired across restarts and sleep states.
+- **Silent Auto-Reconnect Engine:** LifeLog automatically queries saved pairing sessions on launch and runs an automatic 15-second reconnection loop to seamlessly resume encrypted relay sync whenever peers come online.
+- **Deterministic Cryptographic Tombstones:** All deletion events generate deterministic Unix millisecond tombstones (`deleted.notes`, `deleted.tasks`, `deleted.habits`, `deleted.projects`), preventing two-way state reconciliation from resurrecting deleted records.
+- **Explicit Disconnect Action:** Pairing credentials are now only cleared when the user explicitly clicks "Disconnect" in the Sync dialog.
+
+### 🧹 3. Total Database Wipe Support
+- **Full Database Reset:** "Erase LifeLog on this device" in Settings now executes a complete database wipe (`DELETE FROM ...` across all tables + `VACUUM` + removal of disk fallback JSON vaults), guaranteeing a true factory-clean slate.
+
+---
+
 ## 🌟 v1.1.1 — Smart Platform-Filtered Updates, Daily Auto-Check & Release Sync (2026-09-15)
 
 ### 🎯 1. Smart Platform-Filtered Update Detection

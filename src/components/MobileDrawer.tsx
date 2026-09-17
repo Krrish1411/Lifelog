@@ -15,6 +15,7 @@ import {
 import type { Priority, Project, ViewId } from "../types";
 import { LIFE_LOG_PROJECT_ID } from "../types";
 import { useApp } from "../store";
+import { deleteFromDb } from "../db/database";
 import { triggerHaptic } from "../utils/native";
 import { normalizeHex, uid } from "../utils/core";
 import { scrollToPageTop, useBodyScrollLock } from "../utils/scrollLock";
@@ -119,10 +120,23 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
       requireText: p.name,
     });
     if (!ok) return;
+    const deletedTaskIds = state.tasks.filter((t) => t.projectId === p.id).map((t) => t.id);
+    const now = Date.now();
+    const taskTombstones: Record<string, number> = {};
+    for (const tid of deletedTaskIds) {
+      taskTombstones[tid] = now;
+      deleteFromDb("tasks", tid).catch(() => {});
+    }
+    deleteFromDb("projects", p.id).catch(() => {});
     set((s) => ({
       ...s,
       projects: s.projects.filter((x) => x.id !== p.id),
       tasks: s.tasks.filter((t) => t.projectId !== p.id),
+      deleted: {
+        ...s.deleted,
+        projects: { ...(s.deleted?.projects ?? {}), [p.id]: now },
+        tasks: { ...(s.deleted?.tasks ?? {}), ...taskTombstones },
+      },
     }));
     toast(`Deleted project "${p.name}"`, "warn");
   };
@@ -607,10 +621,23 @@ export const MobileDrawer: React.FC<MobileDrawerProps> = ({
                     requireText: p.name,
                   });
                   if (!ok) return;
+                  const deletedTaskIds = state.tasks.filter((t) => t.projectId === p.id).map((t) => t.id);
+                  const now = Date.now();
+                  const taskTombstones: Record<string, number> = {};
+                  for (const tid of deletedTaskIds) {
+                    taskTombstones[tid] = now;
+                    deleteFromDb("tasks", tid).catch(() => {});
+                  }
+                  deleteFromDb("projects", p.id).catch(() => {});
                   set((s) => ({
                     ...s,
                     projects: s.projects.filter((x) => x.id !== p.id),
                     tasks: s.tasks.filter((t) => t.projectId !== p.id),
+                    deleted: {
+                      ...s.deleted,
+                      projects: { ...(s.deleted?.projects ?? {}), [p.id]: now },
+                      tasks: { ...(s.deleted?.tasks ?? {}), ...taskTombstones },
+                    },
                   }));
                   toast(`Deleted project "${p.name}"`, "warn");
                 }}

@@ -60,6 +60,7 @@ import {
   importVaultBackupFromFile,
   setVaultMasterPassword,
   getVaultAuthInfo,
+  wipeAllDatabaseData,
 } from "../db/database";
 import {
   contrast,
@@ -567,6 +568,11 @@ export function SettingsView() {
       confirmLabel: "Erase everything", danger: true, requireText: "DELETE",
     });
     if (!ok) return;
+    try {
+      await wipeAllDatabaseData();
+    } catch (e) {
+      console.warn("Could not wipe database:", e);
+    }
     try {
       await clearIDB();
     } catch {}
