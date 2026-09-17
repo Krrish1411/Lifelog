@@ -323,9 +323,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       return;
     }
     if (syncEngine.getStatus() === "connected") {
+      const delay = syncEngine.getTransportType() === "webrtc" ? 400 : 1200;
       const t = setTimeout(() => {
         syncEngine.broadcastFullState(state).catch(console.error);
-      }, 350);
+      }, delay);
       return () => clearTimeout(t);
     }
   }, [state]);

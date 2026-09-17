@@ -6,12 +6,18 @@ import { cleanSeedData, isFreshSeedState } from "../utils/cleanSeed";
 
 const SYNC_STORAGE_KEY = "lifelog.sync.activeSession";
 
+export const RELAY_SERVERS = [
+  "https://ntfy.envs.net",
+  "https://ntfy.sh",
+];
+
 interface SavedSyncSession {
   pin: string;
   secret: string;
   role: "host" | "joiner";
   deviceName: string;
   peer?: SyncPeerInfo | null;
+  relayServer?: string;
 }
 
 function detectPlatform(): SyncPeerInfo["platform"] {
@@ -44,6 +50,72 @@ export interface SyncTicket {
 type SyncStatusListener = (status: SyncStatus, peer?: SyncPeerInfo) => void;
 type StateApplyListener = (updater: (prev: State) => State) => void;
 
+/**
+ * Post JSON payload to relay servers with automatic failover.
+ */
+async function postRelay(
+  topic: string,
+  body: string,
+  preferredRelay?: string
+): Promise<{ ok: boolean; relayUrl: string; status: number }> {
+  const servers = preferredRelay
+    ? [preferredRelay, ...RELAY_SERVERS.filter((s) => s !== preferredRelay)]
+    : RELAY_SERVERS;
+
+  for (const base of servers) {
+    try {
+      const res = await fetch(`${base}/${topic}`, {
+        method: "POST",
+        body,
+        headers: { "Content-Type": "application/json" },
+      });
+      if (res.ok) {
+        return { ok: true, relayUrl: base, status: res.status };
+      }
+      if (res.status === 429) {
+        console.warn(`[Sync] Relay ${base} rate limited (429), switching to backup relay...`);
+        continue;
+      }
+    } catch (err) {
+      console.warn(`[Sync] Relay ${base} post error:`, err);
+    }
+  }
+  return { ok: false, relayUrl: servers[0], status: 0 };
+}
+
+/**
+ * Query JSON messages from relay servers with automatic failover.
+ */
+async function queryRelayJson(
+  topic: string,
+  preferredRelay?: string
+): Promise<{ data: any; relayUrl: string } | null> {
+  const servers = preferredRelay
+    ? [preferredRelay, ...RELAY_SERVERS.filter((s) => s !== preferredRelay)]
+    : RELAY_SERVERS;
+
+  for (const base of servers) {
+    try {
+      const res = await fetch(`${base}/${topic}/json?poll=1&since=all`);
+      if (!res.ok) continue;
+      const text = await res.text();
+      const lines = text.trim().split("\n").filter(Boolean);
+      for (let i = lines.length - 1; i >= 0; i--) {
+        try {
+          const evt = JSON.parse(lines[i]);
+          if (evt.event === "message" && evt.message) {
+            const parsed = JSON.parse(evt.message);
+            if (parsed && (parsed.secret || parsed.pin || parsed.hostPeer)) {
+              return { data: parsed, relayUrl: base };
+            }
+          }
+        } catch {}
+      }
+    } catch {}
+  }
+  return null;
+}
+
 class WebRTCSyncEngine {
   private pc: RTCPeerConnection | null = null;
   private channel: RTCDataChannel | null = null;
@@ -65,18 +137,33 @@ class WebRTCSyncEngine {
   private incomingTopic: string = "";
   private activePin: string | null = null;
   private isHost: boolean = false;
+  private activeRelayServer: string = RELAY_SERVERS[0];
   private localStateGetter: (() => State | null) | null = null;
   private processedMessageIds: Set<string> = new Set();
 
   constructor() {
     if (typeof window !== "undefined") {
-      setTimeout(() => this.tryAutoReconnect(), 600);
-      setInterval(() => {
-        if (this.status === "idle" && typeof localStorage !== "undefined" && localStorage.getItem(SYNC_STORAGE_KEY)) {
+      // Auto-reconnect once on boot if pairing exists
+      setTimeout(() => this.tryAutoReconnect(), 800);
+
+      // Reconnect when network returns online
+      window.addEventListener("online", () => {
+        if (this.status === "idle" || this.status === "connecting") {
           this.tryAutoReconnect();
         }
-      }, 15000);
+      });
     }
+  }
+
+  public getLocalPeerInfo(overrideName?: string): SyncPeerInfo {
+    return {
+      deviceId: (this.isHost ? "host-" : "joiner-") + Date.now().toString(36),
+      deviceName: overrideName || (this.isHost ? "Host Device" : "Joiner Device"),
+      platform: detectPlatform(),
+      connectedAt: Date.now(),
+      stats: this.getLocalStats(),
+      relayServer: this.activeRelayServer,
+    };
   }
 
   public tryAutoReconnect(): void {
@@ -86,35 +173,40 @@ class WebRTCSyncEngine {
       if (!raw) return;
       const session: SavedSyncSession = JSON.parse(raw);
       if (!session.pin || !session.secret) return;
+
       this.isHost = session.role === "host";
       this.activePin = session.pin;
       this.sharedSecret = session.secret;
+      this.activeRelayServer = session.relayServer || RELAY_SERVERS[0];
       this.transportType = "relay";
       this.outgoingTopic = this.isHost ? `lifelog-sync-${session.pin}-h2j` : `lifelog-sync-${session.pin}-j2h`;
       this.incomingTopic = this.isHost ? `lifelog-sync-${session.pin}-j2h` : `lifelog-sync-${session.pin}-h2j`;
-      const selfPeer: SyncPeerInfo = {
-        deviceId: (this.isHost ? "host-" : "joiner-") + Date.now().toString(36),
-        deviceName: session.deviceName || "Device",
-        platform: detectPlatform(),
-        connectedAt: Date.now(),
-      };
-      this.startRelayListener(this.incomingTopic, selfPeer);
-      this.setStatus("connected", session.peer || undefined);
 
+      const selfPeer = this.getLocalPeerInfo(session.deviceName);
+
+      // Listen on SSE stream
+      this.startRelayListener(this.incomingTopic, selfPeer, this.activeRelayServer);
+
+      // Set connecting status (NOT connected until peer responds)
+      this.setStatus("connecting", session.peer || undefined);
+
+      // Probe peer with a single HANDSHAKE
       setTimeout(() => {
-        this.sendRelayMessage({
-          type: "HANDSHAKE",
-          peer: selfPeer,
-          lastSyncTs: Date.now(),
-        }).catch(() => {});
-        if (this.localStateGetter) {
-          const s = this.localStateGetter();
-          if (s) this.broadcastFullState(s).catch(() => {});
+        if (this.status === "connecting") {
+          this.sendRelayMessage({
+            type: "HANDSHAKE",
+            peer: selfPeer,
+            lastSyncTs: Date.now(),
+          }).catch(() => {});
         }
-      }, 1200);
+      }, 1000);
     } catch (e) {
       console.warn("[Sync] Auto reconnect error:", e);
     }
+  }
+
+  public reconnect(): void {
+    this.tryAutoReconnect();
   }
 
   public getStatus(): SyncStatus {
@@ -182,17 +274,23 @@ class WebRTCSyncEngine {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     this.lastHeartbeatReceived = Date.now();
-    this.heartbeatTimer = setInterval(() => {
-      if (this.status !== "connected") {
-        this.stopHeartbeat();
-        return;
-      }
-      this.sendMessage({ type: "PING", timestamp: Date.now() }).catch(() => {});
-      if (Date.now() - this.lastHeartbeatReceived > 26000) {
-        console.warn("[Sync] Heartbeat timeout: peer silent for >26s. Resetting connection while preserving saved pairing.");
-        this.disconnect(false, false).catch(() => {});
-      }
-    }, 10000);
+
+    // Only send periodic PING over direct WebRTC DataChannel (zero external server load)
+    if (this.transportType === "webrtc") {
+      this.heartbeatTimer = setInterval(() => {
+        if (this.status !== "connected" || this.transportType !== "webrtc") {
+          this.stopHeartbeat();
+          return;
+        }
+        this.sendMessage({ type: "PING", timestamp: Date.now() }).catch(() => {});
+        // If DataChannel silent for >45s, fall back to relay seamlessly
+        if (Date.now() - this.lastHeartbeatReceived > 45000) {
+          console.warn("[Sync] WebRTC silent >45s, falling back to relay transport");
+          this.transportType = "relay";
+          this.stopHeartbeat();
+        }
+      }, 25000);
+    }
   }
 
   private stopHeartbeat(): void {
@@ -215,6 +313,7 @@ class WebRTCSyncEngine {
             role: this.isHost ? "host" : "joiner",
             deviceName: this.connectedPeer?.deviceName || "Peer",
             peer: this.connectedPeer,
+            relayServer: this.activeRelayServer,
           };
           localStorage.setItem(SYNC_STORAGE_KEY, JSON.stringify(saved));
         } catch {}
@@ -242,13 +341,14 @@ class WebRTCSyncEngine {
     return data.message || "";
   }
 
-  private startRelayListener(topic: string, selfPeer: SyncPeerInfo) {
+  private startRelayListener(topic: string, selfPeer: SyncPeerInfo, relayServer?: string) {
     if (this.eventSource) {
       try { this.eventSource.close(); } catch {}
       this.eventSource = null;
     }
 
-    const url = `https://ntfy.sh/${topic}/sse?since=all`;
+    const base = relayServer || this.activeRelayServer || RELAY_SERVERS[0];
+    const url = `${base}/${topic}/sse?since=all`;
     const es = new EventSource(url);
     this.eventSource = es;
 
@@ -283,9 +383,73 @@ class WebRTCSyncEngine {
     };
   }
 
+  private waitForAllIceCandidates(pc: RTCPeerConnection, maxMs: number = 1200): Promise<void> {
+    return new Promise((resolve) => {
+      if (pc.iceGatheringState === "complete") {
+        resolve();
+        return;
+      }
+      let timer: any = null;
+      const check = () => {
+        if (pc.iceGatheringState === "complete") {
+          pc.removeEventListener("icegatheringstatechange", check);
+          if (timer) clearTimeout(timer);
+          resolve();
+        }
+      };
+      pc.addEventListener("icegatheringstatechange", check);
+      timer = setTimeout(() => {
+        pc.removeEventListener("icegatheringstatechange", check);
+        resolve();
+      }, maxMs);
+    });
+  }
+
+  private setupChannel(ch: RTCDataChannel) {
+    this.channel = ch;
+    ch.onopen = () => {
+      console.log("[Sync] WebRTC DataChannel opened! Direct peer-to-peer active.");
+      this.transportType = "webrtc";
+      this.setStatus("connected", this.connectedPeer);
+      this.startHeartbeat();
+
+      this.sendMessage({
+        type: "HANDSHAKE",
+        peer: this.getLocalPeerInfo(),
+        lastSyncTs: Date.now(),
+        stats: this.getLocalStats(),
+      }).catch(() => {});
+    };
+
+    ch.onclose = () => {
+      console.warn("[Sync] WebRTC DataChannel closed, falling back to relay.");
+      this.channel = null;
+      if (this.status === "connected") {
+        this.transportType = "relay";
+      }
+    };
+
+    ch.onerror = (err) => {
+      console.warn("[Sync] WebRTC DataChannel error:", err);
+      if (this.status === "connected") {
+        this.transportType = "relay";
+      }
+    };
+
+    ch.onmessage = async (e) => {
+      try {
+        const rawPacket = JSON.parse(e.data) as EncryptedSyncPacket;
+        const msg = await decryptSyncMessage(rawPacket, this.sharedSecret);
+        await this.handleIncomingMessage(msg);
+      } catch (err) {
+        console.error("[Sync] Error decoding WebRTC message:", err);
+      }
+    };
+  }
+
   /**
    * Device 1 (Host): Creates a session with a 6-digit PIN.
-   * Publishes session metadata and listens for peer's immediate handshake.
+   * Negotiates direct WebRTC DataChannel offer and publishes metadata across relays.
    */
   public async hostWithPin(
     pin: string,
@@ -326,26 +490,41 @@ class WebRTCSyncEngine {
       stats: this.getLocalStats(),
     };
 
-    onProgress?.("Publishing session to relay...");
+    onProgress?.("Generating Google STUN direct connection offer...");
 
-    // Publish session metadata for Joiner
+    // Create RTCPeerConnection & DataChannel for direct P2P
+    let sdpOfferStr = "";
+    try {
+      this.pc = new RTCPeerConnection(STUN_SERVERS);
+      const ch = this.pc.createDataChannel("lifelog-sync", { ordered: true });
+      this.setupChannel(ch);
+
+      const offer = await this.pc.createOffer();
+      await this.pc.setLocalDescription(offer);
+      await this.waitForAllIceCandidates(this.pc, 1000);
+      sdpOfferStr = JSON.stringify(this.pc.localDescription);
+    } catch (e) {
+      console.warn("[Sync] WebRTC offer generation error (will use relay fallback):", e);
+    }
+
+    onProgress?.("Publishing session to secure relays...");
+
     const metaPayload = JSON.stringify({
       pin,
       secret: this.sharedSecret,
       hostPeer,
+      sdpOffer: sdpOfferStr || undefined,
       createdAt: Date.now(),
     });
 
-    await fetch(`https://ntfy.sh/lifelog-sync-${pin}-meta`, {
-      method: "POST",
-      body: metaPayload,
-      headers: { "Content-Type": "application/json" },
-    });
+    // Publish to all candidate relays for maximum discovery reliability
+    const postRes = await postRelay(`lifelog-sync-${pin}-meta`, metaPayload);
+    this.activeRelayServer = postRes.relayUrl;
 
     onProgress?.("Waiting for peer to enter PIN...");
 
     // Connect EventSource to receive Joiner packets
-    this.startRelayListener(this.incomingTopic, hostPeer);
+    this.startRelayListener(this.incomingTopic, hostPeer, this.activeRelayServer);
 
     return {
       stop: () => {
@@ -358,7 +537,7 @@ class WebRTCSyncEngine {
 
   /**
    * Device 2 (Joiner): Joins the session using the 6-digit PIN.
-   * Connects within ~500ms and sends immediate handshake.
+   * Negotiates direct WebRTC answer and sends handshake.
    */
   public async joinWithPin(
     pin: string,
@@ -384,38 +563,23 @@ class WebRTCSyncEngine {
     this.activePin = pin;
     this.transportType = "relay";
 
-    onProgress?.("Locating host session...");
+    onProgress?.("Locating host session across relays...");
 
-    // Retry querying host metadata up to 5 times (every 700ms)
-    let meta: any = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      try {
-        const res = await fetch(`https://ntfy.sh/lifelog-sync-${pin}-meta/json?poll=1&since=all`);
-        const text = await res.text();
-        const lines = text.trim().split("\n").filter(Boolean);
-        for (let i = lines.length - 1; i >= 0; i--) {
-          try {
-            const evt = JSON.parse(lines[i]);
-            if (evt.event === "message" && evt.message) {
-              const parsed = JSON.parse(evt.message);
-              if (parsed.secret && parsed.hostPeer) {
-                meta = parsed;
-                break;
-              }
-            }
-          } catch {}
-        }
-        if (meta) break;
-      } catch {}
-      await new Promise((r) => setTimeout(r, 700));
+    let metaResult: { data: any; relayUrl: string } | null = null;
+    for (let attempt = 0; attempt < 6; attempt++) {
+      metaResult = await queryRelayJson(`lifelog-sync-${pin}-meta`);
+      if (metaResult && metaResult.data?.secret && metaResult.data?.hostPeer) break;
+      await new Promise((r) => setTimeout(r, 600));
     }
 
-    if (!meta) {
+    if (!metaResult || !metaResult.data) {
       throw new Error(
         `No active host session found with PIN ${pin}. Please verify that the Host device has LifeLog open with the PIN displayed.`
       );
     }
 
+    const meta = metaResult.data;
+    this.activeRelayServer = metaResult.relayUrl;
     this.sharedSecret = meta.secret;
     this.outgoingTopic = `lifelog-sync-${pin}-j2h`;
     this.incomingTopic = `lifelog-sync-${pin}-h2j`;
@@ -431,7 +595,31 @@ class WebRTCSyncEngine {
     };
 
     // Start listener on host's incoming stream
-    this.startRelayListener(this.incomingTopic, joinerPeer);
+    this.startRelayListener(this.incomingTopic, joinerPeer, this.activeRelayServer);
+
+    // If Host provided SDP offer, answer it for direct WebRTC DataChannel
+    if (meta.sdpOffer) {
+      try {
+        this.pc = new RTCPeerConnection(STUN_SERVERS);
+        this.pc.ondatachannel = (e) => {
+          this.setupChannel(e.channel);
+        };
+        const remoteDesc = JSON.parse(meta.sdpOffer) as RTCSessionDescriptionInit;
+        await this.pc.setRemoteDescription(remoteDesc);
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        await this.waitForAllIceCandidates(this.pc, 1000);
+
+        // Send SDP Answer to Host via relay
+        await this.sendRelayMessage({
+          type: "SDP_ANSWER",
+          sdpAnswer: JSON.stringify(this.pc.localDescription),
+          peer: joinerPeer,
+        });
+      } catch (e) {
+        console.warn("[Sync] WebRTC answer negotiation failed (relay will handle sync):", e);
+      }
+    }
 
     // Send immediate HANDSHAKE to Host
     await this.sendRelayMessage({
@@ -441,7 +629,6 @@ class WebRTCSyncEngine {
       stats: joinerPeer.stats,
     });
 
-    // Mark connected immediately
     this.connectedPeer = meta.hostPeer;
     this.setStatus("connected", meta.hostPeer);
     onProgress?.(`Connected to ${meta.hostPeer.deviceName}!`);
@@ -451,37 +638,16 @@ class WebRTCSyncEngine {
     if (!this.outgoingTopic || !this.sharedSecret) return;
     try {
       const packet = await encryptSyncMessage(msg, this.sharedSecret);
-      await fetch(`https://ntfy.sh/${this.outgoingTopic}`, {
-        method: "POST",
-        body: JSON.stringify(packet),
-        headers: { "Content-Type": "application/json" },
-      });
+      const res = await postRelay(this.outgoingTopic, JSON.stringify(packet), this.activeRelayServer);
+      if (res.ok && res.relayUrl !== this.activeRelayServer) {
+        this.activeRelayServer = res.relayUrl;
+      }
     } catch (e) {
       console.error("[Sync] Failed to send relay packet:", e);
     }
   }
 
-  /* ------------------- WebRTC Air-Gapped / Direct DataChannel ------------------- */
-
-  private waitForAllIceCandidates(pc: RTCPeerConnection): Promise<void> {
-    return new Promise((resolve) => {
-      if (pc.iceGatheringState === "complete") {
-        resolve();
-        return;
-      }
-      const check = () => {
-        if (pc.iceGatheringState === "complete") {
-          pc.removeEventListener("icegatheringstatechange", check);
-          resolve();
-        }
-      };
-      pc.addEventListener("icegatheringstatechange", check);
-      setTimeout(() => {
-        pc.removeEventListener("icegatheringstatechange", check);
-        resolve();
-      }, 3500);
-    });
-  }
+  /* ------------------- WebRTC Air-Gapped / Manual Ticket Fallback ------------------- */
 
   public async createSession(deviceName: string): Promise<string> {
     await this.disconnect(false);
@@ -498,7 +664,7 @@ class WebRTCSyncEngine {
     const offer = await this.pc.createOffer();
     await this.pc.setLocalDescription(offer);
 
-    await this.waitForAllIceCandidates(this.pc);
+    await this.waitForAllIceCandidates(this.pc, 3000);
 
     const ticket: SyncTicket = {
       type: "offer",
@@ -531,7 +697,7 @@ class WebRTCSyncEngine {
     const answer = await this.pc.createAnswer();
     await this.pc.setLocalDescription(answer);
 
-    await this.waitForAllIceCandidates(this.pc);
+    await this.waitForAllIceCandidates(this.pc, 3000);
 
     const answerTicket: SyncTicket = {
       type: "answer",
@@ -550,51 +716,6 @@ class WebRTCSyncEngine {
     await this.pc.setRemoteDescription(answerDesc);
   }
 
-  private setupChannel(ch: RTCDataChannel) {
-    ch.onopen = () => {
-      this.transportType = "webrtc";
-      this.setStatus("connected", {
-        deviceId: "peer-" + Date.now().toString(36),
-        deviceName: "Connected Peer",
-        platform: "web",
-        connectedAt: Date.now(),
-      });
-
-      this.sendMessage({
-        type: "HANDSHAKE",
-        peer: {
-          deviceId: "self-" + Date.now().toString(36),
-          deviceName: "LifeLog Device",
-          platform: detectPlatform(),
-          connectedAt: Date.now(),
-        },
-        lastSyncTs: Date.now(),
-      }).catch(console.error);
-    };
-
-    ch.onclose = () => {
-      if (this.transportType === "webrtc") {
-        this.setStatus("idle", null);
-      }
-    };
-
-    ch.onerror = () => {
-      if (this.transportType === "webrtc") {
-        this.setStatus("error", null);
-      }
-    };
-
-    ch.onmessage = async (e) => {
-      try {
-        const rawPacket = JSON.parse(e.data) as EncryptedSyncPacket;
-        const msg = await decryptSyncMessage(rawPacket, this.sharedSecret);
-        await this.handleIncomingMessage(msg);
-      } catch (err) {
-        console.error("Failed to decrypt WebRTC packet:", err);
-      }
-    };
-  }
-
   /* ------------------- Unified Messaging & State Synchronization ------------------- */
 
   public async sendMessage(msg: SyncMessage): Promise<void> {
@@ -605,6 +726,7 @@ class WebRTCSyncEngine {
         return;
       } catch (e) {
         console.warn("[Sync] WebRTC send failed, falling back to relay:", e);
+        this.transportType = "relay";
       }
     }
 
@@ -712,37 +834,61 @@ class WebRTCSyncEngine {
 
   private async handleIncomingMessage(msg: SyncMessage, selfPeer?: SyncPeerInfo) {
     this.lastHeartbeatReceived = Date.now();
-    if (this.status === "idle" || this.status === "connecting") {
-      this.setStatus("connected", this.connectedPeer);
+
+    if (msg.type === "SDP_ANSWER") {
+      if (this.pc && this.pc.signalingState !== "closed" && !this.pc.currentRemoteDescription) {
+        try {
+          const desc = JSON.parse(msg.sdpAnswer) as RTCSessionDescriptionInit;
+          await this.pc.setRemoteDescription(desc);
+          console.log("[Sync] Remote SDP answer set on Host successfully.");
+        } catch (e) {
+          console.warn("[Sync] Failed to set remote description from SDP answer:", e);
+        }
+      }
+      if (msg.peer) {
+        this.connectedPeer = msg.peer;
+        this.setStatus("connected", msg.peer);
+      }
+      return;
     }
 
     if (msg.type === "PING") {
       this.sendMessage({ type: "PONG", timestamp: Date.now() }).catch(() => {});
-    } else if (msg.type === "PONG") {
-      // heartbeat timestamp already updated
-    } else if (msg.type === "ROLE_SELECTION") {
+      return;
+    }
+
+    if (msg.type === "PONG") {
+      return;
+    }
+
+    if (msg.type === "ROLE_SELECTION") {
       const masterName = msg.masterDeviceName || this.connectedPeer?.deviceName || "Primary Device";
       for (const l of this.roleSelectionListeners) {
         l({ mode: msg.mode, masterDeviceName: masterName });
       }
-    } else if (msg.type === "HANDSHAKE") {
+      return;
+    }
+
+    if (msg.type === "HANDSHAKE") {
       this.connectedPeer = msg.peer;
       this.setStatus("connected", msg.peer);
 
-      // Respond with HANDSHAKE_ACK
-      if (selfPeer) {
-        await this.sendMessage({
-          type: "HANDSHAKE_ACK",
-          peer: { ...selfPeer, stats: this.getLocalStats() },
-          lastSyncTs: Date.now(),
-        });
-      }
-      // Note: Do NOT auto-broadcast or auto-merge! Await user direction choice in SyncDialog!
-    } else if (msg.type === "HANDSHAKE_ACK") {
+      const replyPeer = selfPeer || this.getLocalPeerInfo();
+      await this.sendMessage({
+        type: "HANDSHAKE_ACK",
+        peer: { ...replyPeer, stats: this.getLocalStats() },
+        lastSyncTs: Date.now(),
+      });
+      return;
+    }
+
+    if (msg.type === "HANDSHAKE_ACK") {
       this.connectedPeer = msg.peer;
       this.setStatus("connected", msg.peer);
-      // Note: Do NOT auto-broadcast or auto-merge! Await user direction choice in SyncDialog!
-    } else if (msg.type === "FORCE_REPLACE_STATE") {
+      return;
+    }
+
+    if (msg.type === "FORCE_REPLACE_STATE") {
       this.setStatus("syncing");
       this.dispatchStateMerge((local) => ({
         ...msg.state,
@@ -758,7 +904,10 @@ class WebRTCSyncEngine {
         l({ mode: "clone_to_peer", masterDeviceName: masterName });
       }
       this.setStatus("connected");
-    } else if (msg.type === "MASTER_SETUP_EVENT") {
+      return;
+    }
+
+    if (msg.type === "MASTER_SETUP_EVENT") {
       const masterName = msg.masterDeviceName || this.connectedPeer?.deviceName || "Primary Device";
       if (typeof localStorage !== "undefined") {
         localStorage.setItem("lifelog.sync.masterEstablished", "true");
@@ -768,7 +917,10 @@ class WebRTCSyncEngine {
       for (const l of this.masterSetupListeners) {
         l({ mode: msg.mode, masterDeviceName: masterName });
       }
-    } else if (msg.type === "FULL_STATE") {
+      return;
+    }
+
+    if (msg.type === "FULL_STATE") {
       this.setStatus("syncing");
       const remoteState = msg.filterSeed ? cleanSeedData(msg.state).cleanedState : msg.state;
       this.dispatchStateMerge((local) => {
@@ -776,13 +928,20 @@ class WebRTCSyncEngine {
         return mergeFullState(cleanLocal, remoteState);
       });
       this.setStatus("connected");
-    } else if (msg.type === "DELTA_STATE") {
+      return;
+    }
+
+    if (msg.type === "DELTA_STATE") {
       this.dispatchStateMerge((local) => mergeDelta(local, msg.delta));
-    } else if (msg.type === "DISCONNECT") {
+      return;
+    }
+
+    if (msg.type === "DISCONNECT") {
       await this.disconnect(false, false);
       for (const l of this.peerDisconnectListeners) {
         try { l(); } catch {}
       }
+      return;
     }
   }
 

@@ -8,7 +8,7 @@
 
 **Crafted with precision by Krish Patel**
 
-[![Release](https://img.shields.io/badge/Release-v1.1.2_Sovereign-6366f1?style=for-the-badge)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest)
+[![Release](https://img.shields.io/badge/Release-v1.1.3_Sovereign-6366f1?style=for-the-badge)](https://github.com/Krrish1411/Lifelog-Releases/releases/latest)
 [![Open Source](https://img.shields.io/badge/Open_Source-100%25_MIT-10b981?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](https://github.com/Krrish1411/Lifelog)
 [![Zero-Cloud](https://img.shields.io/badge/Privacy-100%25_Zero_Cloud-0ea5e9?style=for-the-badge)](#-zero-cloud-sovereignty-guarantee)
 [![Support](https://img.shields.io/badge/Support-Buy_Me_a_Coffee-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/Krrish1411)
@@ -54,7 +54,7 @@ npm run electron:dev
 
 ---
 
-## 📦 Official Downloads (v1.1.2 Sovereign Edition)
+## 📦 Official Downloads (v1.1.3 Sovereign Edition)
 
 Download official, standalone binaries for your operating system. Every package runs 100% locally with zero external network dependencies:
 

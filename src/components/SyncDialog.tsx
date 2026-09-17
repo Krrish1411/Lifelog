@@ -592,15 +592,41 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
             <div className="grid grid-cols-2 gap-2 text-xs pt-1 border-t border-[var(--line)]">
               <div className="p-2 rounded-xl bg-[var(--panel2)]">
                 <span className="text-[var(--mut)] block text-[10.5px]">Transport Link</span>
-                <span className="font-semibold text-[var(--text)]">
-                  {syncEngine.getTransportType() === "webrtc" ? "Direct WebRTC DataChannel" : "Encrypted Cloud Relay"}
+                <span className="font-semibold text-[var(--text)] flex items-center gap-1">
+                  {syncEngine.getTransportType() === "webrtc" ? (
+                    <>
+                      <Zap size={13} className="text-amber-400 shrink-0" />
+                      <span>Direct WebRTC P2P (0 Server Load)</span>
+                    </>
+                  ) : (
+                    <>
+                      <Radio size={13} className="text-emerald-400 shrink-0" />
+                      <span>Encrypted Cloud Relay (Failover Active)</span>
+                    </>
+                  )}
                 </span>
               </div>
               <div className="p-2 rounded-xl bg-[var(--panel2)]">
                 <span className="text-[var(--mut)] block text-[10.5px]">End-to-End Security</span>
-                <span className="font-semibold text-emerald-400">AES-GCM-256 (E2EE)</span>
+                <span className="font-semibold text-emerald-400 flex items-center gap-1">
+                  <ShieldCheck size={13} className="text-emerald-400 shrink-0" />
+                  <span>AES-GCM-256 (E2EE)</span>
+                </span>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Reconnecting banner if connecting to saved session */}
+        {!isConnectedOrSyncing && status === "connecting" && !isPinConnecting && (
+          <div className="p-3 rounded-xl bg-[var(--accent-soft)] border border-[var(--accent)]/30 flex items-center justify-between gap-3 text-xs">
+            <div className="flex items-center gap-2 text-[var(--accent)]">
+              <RefreshCw size={14} className="animate-spin shrink-0" />
+              <span>Searching for paired device across relays...</span>
+            </div>
+            <Btn size="sm" variant="ghost" onClick={handleDisconnect} className="text-xs">
+              Cancel
+            </Btn>
           </div>
         )}
 
@@ -751,7 +777,7 @@ export const SyncDialog: React.FC<SyncDialogProps> = ({ open, onClose }) => {
             <span>P2P Relay Infrastructure & Community Support</span>
           </div>
           <p className="text-[10.5px] text-[var(--mut)] leading-relaxed">
-            Direct device pairing relies on encrypted WebRTC signaling relays. Operating these high-availability STUN/TURN servers incurs continuous monthly hosting costs. Please consider donating via <a href="https://buymeacoffee.com/krish1411" target="_blank" rel="noopener noreferrer" className="text-amber-400 font-semibold underline">Buy Me a Coffee</a> to keep zero-cloud P2P relays free for everyone. If server costs outpace community donations, automated P2P cloud signaling may become a Pro tier feature, while manual file backups remain forever free.
+            LifeLog uses direct peer-to-peer WebRTC via Google STUN first, with automatic encrypted multi-relay failover across independent nodes. Please consider supporting server infrastructure via <a href="https://buymeacoffee.com/krish1411" target="_blank" rel="noopener noreferrer" className="text-amber-400 font-semibold underline">Buy Me a Coffee</a> to keep zero-cloud signaling free forever. If server costs outpace community donations, automated P2P cloud signaling may become a Pro tier feature, while manual file backups remain forever free.
           </p>
         </div>
       </div>

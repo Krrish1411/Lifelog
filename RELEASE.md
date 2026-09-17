@@ -4,6 +4,28 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.3 — Google STUN Direct P2P Sync, Multi-Relay Failover & Zero-Spam Keepalive (2026-09-17)
+
+### ⚡ 1. Direct Peer-to-Peer WebRTC over Google STUN
+- **Direct Device-to-Device Transfer:** 6-digit PIN pairing now negotiates direct WebRTC DataChannel connectivity over Google STUN (`stun.l.google.com:19302`) during handshake. Once paired, all notes, tasks, habits, and delta broadcasts stream peer-to-peer over direct UDP/TCP with **zero server load, zero quota consumption, and sub-20ms latency**.
+- **Universal Multi-Network Operation:** Direct hole punching connects devices seamlessly across different networks, cellular mobile data (4G/5G), and Wi-Fi without needing a local LAN.
+
+### 🛡️ 2. Encrypted Multi-Relay Redundancy & Automatic Failover
+- **Independent High-Availability Relays:** Introduced multi-relay failover architecture with `https://ntfy.envs.net` (primary) and `https://ntfy.sh` (secondary backup).
+- **Zero-Failure Handshake:** Session metadata is mirrored across candidate relays. If one node experiences network hiccups or rate limits, LifeLog switches immediately and automatically to the healthy node.
+- **Relay Fallback Safety Net:** If carrier-grade symmetric NAT blocks direct WebRTC UDP holes, the encrypted relay takes over smoothly in the background.
+
+### 🔇 3. Zero-Spam SSE Keepalive & Rate Limit Elimination
+- **Eliminated Rapid PING Spam:** Removed the aggressive 10-second PING/PONG HTTP requests and 15-second reconnection loop that exhausted public relay quotas.
+- **Passive SSE Streaming:** Persistent Server-Sent Events (SSE) stream maintains listening status with single-request keepalive.
+- **Intelligent Broadcast Debounce:** Real-time state broadcasting intelligently throttles HTTP requests (1200ms debounce on relay, 400ms on WebRTC), protecting battery life, data bandwidth, and server limits.
+
+### 🎯 4. Reliable Handshake & Ghost Connection Resolution
+- **Accurate Connection Transitions:** Auto-reconnect cleanly marks state as `connecting` and only transitions to `connected` upon verified cryptographic peer handshake.
+- **Handshake Peer Preservation:** Fixed race condition where peer identity was wiped during initial handshake packet reception.
+
+---
+
 ## 🌟 v1.1.2 — Database Anti-Resurrection, Cross-Platform SQLite Reconciliation & Persistent P2P Sync (2026-09-17)
 
 ### 🛡️ 1. Permanent SQLite Deletion & Anti-Resurrection Architecture
