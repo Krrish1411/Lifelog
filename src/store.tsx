@@ -36,6 +36,7 @@ import {
 } from "./utils/native";
 import { playNotificationAlarmSound, playTaskDoneSound, playTimerToggleSound } from "./utils/audio";
 import { syncEngine } from "./sync/syncEngine";
+import type { PartialStateDelta } from "./sync/syncTypes";
 import { broadcastWindowState, onWindowStateSync, requestLatestState } from "./utils/windowSync";
 import { X } from "lucide-react";
 import { cn } from "./components/ui";
@@ -200,6 +201,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const isWindowSyncRef = useRef(false);
   const stateRef = useRef<State | null>(null);
   stateRef.current = state;
+  const prevStateRef = useRef<State | null>(null);
   const firedRemindersRef = useRef<Set<string>>(new Set());
 
   /* ----- sync engine listener for incoming remote changes ----- */
@@ -320,10 +322,73 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (!state) return;
     if (isRemoteSyncRef.current) {
       isRemoteSyncRef.current = false;
+      prevStateRef.current = state;
       return;
     }
+
+    const prevState = prevStateRef.current;
+    prevStateRef.current = state;
+
     if (syncEngine.getStatus() === "connected") {
-      const delay = syncEngine.getTransportType() === "webrtc" ? 400 : 1200;
+      // 1. Compute instant delta for urgent real-time actions (0ms debounce)
+      if (prevState) {
+        const urgentDelta: PartialStateDelta = {};
+
+        // Detect session changes (timer start, pause, resume, stop, extend)
+        if (prevState.sessions !== state.sessions) {
+          const prevMap = new Map(prevState.sessions.map((s) => [s.id, s]));
+          const changedSessions = state.sessions.filter((s) => {
+            const p = prevMap.get(s.id);
+            return !p || p !== s;
+          });
+          if (changedSessions.length > 0) {
+            urgentDelta.sessions = changedSessions;
+          }
+        }
+
+        // Detect task changes (checkbox done/undone, title, due)
+        if (prevState.tasks !== state.tasks) {
+          const prevMap = new Map(prevState.tasks.map((t) => [t.id, t]));
+          const changedTasks = state.tasks.filter((t) => {
+            const p = prevMap.get(t.id);
+            return !p || p.done !== t.done || p.due !== t.due || p.title !== t.title;
+          });
+          if (changedTasks.length > 0) {
+            urgentDelta.tasks = changedTasks;
+          }
+          // Detect deleted tasks
+          const currIds = new Set(state.tasks.map((t) => t.id));
+          const deletedTaskIds = prevState.tasks.filter((t) => !currIds.has(t.id)).map((t) => t.id);
+          if (deletedTaskIds.length > 0) {
+            urgentDelta.deletedTaskIds = deletedTaskIds;
+          }
+        }
+
+        // Detect habit completion toggles
+        if (prevState.habits !== state.habits) {
+          const prevMap = new Map(prevState.habits.map((h) => [h.id, h]));
+          const changedHabits = state.habits.filter((h) => {
+            const p = prevMap.get(h.id);
+            return !p || p.completions.length !== h.completions.length;
+          });
+          if (changedHabits.length > 0) {
+            urgentDelta.habits = changedHabits;
+          }
+        }
+
+        // If any urgent changes are detected, broadcast immediately with 0ms delay!
+        if (
+          urgentDelta.sessions?.length ||
+          urgentDelta.tasks?.length ||
+          urgentDelta.deletedTaskIds?.length ||
+          urgentDelta.habits?.length
+        ) {
+          syncEngine.broadcastDelta(urgentDelta).catch(console.error);
+        }
+      }
+
+      // 2. Debounced full-state sync as background eventual consistency
+      const delay = syncEngine.getTransportType() === "webrtc" ? 300 : 800;
       const t = setTimeout(() => {
         syncEngine.broadcastFullState(state).catch(console.error);
       }, delay);

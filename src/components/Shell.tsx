@@ -279,15 +279,17 @@ export function Shell() {
 
       if (!running || running.mode === "flow" || !running.plannedMin) return;
       if (sessionSeconds(running) >= running.plannedMin * 60) {
+        const ts = Date.now();
         set((st) => ({
           ...st,
           sessions: st.sessions.map((x) =>
             x.id === running.id
               ? {
                   ...x,
-                  endedAt: Date.now(),
+                  endedAt: ts,
                   status: "done",
-                  pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: Date.now() })),
+                  updatedAt: ts,
+                  pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
                 }
               : x
           ),
@@ -1496,6 +1498,7 @@ function MiniTimer() {
   const pct = remainingSec !== null ? Math.min(100, (elapsedSec / (running.plannedMin! * 60)) * 100) : null;
 
   const togglePause = () => {
+    const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) => {
@@ -1503,10 +1506,11 @@ function MiniTimer() {
         if (openPause) {
           return {
             ...x,
-            pauses: x.pauses.map((p, i) => (i === x.pauses.length - 1 ? { ...p, resumeAt: Date.now() } : p)),
+            updatedAt: ts,
+            pauses: x.pauses.map((p, i) => (i === x.pauses.length - 1 ? { ...p, resumeAt: ts } : p)),
           };
         }
-        return { ...x, pauses: [...x.pauses, { at: Date.now(), resumeAt: null }] };
+        return { ...x, updatedAt: ts, pauses: [...x.pauses, { at: ts, resumeAt: null }] };
       }),
     }));
     toast(openPause ? "Resumed" : "Paused — timestamps kept", "ok");
@@ -1523,6 +1527,7 @@ function MiniTimer() {
               ...x,
               endedAt: ts,
               status: "stopped",
+              updatedAt: ts,
               pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
             }
           : x
@@ -1906,13 +1911,14 @@ function Overlays({
           }
           const lp = live.pauses[live.pauses.length - 1];
           const isPaused = !!lp && lp.resumeAt === null;
+          const ts = Date.now();
           set((st) => ({
             ...st,
             sessions: st.sessions.map((x) =>
               x.id === live.id
                 ? isPaused
-                  ? { ...x, pauses: x.pauses.map((p, i) => (i === x.pauses.length - 1 ? { ...p, resumeAt: Date.now() } : p)) }
-                  : { ...x, pauses: [...x.pauses, { at: Date.now(), resumeAt: null }] }
+                  ? { ...x, updatedAt: ts, pauses: x.pauses.map((p, i) => (i === x.pauses.length - 1 ? { ...p, resumeAt: ts } : p)) }
+                  : { ...x, updatedAt: ts, pauses: [...x.pauses, { at: ts, resumeAt: null }] }
                 : x
             ),
           }));

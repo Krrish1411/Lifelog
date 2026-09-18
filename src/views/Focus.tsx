@@ -102,13 +102,17 @@ export function FocusView() {
     if (live && live.mode !== "break") setMode(live.mode as TimerMode);
   }, [live?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Close stage when session ends
+  // Close stage when session ends; open stage when new session begins
+  const prevLiveIdRef = useRef<string | null>(null);
   useEffect(() => {
     if (!live) {
       setStage(false);
       setBreakOffer(false);
+    } else if (prevLiveIdRef.current !== live.id) {
+      setStage(true);
     }
-  }, [live?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+    prevLiveIdRef.current = live ? live.id : null;
+  }, [live?.id]);
 
   useEffect(() => {
     if (!live) return;
@@ -133,6 +137,7 @@ export function FocusView() {
               ...x,
               endedAt: ts,
               status: kind,
+              updatedAt: ts,
               pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
             }
           : x
@@ -249,7 +254,9 @@ export function FocusView() {
         ...s,
         tasks: updatedTasks,
         sessions: [
-          ...s.sessions,
+          ...s.sessions.map((x) =>
+            x.status === "running" ? { ...x, status: "stopped" as const, endedAt: ts, updatedAt: ts } : x
+          ),
           {
             id,
             taskId: isBreak ? null : selTaskId,
@@ -259,7 +266,8 @@ export function FocusView() {
             endedAt: null,
             plannedMin,
             pauses: [],
-            status: "running",
+            status: "running" as const,
+            updatedAt: ts,
           },
         ],
       };
@@ -294,13 +302,14 @@ export function FocusView() {
     if (!live || paused) return;
     cancelTimerEndNotification();
     triggerHaptic("light");
+    const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
-        x.id === live.id ? { ...x, pauses: [...x.pauses, { at: Date.now(), resumeAt: null }] } : x
+        x.id === live.id ? { ...x, pauses: [...x.pauses, { at: ts, resumeAt: null }], updatedAt: ts } : x
       ),
     }));
-    setNow(Date.now());
+    setNow(ts);
   };
 
   const resume = () => {
@@ -317,6 +326,7 @@ export function FocusView() {
       }
     }
     triggerHaptic("light");
+    const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
@@ -324,22 +334,24 @@ export function FocusView() {
           ? {
               ...x,
               pauses: x.pauses.map((p, i) =>
-                i === x.pauses.length - 1 && !p.resumeAt ? { ...p, resumeAt: Date.now() } : p
+                i === x.pauses.length - 1 && !p.resumeAt ? { ...p, resumeAt: ts } : p
               ),
+              updatedAt: ts,
             }
           : x
       ),
     }));
-    setNow(Date.now());
+    setNow(ts);
   };
 
   const extend = (min: number) => {
     if (!live || !live.plannedMin) return;
     const newPlanned = live.plannedMin + min;
+    const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
-        x.id === live.id ? { ...x, plannedMin: newPlanned } : x
+        x.id === live.id ? { ...x, plannedMin: newPlanned, updatedAt: ts } : x
       ),
     }));
     const remainingMs = Math.max(0, newPlanned * 60 * 1000 - elapsedMs);

@@ -1,13 +1,13 @@
 {
-  "version": "1.1.3",
-  "releaseDate": "2026-09-17",
+  "version": "1.1.4",
+  "releaseDate": "2026-09-18",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "⚡ Direct Peer-to-Peer WebRTC Sync: 6-digit PIN pairing establishes direct WebRTC DataChannel connectivity over Google STUN, delivering instant sub-20ms syncing with zero server load and zero quotas",
-    "🛡️ Encrypted Multi-Relay Failover: Introduced multi-relay architecture with automatic failover across ntfy.envs.net (primary) and ntfy.sh (secondary backup)",
-    "🔇 Zero-Spam Keepalive Engine: Completely eliminated rapid 10s PING/PONG and 15s reconnect spam, ensuring pairing and sync never hit rate limits",
-    "🌐 Universal Cross-Network Syncing: Full sync functionality across different networks, 4G/5G mobile cellular data, and home Wi-Fi with zero configuration",
-    "🎯 Deterministic Handshake & State Preservation: Fixed peer state transitions and race condition during initial pairing handshake"
+    "⚡ Instant Zero-Debounce Real-Time Sync: Interactive actions including timer pause/resume, task completion checks, and session state now broadcast lightweight inline delta packets immediately (0ms debounce)",
+    "⏱️ Dynamic Timer Reactivity & Frozen Timestamps: Pausing or resuming a timer on one device instantly pauses or resumes the timer on all paired devices with exact timestamp synchronization",
+    "🛡️ Parallel Relay Fan-Out & Split-Brain Elimination: Outgoing relay messages are transmitted across all healthy relays simultaneously, eliminating split-brain communication issues",
+    "🔄 Automatic WebRTC Upgrade on Reconnect: Devices automatically negotiate direct WebRTC DataChannels over Google STUN upon reconnecting or launching",
+    "🎯 Strict Single-Running-Session Sanitization: Enforces that at most one active timer session can run at any time, preventing ghost timers or conflicting active sessions across devices"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Windows-Setup.exe",

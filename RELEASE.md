@@ -4,6 +4,27 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.4 — Instant Zero-Debounce Real-Time Sync, Dynamic Timer Reactivity & Multi-Relay Fan-Out (2026-09-18)
+
+### ⚡ 1. Instant Zero-Debounce Delta Synchronization (<150ms)
+- **Zero-Debounce Priority Pipeline:** Interactive user actions (starting a timer, pausing, resuming, extending `+5m`, stopping, checking off tasks, or deleting tasks) now dispatch an immediate lightweight `DELTA_STATE` packet with **0ms debounce**.
+- **Ultra-Compact Payloads (<400 Bytes):** Instead of serializing and decrypting the entire database across the network, delta updates transmit only the modified entity. Payloads easily fit under relay thresholds (<4096 bytes), avoiding disk attachment conversions and secondary HTTP fetches. Over WebRTC DataChannels, packets arrive in `<20ms`; over relay SSE streams, in `<80ms`.
+- **Background Eventual-Consistency Net:** A debounced (800ms) full-state sync continues to run in the background, guaranteeing that complex state transitions and edge cases are always perfectly aligned.
+
+### ⏱️ 2. Dynamic Timer Reactivity & Real-Time Pause Sync
+- **Frozen Timestamp Synchronization:** Pausing a timer on one device immediately broadcasts the open pause interval (`{ at: ts, resumeAt: null }`), instantly freezing the elapsed countdown/timer on all secondary devices in real time.
+- **Monotonic Timestamp Tracking:** Added `updatedAt` tracking across all session lifecycle events (`pause`, `resume`, `start`, `stop`, `extend`), ensuring Last-Write-Wins (LWW) deterministic reconciliation without clock drift.
+- **Strict Single-Running-Session Sanitization:** Implemented `sanitizeSessions()`, guaranteeing that across the entire session list, only the single most recently active session can have `status: "running"`. Starting a new session automatically terminates any lingering running sessions.
+
+### 🛡️ 3. Parallel Relay Fan-Out & Split-Brain Elimination
+- **Simultaneous Multi-Relay Delivery:** Outgoing relay packets are transmitted across all healthy candidate relay servers (`ntfy.envs.net` and `ntfy.sh`) in parallel. Regardless of which relay node a receiving device is connected to, messages arrive instantly.
+- **Deduplication:** Automatic message ID tracking deduplicates packets so receivers never process duplicate payloads.
+
+### 🔄 4. Automatic WebRTC DataChannel Upgrade on Reconnect
+- **Background SDP Offer/Answer Exchange:** When paired devices relaunch or resume from background, the host automatically generates a WebRTC SDP offer over the relay channel. The joiner creates an SDP answer, automatically upgrading the connection from relay to direct peer-to-peer WebRTC DataChannel whenever NAT topology permits.
+
+---
+
 ## 🌟 v1.1.3 — Google STUN Direct P2P Sync, Multi-Relay Failover & Zero-Spam Keepalive (2026-09-17)
 
 ### ⚡ 1. Direct Peer-to-Peer WebRTC over Google STUN

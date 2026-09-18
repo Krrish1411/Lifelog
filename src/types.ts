@@ -144,6 +144,7 @@ export interface Session {
   plannedMin: number | null;
   pauses: Pause[];
   status: "running" | "done" | "stopped";
+  updatedAt?: number;
 }
 
 export interface DayLog {
@@ -369,7 +370,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.3";
+export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.4";
 
 export interface AppVersionInfo {
   version: string;

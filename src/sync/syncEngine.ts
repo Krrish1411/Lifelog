@@ -51,7 +51,7 @@ type SyncStatusListener = (status: SyncStatus, peer?: SyncPeerInfo) => void;
 type StateApplyListener = (updater: (prev: State) => State) => void;
 
 /**
- * Post JSON payload to relay servers with automatic failover.
+ * Post JSON payload to relay servers in parallel for zero split-brain and resilient delivery.
  */
 async function postRelay(
   topic: string,
@@ -62,25 +62,25 @@ async function postRelay(
     ? [preferredRelay, ...RELAY_SERVERS.filter((s) => s !== preferredRelay)]
     : RELAY_SERVERS;
 
-  for (const base of servers) {
+  const promises = servers.map(async (base) => {
     try {
       const res = await fetch(`${base}/${topic}`, {
         method: "POST",
         body,
         headers: { "Content-Type": "application/json" },
       });
-      if (res.ok) {
-        return { ok: true, relayUrl: base, status: res.status };
-      }
-      if (res.status === 429) {
-        console.warn(`[Sync] Relay ${base} rate limited (429), switching to backup relay...`);
-        continue;
-      }
-    } catch (err) {
-      console.warn(`[Sync] Relay ${base} post error:`, err);
+      return { ok: res.ok, relayUrl: base, status: res.status };
+    } catch {
+      return { ok: false, relayUrl: base, status: 0 };
     }
+  });
+
+  const results = await Promise.all(promises);
+  const success = results.find((r) => r.ok);
+  if (success) {
+    return success;
   }
-  return { ok: false, relayUrl: servers[0], status: 0 };
+  return results[0] || { ok: false, relayUrl: servers[0], status: 0 };
 }
 
 /**
@@ -200,6 +200,33 @@ class WebRTCSyncEngine {
           }).catch(() => {});
         }
       }, 1000);
+
+      // If host, initiate WebRTC offer negotiation over relay to upgrade to direct P2P DataChannel
+      if (this.isHost) {
+        setTimeout(async () => {
+          try {
+            if (this.pc) {
+              try { this.pc.close(); } catch {}
+              this.pc = null;
+            }
+            this.pc = new RTCPeerConnection(STUN_SERVERS);
+            const ch = this.pc.createDataChannel("lifelog-sync", { ordered: true });
+            this.setupChannel(ch);
+
+            const offer = await this.pc.createOffer();
+            await this.pc.setLocalDescription(offer);
+            await this.waitForAllIceCandidates(this.pc, 1000);
+
+            await this.sendRelayMessage({
+              type: "SDP_OFFER",
+              sdpOffer: JSON.stringify(this.pc.localDescription),
+              peer: selfPeer,
+            });
+          } catch (e) {
+            console.warn("[Sync] Auto-reconnect WebRTC offer error:", e);
+          }
+        }, 1500);
+      }
     } catch (e) {
       console.warn("[Sync] Auto reconnect error:", e);
     }
@@ -835,6 +862,34 @@ class WebRTCSyncEngine {
   private async handleIncomingMessage(msg: SyncMessage, selfPeer?: SyncPeerInfo) {
     this.lastHeartbeatReceived = Date.now();
 
+    if (msg.type === "SDP_OFFER") {
+      try {
+        if (this.pc) {
+          try { this.pc.close(); } catch {}
+          this.pc = null;
+        }
+        this.pc = new RTCPeerConnection(STUN_SERVERS);
+        this.pc.ondatachannel = (e) => {
+          this.setupChannel(e.channel);
+        };
+        const remoteOffer = JSON.parse(msg.sdpOffer) as RTCSessionDescriptionInit;
+        await this.pc.setRemoteDescription(remoteOffer);
+        const answer = await this.pc.createAnswer();
+        await this.pc.setLocalDescription(answer);
+        await this.waitForAllIceCandidates(this.pc, 1000);
+
+        const replyPeer = selfPeer || this.getLocalPeerInfo();
+        await this.sendRelayMessage({
+          type: "SDP_ANSWER",
+          sdpAnswer: JSON.stringify(this.pc.localDescription),
+          peer: replyPeer,
+        });
+      } catch (e) {
+        console.warn("[Sync] Error answering WebRTC offer on auto-reconnect:", e);
+      }
+      return;
+    }
+
     if (msg.type === "SDP_ANSWER") {
       if (this.pc && this.pc.signalingState !== "closed" && !this.pc.currentRemoteDescription) {
         try {
@@ -1000,16 +1055,51 @@ class WebRTCSyncEngine {
 }
 
 /**
- * Returns latest timestamp for a session including all pauses and resumes.
+ * Returns latest timestamp for a session including all pauses, resumes, and manual extensions.
  */
 export function getSessionLatestTs(s: Session): number {
   let ts = s.startedAt;
+  if (s.updatedAt) ts = Math.max(ts, s.updatedAt);
   if (s.endedAt) ts = Math.max(ts, s.endedAt);
   for (const p of s.pauses) {
     ts = Math.max(ts, p.at);
     if (p.resumeAt) ts = Math.max(ts, p.resumeAt);
   }
   return ts;
+}
+
+/**
+ * Enforce that across the entire session list, at most ONE session can ever have status "running".
+ * The running session with the highest latest timestamp remains running; all other running sessions
+ * are cleanly terminated with status "stopped" so secondary devices never display ghost or conflicting timers.
+ */
+export function sanitizeSessions(sessions: Session[]): Session[] {
+  let latestRunning: Session | null = null;
+  let latestRunningTs = -1;
+
+  for (const s of sessions) {
+    if (s.status === "running") {
+      const ts = getSessionLatestTs(s);
+      if (ts > latestRunningTs) {
+        latestRunningTs = ts;
+        latestRunning = s;
+      }
+    }
+  }
+
+  if (!latestRunning) return sessions;
+
+  return sessions.map((s) => {
+    if (s.status === "running" && s.id !== latestRunning!.id) {
+      return {
+        ...s,
+        status: "stopped",
+        endedAt: s.endedAt || latestRunning!.startedAt,
+        updatedAt: Math.max(s.updatedAt || 0, latestRunning!.startedAt),
+      };
+    }
+    return s;
+  });
 }
 
 /**
@@ -1030,7 +1120,9 @@ export function mergeFullState(local: State, remote: State): State {
   let mergedNotes = mergeList(local.notes, remote.notes, (n) => n.updatedAt ?? n.createdAt);
   let mergedProjects = mergeList(local.projects, remote.projects, (p) => p.createdAt);
   let mergedHabits = mergeList(local.habits, remote.habits, (h) => h.createdAt);
-  let mergedSessions = mergeList(local.sessions, remote.sessions, getSessionLatestTs);
+  let mergedSessions = sanitizeSessions(
+    mergeList(local.sessions, remote.sessions, getSessionLatestTs)
+  );
 
   // 3. Apply tombstones: purge any deleted items so they never resurrect
   if (mergedDeleted.notes) {
@@ -1104,7 +1196,9 @@ export function mergeDelta(local: State, delta: PartialStateDelta): State {
     next.habits = mergeList(next.habits, delta.habits, (h) => h.createdAt);
   }
   if (delta.sessions) {
-    next.sessions = mergeList(next.sessions, delta.sessions, getSessionLatestTs);
+    next.sessions = sanitizeSessions(
+      mergeList(next.sessions, delta.sessions, getSessionLatestTs)
+    );
   }
   if (delta.dayLogs) {
     next.dayLogs = { ...next.dayLogs, ...delta.dayLogs };
@@ -1114,6 +1208,12 @@ export function mergeDelta(local: State, delta: PartialStateDelta): State {
   }
   if (delta.deletedNoteIds?.length) {
     next.notes = next.notes.filter((n) => !delta.deletedNoteIds!.includes(n.id));
+  }
+  if (delta.deletedHabitIds?.length) {
+    next.habits = next.habits.filter((h) => !delta.deletedHabitIds!.includes(h.id));
+  }
+  if (delta.deletedProjectIds?.length) {
+    next.projects = next.projects.filter((p) => !delta.deletedProjectIds!.includes(p.id));
   }
 
   return next;

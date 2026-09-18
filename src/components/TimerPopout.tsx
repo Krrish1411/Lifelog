@@ -51,6 +51,7 @@ export function TimerPopout() {
 
   const togglePause = () => {
     if (!running) return;
+    const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) => {
@@ -58,12 +59,13 @@ export function TimerPopout() {
         if (openPause) {
           return {
             ...x,
+            updatedAt: ts,
             pauses: x.pauses.map((p, i) =>
-              i === x.pauses.length - 1 ? { ...p, resumeAt: Date.now() } : p
+              i === x.pauses.length - 1 ? { ...p, resumeAt: ts } : p
             ),
           };
         }
-        return { ...x, pauses: [...x.pauses, { at: Date.now(), resumeAt: null }] };
+        return { ...x, updatedAt: ts, pauses: [...x.pauses, { at: ts, resumeAt: null }] };
       }),
     }));
     toast(openPause ? "Resumed" : "Paused", "ok");
@@ -81,6 +83,7 @@ export function TimerPopout() {
               ...x,
               endedAt: ts,
               status: "stopped",
+              updatedAt: ts,
               pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
             }
           : x
@@ -92,10 +95,11 @@ export function TimerPopout() {
   const extend = (min: number) => {
     if (!running || !running.plannedMin) return;
     const newPlanned = running.plannedMin + min;
+    const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
-        x.id === running.id ? { ...x, plannedMin: newPlanned } : x
+        x.id === running.id ? { ...x, plannedMin: newPlanned, updatedAt: ts } : x
       ),
     }));
     toast(`+${min}m added`, "ok");
@@ -113,12 +117,13 @@ export function TimerPopout() {
       taskId: null,
       subtaskId: null,
       pauses: [],
+      updatedAt: now,
     };
     set((s) => ({
       ...s,
       sessions: [
         ...s.sessions.map((x) =>
-          x.status === "running" ? { ...x, status: "stopped" as const, endedAt: now } : x
+          x.status === "running" ? { ...x, status: "stopped" as const, endedAt: now, updatedAt: now } : x
         ),
         newSess,
       ],
