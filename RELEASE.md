@@ -43,6 +43,19 @@ Official release documentation and changelogs for **LifeLog** — the offline-fi
 - **Removed Ghost +30m Fallback:** Eliminated arbitrary 30-minute additions for routine checklist items lacking duration.
 - **Purified Work Deliverables & Calibration:** Filtered `LIFE_LOG_PROJECT_ID` out of completed work deliverables, project breakdown, estimate vs. actual, and calibration tables, keeping deep work metrics authentic.
 
+### 📱 9. Android Public Lockscreen Notifications & Interactive Controls
+- **Public Lockscreen Visibility:** Registered channels `focus-running-channel-v3` and `focus-alarm-channel-v3` with explicit `visibility: 1` (`VISIBILITY_PUBLIC`), ensuring Android lock screens render the notification regardless of the device OS setting *"Don't show sensitive notifications on lock screen"*.
+- **Dynamic Title & Time Formatting:** Live formatting as `🎯 Focus · MM:SS: <Task Name>` (or `⏸️ Paused (MM:SS): <Task Name>`) across lock screen and notification shade.
+- **Interactive Action Buttons:** Direct 1-tap `⏸️ Pause` / `▶️ Resume` and `⏹️ Stop` action buttons right from the lockscreen and shade without opening the app.
+- **Background Ticking Heartbeat:** 5-second periodic update interval keeping the notification countdown accurate while the device is locked.
+
+### 🖥️ 10. Linux / Desktop Window Restoration & System Tray Indicator
+- **Single-Instance Restoration:** Launching LifeLog from desktop application menus or running `lifelog` while a session is running immediately restores, un-minimizes, and focuses the existing window.
+- **System Tray App Indicator:** Permanent 22×22px system tray indicator with click-to-restore and quick action menu ("Open LifeLog", "Open Floating Timer", "Quit LifeLog").
+
+### 🚀 11. Tag-Only Workflow Execution
+- Restricted GitHub Actions pipelines strictly to version tags (`tags: [ "v*" ]`) or manual `workflow_dispatch`, completely eliminating unintentional CI/CD runs on branch pushes.
+
 ---
 
 ## 🌟 v1.1.4 — Instant Zero-Debounce Real-Time Sync, Dynamic Timer Reactivity & Multi-Relay Fan-Out (2026-09-18)
