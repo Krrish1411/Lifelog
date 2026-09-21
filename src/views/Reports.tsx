@@ -39,12 +39,33 @@ export function ReportsView() {
 
   const days = useMemo(() => listDates(from, to), [from, to]);
 
+  const isLifeTask = (taskId?: string | null) => {
+    if (!taskId) return false;
+    const t = state.tasks.find((x) => x.id === taskId);
+    return t?.projectId === LIFE_LOG_PROJECT_ID;
+  };
+
   const sessions = useMemo(
     () => state.sessions.filter((s) => { const d = isoDate(new Date(s.startedAt)); return d >= from && d <= to; }),
     [state.sessions, from, to],
   );
-  const workSessions = sessions.filter((s) => s.taskId && s.mode !== "break");
-  const totalMin = workSessions.reduce((a, s) => a + sessionMinutes(s), 0);
+
+  // Pure work sessions (exclude Life Log routine streams so deep work stats stay clean)
+  const workSessions = useMemo(
+    () => sessions.filter((s) => s.taskId && s.mode !== "break" && !isLifeTask(s.taskId)),
+    [sessions, state.tasks],
+  );
+  const totalMin = useMemo(
+    () => workSessions.reduce((a, s) => a + sessionMinutes(s), 0),
+    [workSessions],
+  );
+
+  // Sessions tracked on Life Log tasks
+  const lifeSessions = useMemo(
+    () => sessions.filter((s) => s.taskId && s.mode !== "break" && isLifeTask(s.taskId)),
+    [sessions, state.tasks],
+  );
+
   const w = state.settings.reportWidgets;
   const anyWidget = Object.values(w).some(Boolean);
 
@@ -76,12 +97,12 @@ export function ReportsView() {
     for (const s of workSessions) {
       const t = state.tasks.find((x) => x.id === s.taskId);
       if (t) {
-        if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) continue;
+        if (t.projectId === LIFE_LOG_PROJECT_ID) continue;
         m.set(t.projectId, (m.get(t.projectId) ?? 0) + sessionMinutes(s));
       }
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [workSessions, state.tasks, state.settings.showLifeLogProject]);
+  }, [workSessions, state.tasks]);
   const byTag = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of workSessions) {
@@ -92,23 +113,36 @@ export function ReportsView() {
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
   }, [workSessions, state.tasks]);
 
-  /* ---- completed + estimates ---- */
+  /* ---- completed work tasks + estimates (exclude routine life checklist) ---- */
   const completedIn = useMemo(() => {
     const out: { title: string; at: number }[] = [];
     for (const t of state.tasks) {
+      if (t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (t.done && t.doneAt) { const d = isoDate(new Date(t.doneAt)); if (d >= from && d <= to) out.push({ title: t.title, at: t.doneAt }); }
       for (const c of t.completions) { const d = isoDate(new Date(c.at)); if (d >= from && d <= to) out.push({ title: `${t.title} ↻`, at: c.at }); }
     }
     return out;
   }, [state.tasks, from, to]);
+
+  const completedLifeCount = useMemo(() => {
+    let count = 0;
+    for (const t of state.tasks) {
+      if (t.projectId !== LIFE_LOG_PROJECT_ID) continue;
+      if (t.done && t.doneAt) { const d = isoDate(new Date(t.doneAt)); if (d >= from && d <= to) count++; }
+      for (const c of t.completions) { const d = isoDate(new Date(c.at)); if (d >= from && d <= to) count++; }
+    }
+    return count;
+  }, [state.tasks, from, to]);
+
   const estVsActual = useMemo(() => {
     let planned = 0, actual = 0;
     for (const t of state.tasks) {
+      if (t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (!t.done || !t.doneAt || t.estimateMin <= 0) continue;
       const d = isoDate(new Date(t.doneAt));
       if (d < from || d > to) continue;
       planned += t.estimateMin;
-      actual += state.sessions.filter((s) => s.taskId === t.id).reduce((a, s) => a + sessionMinutes(s), 0);
+      actual += state.sessions.filter((s) => s.taskId === t.id && s.mode !== "break").reduce((a, s) => a + sessionMinutes(s), 0);
     }
     return { planned, actual };
   }, [state.tasks, state.sessions, from, to]);
@@ -118,14 +152,25 @@ export function ReportsView() {
     if (state.settings.showLifeLogProject === false) return [];
     return state.tasks.filter((t) => {
       if (t.projectId !== LIFE_LOG_PROJECT_ID) return false;
-      const d = t.due || isoDate(new Date(t.createdAt));
-      return d >= from && d <= to;
+      if (t.due && t.due >= from && t.due <= to) return true;
+      if (t.done && t.doneAt) {
+        const d = isoDate(new Date(t.doneAt));
+        if (d >= from && d <= to) return true;
+      }
+      if (t.completions.some((c) => { const cd = isoDate(new Date(c.at)); return cd >= from && cd <= to; })) return true;
+      if (lifeSessions.some((s) => s.taskId === t.id)) return true;
+      const cd = isoDate(new Date(t.createdAt));
+      return !t.due && !t.doneAt && cd >= from && cd <= to;
     });
-  }, [state.tasks, from, to, state.settings.showLifeLogProject]);
+  }, [state.tasks, from, to, state.settings.showLifeLogProject, lifeSessions]);
 
   const lifeMin = useMemo(() => {
-    return lifeTasks.reduce((acc, t) => acc + (t.durationMin || t.estimateMin || 30), 0);
-  }, [lifeTasks]);
+    return lifeTasks.reduce((acc, t) => {
+      const taskSessionMin = lifeSessions.filter((s) => s.taskId === t.id).reduce((a, s) => a + sessionMinutes(s), 0);
+      const min = taskSessionMin > 0 ? taskSessionMin : (t.durationMin || t.estimateMin || 0);
+      return acc + min;
+    }, 0);
+  }, [lifeTasks, lifeSessions]);
 
   const totalAllMin = totalMin + lifeMin;
   const workPct = totalAllMin > 0 ? Math.round((totalMin / totalAllMin) * 100) : 50;
@@ -140,11 +185,13 @@ export function ReportsView() {
       const match = LIFE_LOG_CATEGORIES.find((c) => t.tags.includes(c.tag)) || LIFE_LOG_CATEGORIES[0];
       const cur = map.get(match.tag);
       if (cur) {
-        cur.min += t.durationMin || t.estimateMin || 30;
+        const taskSessionMin = lifeSessions.filter((s) => s.taskId === t.id).reduce((a, s) => a + sessionMinutes(s), 0);
+        const taskMin = taskSessionMin > 0 ? taskSessionMin : (t.durationMin || t.estimateMin || 0);
+        cur.min += taskMin;
       }
     }
     return [...map.values()].filter((x) => x.min > 0).sort((a, b) => b.min - a.min);
-  }, [lifeTasks]);
+  }, [lifeTasks, lifeSessions]);
 
   /* ---- estimate calibration (task / project / tag) ---- */
   const [calibDim, setCalibDim] = useState<"task" | "project" | "tag">("task");
@@ -152,6 +199,7 @@ export function ReportsView() {
     const inRange = new Set<string>();
     for (const s of workSessions) if (s.taskId) inRange.add(s.taskId);
     for (const t of state.tasks) {
+      if (t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (t.done && t.doneAt) { const d = isoDate(new Date(t.doneAt)); if (d >= from && d <= to) inRange.add(t.id); }
       for (const c of t.completions) { const d = isoDate(new Date(c.at)); if (d >= from && d <= to) inRange.add(t.id); }
     }
@@ -165,6 +213,7 @@ export function ReportsView() {
     };
     const trackedFor = (tid: string) => workSessions.filter((s) => s.taskId === tid).reduce((a, s) => a + sessionMinutes(s), 0);
     for (const t of state.tasks) {
+      if (t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (!inRange.has(t.id) || t.estimateMin <= 0) continue;
       const actual = trackedFor(t.id);
       if (calibDim === "task") add(t.id, t.title, t.emoji ?? undefined, undefined, t.estimateMin, actual);
@@ -218,12 +267,13 @@ export function ReportsView() {
       let min = 0;
       const activeDays = new Set<string>();
       for (const s of state.sessions) {
-        if (!s.taskId || s.mode === "break") continue;
+        if (!s.taskId || s.mode === "break" || isLifeTask(s.taskId)) continue;
         const d = isoDate(new Date(s.startedAt));
         if (d >= ws && d <= we) { min += sessionMinutes(s); activeDays.add(d); }
       }
       let done = 0;
       for (const t of state.tasks) {
+        if (t.projectId === LIFE_LOG_PROJECT_ID) continue;
         if (t.done && t.doneAt) { const d = isoDate(new Date(t.doneAt)); if (d >= ws && d <= we) done++; }
         for (const c of t.completions) { const d = isoDate(new Date(c.at)); if (d >= ws && d <= we) done++; }
       }
@@ -348,7 +398,7 @@ export function ReportsView() {
       });
     }
     /* longest run of consecutive working days (all history) */
-    const workedDays = [...new Set(state.sessions.filter((s) => s.taskId && s.mode !== "break").map((s) => isoDate(new Date(s.startedAt))))];
+    const workedDays = [...new Set(state.sessions.filter((s) => s.taskId && s.mode !== "break" && !isLifeTask(s.taskId)).map((s) => isoDate(new Date(s.startedAt))))];
     if (workedDays.length > 1) {
       const nums = workedDays.map((d) => Math.round(parseIso(d).getTime() / 86400000)).sort((a, b) => a - b);
       let run = 1, bestRun = 1;
@@ -428,7 +478,7 @@ export function ReportsView() {
           <div className="flex items-center justify-between text-xs font-bold text-[var(--mut)] uppercase tracking-wider">
             <span>Total Sessions Logged</span>
             <span className="chip !py-0.5 text-[10px] text-[var(--ok)]">
-              {completedIn.length} completed
+              {completedIn.length} work task{completedIn.length === 1 ? "" : "s"} completed
             </span>
           </div>
           <div className="font-mono text-3xl sm:text-4xl font-extrabold text-[var(--text)] my-1.5 tnum">
@@ -438,6 +488,12 @@ export function ReportsView() {
             <span>Avg session: <b className="text-[var(--text)]">{quality ? fmtDur(quality.avg) : "0m"}</b></span>
             <span>•</span>
             <span>{quality?.pauses ?? 0} pause{(quality?.pauses ?? 0) === 1 ? "" : "s"} logged</span>
+            {completedLifeCount > 0 && state.settings.showLifeLogProject !== false && (
+              <>
+                <span>•</span>
+                <span className="text-sky-500 font-semibold">{completedLifeCount} routine logs</span>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -529,7 +585,7 @@ export function ReportsView() {
       {/* summary strip */}
       <div className="stagger grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5 w-full min-w-0">
         {[
-          { k: "Completed", v: String(completedIn.length), sub: "tasks & recurrences" },
+          { k: "Completed", v: String(completedIn.length), sub: "work deliverables" },
           { k: "Active days", v: `${new Set(workSessions.map((s) => isoDate(new Date(s.startedAt)))).size}/${days.length}`, sub: "days with focus" },
           { k: "Pace", v: `${Math.round((completedIn.length / Math.max(1, days.length)) * 10) / 10}/day`, sub: "completion velocity" },
           { k: "Peak hour", v: hourBuckets.some((x) => x > 0) ? `${String(peakHour).padStart(2, "0")}:00` : "—", sub: "most-worked hour" },

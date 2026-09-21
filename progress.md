@@ -476,3 +476,9 @@ This document provides a complete, authoritative, and chronological record of th
 ### H. Demo Seed Data Deletion & Tombstone Reconciliation (`src/utils/cleanSeed.ts`)
 - Purged hardcoded demo daily note ("Intentions for today..."), cleaned demo `dayLogs`, and created deletion tombstones for proper SQLite synchronization.
 
+### I. Reports Life Log vs Deep Work Segregation & Deduplication (`src/views/Reports.tsx`)
+- **Segregated Work & Life Sessions**: Separated `workSessions` (`!isLifeTask`) from `lifeSessions`. Deep work stats, total time focused, deep work percentage, and focus velocity now measure actual work deliverables without routine habits skewing them.
+- **Eliminated Double Counting**: In the Life Balance section, `lifeMin` accounts for timed sessions or explicit duration/estimates with zero double-counting (`totalAllMin = totalMin + lifeMin`).
+- **Removed Ghost +30m Fallback**: Removed the arbitrary `|| 30` minutes fallback for Life Log checklist items with no duration.
+- **Purified Work Deliverables**: Filtered `LIFE_LOG_PROJECT_ID` out of `completedIn`, `estVsActual`, `calibration`, `weeklyTrend`, and `byProject`. Routine habit checks are cleanly displayed in Hero Card 2 as routine logs without inflating work completion metrics or distorting estimate accuracy.
+
