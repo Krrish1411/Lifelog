@@ -12,7 +12,8 @@
     "🔔 Soothing Downward Stopping Chime: Acoustic downward resolving chime (440Hz → 220Hz decay) on session stop across Focus, Popout, and mini-timer",
     "🛡️ Sovereign Encrypted SQLite Storage: AES-256-GCM authenticated encryption for all notes with zero plaintext disk dumping",
     "🔤 System Default Native OS Font: Added native system font stack option in Settings for authentic OS look and feel",
-    "📱 Mobile Android Shade Notifications: Live running timer notification in shade with Active vs Paused state and remaining countdown time"
+    "📱 Mobile Android Shade Notifications: Live running timer notification in shade with Active vs Paused state and remaining countdown time",
+    "🌊 Reports Life Log Segregation & Deduplication: Pure deep work metrics, eliminated double-counting in Life Balance, removed ghost +30m additions, and purified work deliverables & estimate calibration"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Windows-Setup.exe",

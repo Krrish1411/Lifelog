@@ -37,6 +37,12 @@ Official release documentation and changelogs for **LifeLog** — the offline-fi
 ### 🔤 7. System Default Native OS Font
 - Added `"system"` font pair option in Settings rendering the native OS font stack (`system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, Cantarell, sans-serif`).
 
+### 🌊 8. Reports Life Log Segregation & Deduplication
+- **Pure Deep Work Metrics:** Cleanly separated genuine work sessions (`!isLifeTask`) from Life Log routine streams.
+- **Zero Double-Counting:** Life Balance strictly accounts for activities once (`totalAllMin = totalMin + lifeMin`) without duplicating tracked sessions.
+- **Removed Ghost +30m Fallback:** Eliminated arbitrary 30-minute additions for routine checklist items lacking duration.
+- **Purified Work Deliverables & Calibration:** Filtered `LIFE_LOG_PROJECT_ID` out of completed work deliverables, project breakdown, estimate vs. actual, and calibration tables, keeping deep work metrics authentic.
+
 ---
 
 ## 🌟 v1.1.4 — Instant Zero-Debounce Real-Time Sync, Dynamic Timer Reactivity & Multi-Relay Fan-Out (2026-09-18)
