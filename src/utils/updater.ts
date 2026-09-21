@@ -34,6 +34,8 @@ export async function fetchRemoteVersionInfo(): Promise<AppVersionInfo> {
   const primaryUrl = `${REMOTE_VERSION_URL}?_t=${ts}`;
   const fallbackUrl = `${FALLBACK_VERSION_URL}?_t=${ts}`;
 
+  const candidates: AppVersionInfo[] = [];
+
   // 1. On Native Android / iOS, try native CapacitorHttp (bypasses WebView CORS completely)
   if (Capacitor.isNativePlatform()) {
     try {
@@ -43,7 +45,8 @@ export async function fetchRemoteVersionInfo(): Promise<AppVersionInfo> {
         readTimeout: 9000,
       });
       if (response.status === 200 && response.data) {
-        return typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+        const parsed = typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+        if (parsed?.version) candidates.push(parsed);
       }
     } catch {}
 
@@ -54,39 +57,43 @@ export async function fetchRemoteVersionInfo(): Promise<AppVersionInfo> {
         readTimeout: 9000,
       });
       if (response.status === 200 && response.data) {
-        return typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+        const parsed = typeof response.data === "string" ? JSON.parse(response.data) : response.data;
+        if (parsed?.version) candidates.push(parsed);
       }
+    } catch {}
+  } else {
+    // Helper for web/electron fetch with individual timeout and no custom headers (avoids CORS preflight)
+    const fetchWithTimeout = async (url: string, timeoutMs: number = 8000) => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), timeoutMs);
+      try {
+        const res = await fetch(url, {
+          method: "GET",
+          signal: controller.signal,
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        return await res.json();
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+
+    try {
+      const p = await fetchWithTimeout(primaryUrl, 7000);
+      if (p?.version) candidates.push(p);
+    } catch {}
+
+    try {
+      const f = await fetchWithTimeout(fallbackUrl, 7000);
+      if (f?.version) candidates.push(f);
     } catch {}
   }
 
-  // Helper for web/electron fetch with individual timeout and no custom headers (avoids CORS preflight)
-  const fetchWithTimeout = async (url: string, timeoutMs: number = 8000) => {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
-    try {
-      const res = await fetch(url, {
-        method: "GET",
-        signal: controller.signal,
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      return await res.json();
-    } finally {
-      clearTimeout(timer);
-    }
-  };
-
-  // 2. Primary GitHub raw content fetch
-  try {
-    return await fetchWithTimeout(primaryUrl, 7000);
-  } catch {}
-
-  // 3. Fallback to GitHub Pages
-  try {
-    return await fetchWithTimeout(fallbackUrl, 7000);
-  } catch (err: any) {
-    if (err?.name === "AbortError") {
-      throw new Error("Update check timed out. Verify your internet connection.");
-    }
+  if (candidates.length > 0) {
+    // Return candidate with the highest semver
+    return candidates.reduce((highest, current) => {
+      return isNewerVersion(current.version, highest.version) ? current : highest;
+    });
   }
 
   throw new Error("Could not reach the releases server. Verify your internet connection.");
