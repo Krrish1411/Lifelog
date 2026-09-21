@@ -1,10 +1,82 @@
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, Tray, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const dbManager = require('./db.cjs');
 
 let mainWindow = null;
 let popoutWindow = null;
+let tray = null;
+
+// Single Instance Lock: Prevent multiple processes and restore existing window on second launch
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    restoreAndFocusApp();
+  });
+}
+
+function restoreAndFocusApp() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+  if (popoutWindow && !popoutWindow.isDestroyed()) {
+    if (popoutWindow.isMinimized()) popoutWindow.restore();
+    if (!popoutWindow.isVisible()) popoutWindow.show();
+    popoutWindow.focus();
+    return;
+  }
+  createMainWindow();
+}
+
+function createTray() {
+  if (tray && !tray.isDestroyed()) return;
+  const iconPath = path.join(__dirname, 'icons/icon.png');
+  if (!fs.existsSync(iconPath)) return;
+
+  try {
+    let trayIcon = nativeImage.createFromPath(iconPath);
+    trayIcon = trayIcon.resize({ width: 22, height: 22 });
+
+    tray = new Tray(trayIcon);
+    tray.setToolTip('LifeLog — Sovereign Personal OS');
+
+    const contextMenu = Menu.buildFromTemplate([
+      {
+        label: 'Open LifeLog',
+        click: () => restoreAndFocusApp(),
+      },
+      {
+        label: 'Open Floating Timer',
+        click: () => createTimerPopoutWindow(),
+      },
+      { type: 'separator' },
+      {
+        label: 'Quit LifeLog',
+        click: () => {
+          app.isQuitting = true;
+          app.quit();
+        },
+      },
+    ]);
+
+    tray.setContextMenu(contextMenu);
+
+    tray.on('click', () => {
+      restoreAndFocusApp();
+    });
+
+    tray.on('double-click', () => {
+      restoreAndFocusApp();
+    });
+  } catch (err) {
+    console.warn('Could not create system tray indicator:', err);
+  }
+}
 
 // Optimize Chromium memory and V8 garbage collection footprint without degrading display quality
 app.commandLine.appendSwitch('js-flags', '--max-old-space-size=256');
@@ -289,13 +361,8 @@ ipcMain.handle('lifelog:open-timer-popout', async () => {
 
 // 9. Focus / restore main window from popout or tray
 ipcMain.handle('lifelog:focus-main-window', async () => {
-  if (mainWindow && !mainWindow.isDestroyed()) {
-    if (mainWindow.isMinimized()) mainWindow.restore();
-    mainWindow.show();
-    mainWindow.focus();
-    return true;
-  }
-  return false;
+  restoreAndFocusApp();
+  return true;
 });
 
 // 10. Hide / minimize main window to conserve RAM and CPU
@@ -467,6 +534,7 @@ app.whenReady().then(() => {
   }
 
   createMainWindow();
+  createTray();
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

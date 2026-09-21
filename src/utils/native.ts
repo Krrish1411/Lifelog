@@ -252,24 +252,63 @@ export async function initNotificationChannels(): Promise<void> {
       await LocalNotifications.deleteChannel({ id: "task-reminders" });
       await LocalNotifications.deleteChannel({ id: "focus-timer-v2" });
       await LocalNotifications.deleteChannel({ id: "task-reminders-v2" });
+      await LocalNotifications.deleteChannel({ id: "focus-channel-os" });
+      await LocalNotifications.deleteChannel({ id: "task-channel-os" });
     } catch {}
 
+    // 1. Completion Alarm Channel (Heads-up, vibration, sound, public)
     await LocalNotifications.createChannel({
-      id: "focus-channel-os",
-      name: "Focus & Pomodoro Timer",
-      description: "Alerts when Pomodoro, Countdown, or Break sessions finish",
+      id: "focus-alarm-channel-v3",
+      name: "Focus Session Completion Alarms",
+      description: "Alerts when your Pomodoro, Countdown, or Break finishes",
       importance: 5, // High priority / Heads-up
-      visibility: 1,
+      visibility: 1, // VISIBILITY_PUBLIC (Always show in full on lock screen)
       vibration: true,
     });
+
+    // 2. Active Running Timer Channel for Shade & Lock Screen (Silent live countdown, public)
     await LocalNotifications.createChannel({
-      id: "task-channel-os",
+      id: "focus-running-channel-v3",
+      name: "Active Focus Timer & Status",
+      description: "Shows live countdown, task name, and pause/resume controls on lock screen and notification shade",
+      importance: 3, // Default priority (No sound or vibration on periodic countdown update)
+      visibility: 1, // VISIBILITY_PUBLIC (Guarantees display on lock screen even if sensitive notifications are hidden)
+      vibration: false,
+    });
+
+    // 3. Task Due Alarms Channel
+    await LocalNotifications.createChannel({
+      id: "task-channel-v3",
       name: "Task Due Alarms",
       description: "Alerts for upcoming and scheduled tasks",
       importance: 5,
       visibility: 1,
       vibration: true,
     });
+
+    // 4. Register action types for interactive lock screen / shade buttons
+    try {
+      await LocalNotifications.registerActionTypes({
+        types: [
+          {
+            id: "TIMER_RUNNING_ACTIONS",
+            actions: [
+              { id: "action_pause", title: "⏸️ Pause" },
+              { id: "action_stop", title: "⏹️ Stop", destructive: true },
+            ],
+          },
+          {
+            id: "TIMER_PAUSED_ACTIONS",
+            actions: [
+              { id: "action_resume", title: "▶️ Resume" },
+              { id: "action_stop", title: "⏹️ Stop", destructive: true },
+            ],
+          },
+        ],
+      });
+    } catch (e) {
+      console.warn("Could not register notification action types:", e);
+    }
   } catch (err) {
     console.warn("Could not register notification channels:", err);
   }
@@ -418,7 +457,7 @@ export async function scheduleTimerEndNotification(
             ? `Completed: "${title}". Great job! Tap to review.`
             : "Session ended. Time to stretch or start your next block.",
           schedule: { at: targetDate, allowWhileIdle: true },
-          channelId: "focus-channel-os",
+          channelId: "focus-alarm-channel-v3",
         },
       ],
     });
@@ -455,7 +494,7 @@ export async function sendNativeTestNotification(): Promise<void> {
           title: "LifeLog Notification 🚀",
           body: "Native Android notifications are active! Alarms will fire even when the app is closed.",
           schedule: { at: new Date(Date.now() + 500), allowWhileIdle: true },
-          channelId: "task-channel-os",
+          channelId: "task-channel-v3",
         },
       ],
     });
@@ -470,7 +509,8 @@ export async function sendNativeTestNotification(): Promise<void> {
 const RUNNING_TIMER_NOTIF_ID = 88888;
 
 /**
- * Show a persistent/running timer status notification in the Android shade.
+ * Show a persistent/running timer status notification on the Android lock screen and shade.
+ * Uses focus-running-channel-v3 with VISIBILITY_PUBLIC so it displays in full on lock screens.
  */
 export async function showRunningTimerNotification(
   taskTitle: string,
@@ -481,22 +521,33 @@ export async function showRunningTimerNotification(
   if (!isNativeMobile) return;
   try {
     const modeLabel = mode === "break" ? "☕ Break" : "🎯 Focus";
-    const statusLabel = isPaused ? "⏸️ Paused" : "▶️ Active";
     let timeStr = "";
     if (remainingSeconds !== undefined) {
       const mins = Math.floor(remainingSeconds / 60);
       const secs = remainingSeconds % 60;
-      timeStr = ` · ${mins}:${secs < 10 ? "0" : ""}${secs} remaining`;
+      timeStr = `${mins}:${secs < 10 ? "0" : ""}${secs}`;
     }
+
+    const title = isPaused
+      ? `⏸️ Paused${timeStr ? ` (${timeStr})` : ""}: ${taskTitle || "Focus Session"}`
+      : `🎯 ${modeLabel}${timeStr ? ` · ${timeStr}` : ""}: ${taskTitle || "Deep Work"}`;
+
+    const body = isPaused
+      ? `Timer is paused${timeStr ? ` at ${timeStr}` : ""}. Tap or use buttons below to resume.`
+      : `${modeLabel} in progress${timeStr ? ` (${timeStr} remaining)` : ""}. Tap to open LifeLog.`;
+
     await LocalNotifications.schedule({
       notifications: [
         {
           id: RUNNING_TIMER_NOTIF_ID,
-          title: `⏱️ ${modeLabel} (${statusLabel}): ${taskTitle || "Focus Session"}`,
-          body: isPaused ? `Session is paused${timeStr}. Tap to resume LifeLog.` : `Focus session in progress${timeStr}. Tap to open LifeLog.`,
+          title,
+          body,
+          summaryText: timeStr ? `${timeStr} · ${modeLabel}` : modeLabel,
           schedule: { at: new Date(Date.now() + 50) },
-          channelId: "focus-channel-os",
+          channelId: "focus-running-channel-v3",
           ongoing: !isPaused,
+          autoCancel: false,
+          actionTypeId: isPaused ? "TIMER_PAUSED_ACTIONS" : "TIMER_RUNNING_ACTIONS",
         },
       ],
     });
@@ -520,6 +571,35 @@ export async function dismissRunningTimerNotification(): Promise<void> {
 }
 
 /**
+ * Listen for interactive notification actions (Pause, Resume, Stop) performed from lock screen or notification shade.
+ */
+export function initNotificationActionListener(handlers: {
+  onPause?: () => void;
+  onResume?: () => void;
+  onStop?: () => void;
+}): () => void {
+  if (!isNativeMobile) return () => {};
+
+  const handle = LocalNotifications.addListener(
+    "localNotificationActionPerformed",
+    (notificationAction) => {
+      const actionId = notificationAction.actionId;
+      if (actionId === "action_pause") {
+        handlers.onPause?.();
+      } else if (actionId === "action_resume") {
+        handlers.onResume?.();
+      } else if (actionId === "action_stop") {
+        handlers.onStop?.();
+      }
+    }
+  );
+
+  return () => {
+    handle.then((h) => h.remove()).catch(() => {});
+  };
+}
+
+/**
  * Register App State Change listener so when app is minimized,
  * if a timer is running, a running notification is posted to the Android tray,
  * and removed when returning to the app.
@@ -529,20 +609,39 @@ export function initRunningTimerTrayListener(
 ): () => void {
   if (!isNativeMobile) return () => {};
 
+  let intervalId: any = null;
+
   const handle = CapApp.addListener("appStateChange", (state) => {
     if (!state.isActive) {
-      // App was minimized or backgrounded
-      const timer = getActiveTimer();
-      if (timer && timer.running) {
-        showRunningTimerNotification(timer.taskTitle, timer.mode, timer.remainingSec, timer.isPaused);
-      }
+      // App was minimized or backgrounded: show immediately and tick every 5s
+      const updateNotif = () => {
+        const timer = getActiveTimer();
+        if (timer && timer.running) {
+          showRunningTimerNotification(timer.taskTitle, timer.mode, timer.remainingSec, timer.isPaused);
+        } else {
+          dismissRunningTimerNotification();
+          if (intervalId) {
+            clearInterval(intervalId);
+            intervalId = null;
+          }
+        }
+      };
+
+      updateNotif();
+      if (intervalId) clearInterval(intervalId);
+      intervalId = setInterval(updateNotif, 5000);
     } else {
-      // App brought back to foreground
+      // App brought back to foreground: clear ticker and dismiss running shade notification
+      if (intervalId) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
       dismissRunningTimerNotification();
     }
   });
 
   return () => {
+    if (intervalId) clearInterval(intervalId);
     handle.then((h) => h.remove()).catch(() => {});
   };
 }

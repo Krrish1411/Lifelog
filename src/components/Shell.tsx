@@ -73,6 +73,7 @@ import {
   triggerHaptic,
   initNotificationChannels,
   initRunningTimerTrayListener,
+  initNotificationActionListener,
   sendDesktopNotification,
   openTimerPopout,
 } from "../utils/native";
@@ -234,6 +235,67 @@ export function Shell() {
     });
     return cleanup;
   }, [state.sessions, state.tasks]);
+
+  // Handle interactive lock screen and shade actions (Pause, Resume, Stop)
+  useEffect(() => {
+    const cleanup = initNotificationActionListener({
+      onPause: () => {
+        const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
+        if (!sess) return;
+        const isPaused = sess.pauses.length > 0 && !sess.pauses[sess.pauses.length - 1].resumeAt;
+        if (isPaused) return;
+        const ts = Date.now();
+        set((s) => ({
+          ...s,
+          sessions: s.sessions.map((x) =>
+            x.id === sess.id
+              ? { ...x, updatedAt: ts, pauses: [...x.pauses, { at: ts, resumeAt: null }] }
+              : x
+          ),
+        }));
+      },
+      onResume: () => {
+        const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
+        if (!sess) return;
+        const isPaused = sess.pauses.length > 0 && !sess.pauses[sess.pauses.length - 1].resumeAt;
+        if (!isPaused) return;
+        const ts = Date.now();
+        set((s) => ({
+          ...s,
+          sessions: s.sessions.map((x) =>
+            x.id === sess.id
+              ? {
+                  ...x,
+                  updatedAt: ts,
+                  pauses: x.pauses.map((p, i) => (i === x.pauses.length - 1 ? { ...p, resumeAt: ts } : p)),
+                }
+              : x
+          ),
+        }));
+      },
+      onStop: () => {
+        const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
+        if (!sess) return;
+        playTimerStopSound();
+        const ts = Date.now();
+        set((s) => ({
+          ...s,
+          sessions: s.sessions.map((x) =>
+            x.id === sess.id
+              ? {
+                  ...x,
+                  endedAt: ts,
+                  status: "stopped",
+                  updatedAt: ts,
+                  pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
+                }
+              : x
+          ),
+        }));
+      },
+    });
+    return cleanup;
+  }, [state.sessions]);
 
   // Sync view with URL hash
   useEffect(() => {

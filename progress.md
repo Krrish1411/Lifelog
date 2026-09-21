@@ -482,3 +482,16 @@ This document provides a complete, authoritative, and chronological record of th
 - **Removed Ghost +30m Fallback**: Removed the arbitrary `|| 30` minutes fallback for Life Log checklist items with no duration.
 - **Purified Work Deliverables**: Filtered `LIFE_LOG_PROJECT_ID` out of `completedIn`, `estVsActual`, `calibration`, `weeklyTrend`, and `byProject`. Routine habit checks are cleanly displayed in Hero Card 2 as routine logs without inflating work completion metrics or distorting estimate accuracy.
 
+### J. Android Public Lockscreen Notifications, Interactive Action Controls, Electron System Tray & Window Single-Instance, and Tag-Only CI Triggers
+- **Android Public Lockscreen Notifications & Interactive Controls (`src/utils/native.ts`, `src/components/Shell.tsx`)**:
+  - **Public Lockscreen Visibility**: Created new notification channels `focus-running-channel-v3` and `focus-alarm-channel-v3` with explicit `visibility: 1` (`Notification.VISIBILITY_PUBLIC`), ensuring Android lock screens render the notification regardless of the device OS setting *"Don't show sensitive notifications on lock screen"*.
+  - **Dynamic Title & Time Formatting**: Replaced generic static text with dynamic format `🎯 Focus · MM:SS: <Task Name>` (or `⏸️ Paused (MM:SS): <Task Name>`), matching notification shade and lock screen visibility.
+  - **Interactive Action Buttons**: Configured `TIMER_RUNNING_ACTIONS` (`action_pause`, `action_stop`) and `TIMER_PAUSED_ACTIONS` (`action_resume`, `action_stop`) with direct intent listeners in `Shell.tsx` allowing 1-tap pause, resume, and cancellation from lockscreen and shade without opening the app.
+  - **Background Ticking Engine**: Configured 5-second interval heartbeat in `initRunningTimerTrayListener` keeping the notification countdown accurate while the phone screen is locked.
+- **Linux / Desktop Window Restoration & System Tray Indicator (`electron/main.cjs`)**:
+  - **Single Instance Lock**: Added `app.requestSingleInstanceLock()` and `app.on('second-instance')` with `restoreAndFocusApp()`, so clicking the LifeLog desktop launcher icon or running `lifelog` while a timer or session is running instantly restores, un-minimizes, and focuses the existing window.
+  - **System Tray App Indicator**: Implemented `createTray()` creating a permanent 22×22px system tray app indicator with tooltip, left/double-click restore handlers, and context menu ("Open LifeLog", "Open Floating Timer", "Quit LifeLog").
+- **Tag-Only GitHub Actions Triggers (`.github/workflows/build-apk.yml`, `.github/workflows/build-electron.yml`, `.github/workflows/deploy.yml`)**:
+  - Removed all `branches: [ "main" ]` triggers across all workflows.
+  - Restricted push execution strictly to git release tags (`tags: [ "v*" ]`) and manual `workflow_dispatch`, ensuring standard git pushes to `main` branch never trigger CI/CD builds or runner consumption.
+
