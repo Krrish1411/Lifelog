@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
-import { Flame, Lightbulb, Settings2, Target, Clock, Printer, Check, Search } from "lucide-react";
+import { Flame, Lightbulb, Settings2, Target, Clock, Printer, Check, Search, Pause, Sparkles, CheckCircle2 } from "lucide-react";
 import { useApp } from "../store";
 import {
   MONTHS, WEEKDAYS_SHORT, addDaysIso, fmtDayShort, fmtDur, isoDate, listDates, parseIso,
-  sessionMinutes, streakStats, todayIso, weekStartIso,
+  sessionMinutes, streakStats, todayIso, weekStartIso, fmtClock,
 } from "../utils/core";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { BarRow, Btn, EmptyState, Modal, Seg, cn } from "../components/ui";
+import { SessionTimelineBranch } from "../components/SessionTimelineBranch";
 
 type Preset = "week" | "last7" | "month" | "last30" | "all" | "custom";
 
@@ -243,6 +244,58 @@ export function ReportsView() {
     const pauses = workSessions.reduce((a, s) => a + s.pauses.length, 0);
     return { avg, longest: mins.length > 0 ? Math.max(...mins) : 0, longestTask: longestTask?.title ?? "task", deepMin, pauses };
   }, [workSessions, state.tasks, state.settings.pomodoroMin]);
+
+  /* ---- pause analytics across sessions in range ---- */
+  const pauseStats = useMemo(() => {
+    let totalPauseMs = 0;
+    let totalPausesCount = 0;
+    const allPauseLengthsMs: number[] = [];
+    let lowestPauseSession: { session: typeof workSessions[0]; pauseMs: number } | null = null;
+    let highestPauseSession: { session: typeof workSessions[0]; pauseMs: number } | null = null;
+
+    workSessions.forEach((s) => {
+      const pCount = s.pauses.length;
+      totalPausesCount += pCount;
+      let sPauseMs = 0;
+      s.pauses.forEach((p) => {
+        const resume = p.resumeAt ?? (s.endedAt ?? Date.now());
+        const dur = Math.max(0, resume - p.at);
+        sPauseMs += dur;
+        allPauseLengthsMs.push(dur);
+      });
+      totalPauseMs += sPauseMs;
+
+      if (pCount > 0) {
+        if (!lowestPauseSession || sPauseMs < lowestPauseSession.pauseMs) {
+          lowestPauseSession = { session: s, pauseMs: sPauseMs };
+        }
+        if (!highestPauseSession || sPauseMs > highestPauseSession.pauseMs) {
+          highestPauseSession = { session: s, pauseMs: sPauseMs };
+        }
+      }
+    });
+
+    const avgPauseSec = allPauseLengthsMs.length > 0 ? Math.round(totalPauseMs / allPauseLengthsMs.length / 1000) : 0;
+    const shortestPauseSec = allPauseLengthsMs.length > 0 ? Math.round(Math.min(...allPauseLengthsMs) / 1000) : 0;
+    const longestPauseSec = allPauseLengthsMs.length > 0 ? Math.round(Math.max(...allPauseLengthsMs) / 1000) : 0;
+    const zeroPauseSessions = workSessions.filter((s) => s.pauses.length === 0).length;
+    const totalPauseMin = Math.round(totalPauseMs / 60000);
+    const focusIntegrityPct =
+      totalMin > 0 ? Math.min(100, Math.round((totalMin / (totalMin + totalPauseMin)) * 100)) : 100;
+
+    return {
+      totalPausesCount,
+      totalPauseMs,
+      totalPauseMin,
+      avgPauseSec,
+      shortestPauseSec,
+      longestPauseSec,
+      zeroPauseSessions,
+      focusIntegrityPct,
+      lowestPauseSession,
+      highestPauseSession,
+    };
+  }, [workSessions, totalMin]);
 
   /* ---- weekdays ---- */
   const byWeekday = useMemo(() => {
@@ -795,6 +848,97 @@ export function ReportsView() {
             </div>
           )
         ))}
+
+        {/* Pause Analytics & Focus Chronological Timeline Branch Inspector */}
+        {widgetCard(
+          "Focus session pause analytics & branch timelines",
+          "chronological audit with pause intervals & efficiency",
+          (
+            <div className="flex flex-col gap-4">
+              {/* Top Stats Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--bg)] flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">Avg Pause Duration</span>
+                  <span className="font-mono text-base font-bold text-[var(--accent)]">
+                    {pauseStats.avgPauseSec >= 60
+                      ? `${Math.floor(pauseStats.avgPauseSec / 60)}m ${pauseStats.avgPauseSec % 60}s`
+                      : `${pauseStats.avgPauseSec}s`}
+                  </span>
+                  <span className="text-[9.5px] text-[var(--mut)]">{pauseStats.totalPausesCount} total pauses in range</span>
+                </div>
+
+                <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--bg)] flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">Focus Efficiency</span>
+                  <span className="font-mono text-base font-bold text-[var(--ok)]">
+                    {pauseStats.focusIntegrityPct}%
+                  </span>
+                  <span className="text-[9.5px] text-[var(--mut)]">Active vs paused ratio</span>
+                </div>
+
+                <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--bg)] flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">Shortest Pause</span>
+                  <span className="font-mono text-base font-bold text-[var(--text)]">
+                    {pauseStats.shortestPauseSec >= 60
+                      ? `${Math.floor(pauseStats.shortestPauseSec / 60)}m ${pauseStats.shortestPauseSec % 60}s`
+                      : `${pauseStats.shortestPauseSec}s`}
+                  </span>
+                  <span className="text-[9.5px] text-[var(--mut)]">Quickest recovery</span>
+                </div>
+
+                <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--bg)] flex flex-col gap-1">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">Zero-Pause Sessions</span>
+                  <span className="font-mono text-base font-bold text-[var(--ok)]">
+                    {pauseStats.zeroPauseSessions} / {workSessions.length}
+                  </span>
+                  <span className="text-[9.5px] text-[var(--mut)]">Continuous flow state</span>
+                </div>
+              </div>
+
+              {/* Itemized Chronological Session List with Branches */}
+              <div className="flex flex-col gap-2">
+                <div className="text-[11px] font-bold text-[var(--mut)] uppercase tracking-wider">
+                  Session Chronological Audit ({workSessions.length} logged)
+                </div>
+                {workSessions.length === 0 ? (
+                  <div className="py-6 text-center text-xs text-[var(--mut)]">No focus sessions logged in this range.</div>
+                ) : (
+                  <div className="flex flex-col gap-2 max-h-[380px] overflow-y-auto pr-1">
+                    {[...workSessions].reverse().map((s) => {
+                      const t = state.tasks.find((x) => x.id === s.taskId);
+                      const p = t ? state.projects.find((pr) => pr.id === t.projectId) : null;
+                      return (
+                        <div
+                          key={s.id}
+                          className="flex flex-col gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--bg)] p-2.5 transition-all"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="h-2 w-2 rounded-full shrink-0" style={{ background: p?.color ?? "var(--accent)" }} />
+                              <span className="font-bold text-xs truncate text-[var(--text)]">{t?.title ?? "Untitled focus session"}</span>
+                              {p && (
+                                <span className="chip !py-0 !text-[9.5px] font-semibold shrink-0" style={{ color: p.color, borderColor: `${p.color}40` }}>
+                                  #{p.name}
+                                </span>
+                              )}
+                            </div>
+                            <span className="font-mono text-xs font-bold text-[var(--accent)] shrink-0">
+                              {fmtDur(sessionMinutes(s))}
+                            </span>
+                          </div>
+
+                          <div className="border-t border-[var(--line)]/50 pt-1.5">
+                            <SessionTimelineBranch session={s} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          ),
+          true
+        )}
       </div>
 
       {/* PDF Export Modal */}

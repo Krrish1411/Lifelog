@@ -1,13 +1,18 @@
 {
-  "version": "1.1.4",
-  "releaseDate": "2026-09-18",
+  "version": "1.1.5",
+  "releaseDate": "2026-09-21",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "⚡ Instant Zero-Debounce Real-Time Sync: Interactive actions including timer pause/resume, task completion checks, and session state now broadcast lightweight inline delta packets immediately (0ms debounce)",
-    "⏱️ Dynamic Timer Reactivity & Frozen Timestamps: Pausing or resuming a timer on one device instantly pauses or resumes the timer on all paired devices with exact timestamp synchronization",
-    "🛡️ Parallel Relay Fan-Out & Split-Brain Elimination: Outgoing relay messages are transmitted across all healthy relays simultaneously, eliminating split-brain communication issues",
-    "🔄 Automatic WebRTC Upgrade on Reconnect: Devices automatically negotiate direct WebRTC DataChannels over Google STUN upon reconnecting or launching",
-    "🎯 Strict Single-Running-Session Sanitization: Enforces that at most one active timer session can run at any time, preventing ghost timers or conflicting active sessions across devices"
+    "⚡ Real-Time Live Ticking: Dashboard focus minutes, today's totals, and reports update dynamically every second during active sessions without tab switching",
+    "🌿 Multi-Pause Branch Timeline: Proportional segmented interval bar and expandable branch-tree diagram plotting exact start, pause intervals (e.g. 11:45 AM → 12:15 PM), resume timestamps, and net focus duration across multiple pauses in Day Log, Focus, and Reports",
+    "📊 Deep Pause Analytics: Dedicated Reports widget displaying average pause duration, shortest/longest pause, continuous flow sessions (0 pauses), and focus efficiency percentage",
+    "📝 Notes Editor Caret Preservation: Resolved autosave cursor jumps mid-paragraph; notes always open pinned cleanly to top; direct 1-click .md file export",
+    "⌨️ Markdown Formatting Shortcuts & Cheatsheet: Full keyboard shortcuts (Ctrl+B, Ctrl+I, Ctrl+U, Ctrl+Shift+X/H/C/T, etc.) with an interactive on-screen cheatsheet modal (?)",
+    "⏱️ Focus Popout Lifecycle & Universal Breaks: Auto-finalizes at 0:00 (no stuck screen), provides 1-click break offers (+5m/+15m) for all modes (Pomodoro, Countdown, Flow), and restores main window on demand with RAM trimming",
+    "🔔 Soothing Downward Stopping Chime: Acoustic downward resolving chime (440Hz → 220Hz decay) on session stop across Focus, Popout, and mini-timer",
+    "🛡️ Sovereign Encrypted SQLite Storage: AES-256-GCM authenticated encryption for all notes with zero plaintext disk dumping",
+    "🔤 System Default Native OS Font: Added native system font stack option in Settings for authentic OS look and feel",
+    "📱 Mobile Android Shade Notifications: Live running timer notification in shade with Active vs Paused state and remaining countdown time"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Windows-Setup.exe",

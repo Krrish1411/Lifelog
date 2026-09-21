@@ -4,13 +4,13 @@ import {
   Highlighter, ImageIcon, Italic, Link2, List, ListOrdered, ListTodo,
   Lock, Maximize2, Mic, Minimize2, Minus, PanelLeft,
   Paperclip, Pencil, Pin, PinOff, Plus, Quote, Square, Strikethrough,
-  Trash2, Underline, X, Loader2, BookOpen, Clock, FileText
+  Trash2, Underline, X, Loader2, BookOpen, Clock, FileText, Download, HelpCircle, FileDown
 } from "lucide-react";
 import type { Attachment, Note } from "../types";
 import { useApp } from "../store";
 import { deleteFromDb } from "../db/database";
 import { decryptText, encryptText, getDeviceKey } from "../utils/crypto";
-import { fmtClock, fmtDayShort, fmtNoteName, todayIso, uid, extractWikiLinks } from "../utils/core";
+import { fmtClock, fmtDayShort, fmtNoteName, todayIso, uid, extractWikiLinks, download } from "../utils/core";
 import { applyLinePrefix, applyWrap, renderMarkdown } from "../utils/markdown";
 import { consumeDailyNote } from "../utils/nav";
 import { useBodyScrollLock } from "../utils/scrollLock";
@@ -64,11 +64,13 @@ export function NotesView() {
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [lightbox, setLightbox] = useState<Attachment | null>(null);
   const [recSec, setRecSec] = useState<number | null>(null);
+  const [showShortcutsCheatsheet, setShowShortcutsCheatsheet] = useState(false);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const recRef = useRef<MediaRecorder | null>(null);
   const recTimer = useRef<number | null>(null);
   const loadedFor = useRef<string | null>(null);
   const dirty = useRef(false);
+  const lastSavedTs = useRef<number>(0);
 
   /* ensure today's daily note draft + cross-view request */
   const draftDailyId = `draft-daily-${today}`;
@@ -120,18 +122,24 @@ export function NotesView() {
       return;
     }
     dirty.current = false;
+    const saveTs = Date.now();
     try {
       const key = await getDeviceKey();
       const blob = await encryptText(key, curDraft.text);
+      lastLoadedUpdatedAt.current = saveTs;
+      lastSavedTs.current = saveTs;
+
+      const effectiveTitle = curDraft.title.trim() || (curId.startsWith("draft-daily-") ? fmtNoteName(curId.replace("draft-daily-", "") || today) : fmtNoteName(today));
+
       if (curId.startsWith("draft-daily-")) {
         const dayIso = curId.replace("draft-daily-", "") || today;
         const newId = uid();
         const newNote: Note = {
           id: newId,
-          title: curDraft.title.trim() || fmtNoteName(dayIso),
+          title: effectiveTitle,
           folderId: "f-daily",
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
+          createdAt: saveTs,
+          updatedAt: saveTs,
           blob,
           daily: true,
           day: dayIso,
@@ -143,9 +151,10 @@ export function NotesView() {
       } else {
         set((s) => ({
           ...s,
-          notes: s.notes.map((n) => (n.id === curId ? { ...n, title: curDraft.title.trim() || n.title, blob, updatedAt: Date.now() } : n)),
+          notes: s.notes.map((n) => (n.id === curId ? { ...n, title: effectiveTitle || n.title, blob, updatedAt: saveTs } : n)),
         }));
       }
+
       setSaveState("saved");
       setTimeout(() => setSaveState("idle"), 1800);
     } catch {
@@ -156,7 +165,7 @@ export function NotesView() {
   /* flush pending save on unmount */
   useEffect(() => () => { flushSave(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  /* load + decrypt selected note (only when switching notes!) */
+  /* load + decrypt selected note (only when switching notes or remote sync arrives) */
   const prevSelId = useRef<string | null>(null);
   const lastLoadedUpdatedAt = useRef<number>(0);
   useEffect(() => {
@@ -169,10 +178,14 @@ export function NotesView() {
     if (!selId) return;
     if (isSwitching && taRef.current) {
       taRef.current.scrollTop = 0;
+      taRef.current.selectionStart = 0;
+      taRef.current.selectionEnd = 0;
     }
 
     const note = selId && !selId.startsWith("draft-daily-") ? state.notes.find((n) => n.id === selId) : null;
-    const isRemoteUpdate = !dirty.current && note && note.updatedAt > (lastLoadedUpdatedAt.current || 0);
+    // Guard against local autosave re-decryption loop that wipes cursor/caret position:
+    // Only re-decrypt if the update is truly remote and not from our own flushSave timestamp.
+    const isRemoteUpdate = !dirty.current && note && note.updatedAt > (lastLoadedUpdatedAt.current || 0) && note.updatedAt > (lastSavedTs.current || 0);
 
     if (isSwitching || loadedFor.current !== selId || isRemoteUpdate) {
       if (selId.startsWith("draft-daily-")) {
@@ -181,6 +194,13 @@ export function NotesView() {
         dirty.current = false;
         setDraft({ title: fmtNoteName(dayIso), text: "" });
         setPreview("write");
+        requestAnimationFrame(() => {
+          if (taRef.current) {
+            taRef.current.scrollTop = 0;
+            taRef.current.selectionStart = 0;
+            taRef.current.selectionEnd = 0;
+          }
+        });
         return;
       }
       if (!note) return;
@@ -192,6 +212,13 @@ export function NotesView() {
         setDraft((d) => (loadedFor.current === selId ? { ...d, text } : d));
         if (loadedFor.current === selId && isSwitching) {
           setPreview(text.trim().length === 0 ? "write" : "preview");
+          requestAnimationFrame(() => {
+            if (taRef.current) {
+              taRef.current.scrollTop = 0;
+              taRef.current.selectionStart = 0;
+              taRef.current.selectionEnd = 0;
+            }
+          });
         }
       });
     }
@@ -438,6 +465,105 @@ export function NotesView() {
   );
   const wrap = (b: string, a: string) => { if (taRef.current) applyWrap(taRef.current, b, a, (v) => { setDraft((d) => ({ ...d, text: v })); dirty.current = true; }); };
   const prefix = (p: string) => { if (taRef.current) applyLinePrefix(taRef.current, p, (v) => { setDraft((d) => ({ ...d, text: v })); dirty.current = true; }); };
+
+  const exportAsMd = () => {
+    if (!selNote) return;
+    const cleanTitle = (draft.title || selNote.title || "Untitled").replace(/[\\/:*?"<>|]/g, "_").trim() || "Untitled";
+    const filename = `${cleanTitle}.md`;
+    download(filename, draft.text, "text/markdown");
+    toast(`Exported note as ${filename}`, "ok");
+  };
+
+  const handleEditorKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    const isMod = e.ctrlKey || e.metaKey;
+    if (!isMod) return;
+
+    // Ctrl+S / Cmd+S -> Quick Save
+    if (e.key === "s" && !e.shiftKey) {
+      e.preventDefault();
+      flushSave();
+      toast("Note saved & encrypted", "ok");
+      return;
+    }
+    // Ctrl+B -> Bold
+    if (e.key === "b" && !e.shiftKey) {
+      e.preventDefault();
+      wrap("**", "**");
+      return;
+    }
+    // Ctrl+I -> Italic
+    if (e.key === "i" && !e.shiftKey) {
+      e.preventDefault();
+      wrap("*", "*");
+      return;
+    }
+    // Ctrl+U -> Underline
+    if (e.key === "u" && !e.shiftKey) {
+      e.preventDefault();
+      wrap("++", "++");
+      return;
+    }
+    // Ctrl+K -> Markdown Link
+    if (e.key === "k" && !e.shiftKey) {
+      e.preventDefault();
+      wrap("[", "](https://)");
+      return;
+    }
+    // Ctrl+Shift+X -> Strikethrough
+    if ((e.key === "X" || e.key === "x") && e.shiftKey) {
+      e.preventDefault();
+      wrap("~~", "~~");
+      return;
+    }
+    // Ctrl+Shift+H -> Highlight
+    if ((e.key === "H" || e.key === "h") && e.shiftKey) {
+      e.preventDefault();
+      wrap("==", "==");
+      return;
+    }
+    // Ctrl+Shift+C -> Inline Code
+    if ((e.key === "C" || e.key === "c") && e.shiftKey) {
+      e.preventDefault();
+      wrap("`", "`");
+      return;
+    }
+    // Ctrl+Shift+T -> Checklist Todo item
+    if ((e.key === "T" || e.key === "t") && e.shiftKey) {
+      e.preventDefault();
+      prefix("- [ ] ");
+      return;
+    }
+    // Ctrl+Shift+1 -> Heading 1
+    if (e.key === "1" && e.shiftKey) {
+      e.preventDefault();
+      prefix("# ");
+      return;
+    }
+    // Ctrl+Shift+2 -> Heading 2
+    if (e.key === "2" && e.shiftKey) {
+      e.preventDefault();
+      prefix("## ");
+      return;
+    }
+    // Ctrl+Shift+3 -> Heading 3
+    if (e.key === "3" && e.shiftKey) {
+      e.preventDefault();
+      prefix("### ");
+      return;
+    }
+    // Ctrl+Shift+8 -> Bullet item
+    if (e.key === "8" && e.shiftKey) {
+      e.preventDefault();
+      prefix("- ");
+      return;
+    }
+    // Ctrl+Shift+. or Ctrl+> -> Blockquote
+    if (e.key === ">" || (e.key === "." && e.shiftKey)) {
+      e.preventDefault();
+      prefix("> ");
+      return;
+    }
+  };
 
   const formattingToolbar = (
     <div className="flex items-center gap-1.5 w-full min-w-0 overflow-x-auto scrollbar-none py-1 px-1 select-none">
@@ -908,6 +1034,24 @@ export function NotesView() {
               </div>
 
               <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setShowShortcutsCheatsheet(true)}
+                  title="Markdown Formatting & Shortcuts (?)"
+                  className="rounded-lg p-1.5 transition-all hover:bg-[var(--panel2)] cursor-pointer text-[var(--mut)] hover:text-[var(--accent)] shrink-0"
+                >
+                  <HelpCircle size={16} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={exportAsMd}
+                  title="Download / Export as plain Markdown (.md)"
+                  className="rounded-lg p-1.5 transition-all hover:bg-[var(--panel2)] cursor-pointer text-[var(--mut)] hover:text-[var(--accent)] shrink-0"
+                >
+                  <Download size={16} />
+                </button>
+
                 <Seg
                   size="sm"
                   options={[
@@ -1004,6 +1148,14 @@ export function NotesView() {
                     <BookOpen size={11} className="inline mr-1 opacity-70" />
                     {wordCount} words · {readingMin}m read
                   </span>
+                  <button
+                    type="button"
+                    onClick={() => setShowShortcutsCheatsheet(true)}
+                    className="chip !py-0.5 text-[10.5px] hover:border-[var(--accent)] hover:text-[var(--accent)] cursor-pointer transition-colors"
+                    title="Markdown Keyboard Shortcuts"
+                  >
+                    <HelpCircle size={10} className="inline mr-1" /> Shortcuts (Ctrl+B/I/K/T)
+                  </button>
                   <span className="chip !py-0.5 text-[10.5px] text-[var(--accent)] font-semibold">
                     <Lock size={10} className="inline mr-1" /> AES-256
                   </span>
@@ -1042,6 +1194,7 @@ export function NotesView() {
                   <>
                     <textarea
                       ref={taRef}
+                      onKeyDown={handleEditorKeyDown}
                       className="note-page flex-1 min-h-[320px] w-full resize-none border-0 !bg-transparent text-[15px] sm:text-[15.5px] leading-[1.75] text-[var(--text)] placeholder:text-[var(--mut)]/30 focus:outline-none focus:ring-0 !p-0 mt-4 pb-28"
                       autoCapitalize="sentences"
                       autoComplete="on"
@@ -1056,7 +1209,7 @@ export function NotesView() {
                       placeholder={
                         selNote.daily
                           ? "# Intentions\n- [ ] Finish hero wireframe\n\n# Log\n==Highlight== what mattered today…"
-                          : "# Start writing freely\n**Bold**, *italic*, ==highlight==, checklists, lists…"
+                          : "# Start writing freely\n**Bold** (Ctrl+B), *italic* (Ctrl+I), checklists (Ctrl+Shift+T)…"
                       }
                     />
                     <MentionAutocomplete
@@ -1346,6 +1499,127 @@ export function NotesView() {
             <audio src={lightbox.dataUrl} controls className="w-full max-w-[440px]" />
           </div>
         )}
+      </Modal>
+
+      {/* Markdown Formatting & Shortcuts Cheatsheet Modal */}
+      <Modal
+        open={showShortcutsCheatsheet}
+        onClose={() => setShowShortcutsCheatsheet(false)}
+        title="Markdown & Keyboard Shortcuts"
+        width={560}
+      >
+        <div className="flex flex-col gap-4 py-2 text-xs">
+          <p className="text-[var(--mut)]">
+            Use standard markdown syntax or these quick keyboard shortcuts inside the editor:
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Bold</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+B</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">**text**</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Italic</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+I</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">*text*</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Underline</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+U</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">++text++</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Strikethrough</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+Shift+X</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">~~text~~</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Highlight</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+Shift+H</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">==text==</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Inline Code</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+Shift+C</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">`code`</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Checklist Todo</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+Shift+T</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">- [ ] </span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Link</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+K</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">[text](url)</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Heading 1 / 2 / 3</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+Shift+1/2/3</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]"># / ## / ###</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Bullet List</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+Shift+8</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">- item</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Blockquote</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+Shift+.</kbd>
+                <span className="font-mono text-[10px] text-[var(--mut)]">&gt; quote</span>
+              </div>
+            </div>
+
+            <div className="p-2.5 rounded-xl border border-[var(--line)] bg-[var(--panel2)] flex items-center justify-between">
+              <span className="font-semibold text-[var(--text)]">Save & Encrypt</span>
+              <div className="flex items-center gap-1.5">
+                <kbd className="px-1.5 py-0.5 rounded bg-[var(--bg)] border border-[var(--line)] font-mono text-[10px] text-[var(--text)]">Ctrl+S</kbd>
+                <span className="text-[10px] text-emerald-500 font-bold">AES-256</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl border border-[var(--line)] bg-[var(--panel)] space-y-1.5">
+            <span className="font-bold text-[var(--text)] block">Obsidian Wiki Backlinks:</span>
+            <div className="flex flex-wrap gap-2 text-[11px] text-[var(--mut)]">
+              <span><code className="px-1 rounded bg-[var(--panel2)] text-[var(--accent)]">[[Note Title]]</code> Link to note</span>
+              <span><code className="px-1 rounded bg-[var(--panel2)] text-blue-400">[[@Task Name]]</code> Link to task</span>
+              <span><code className="px-1 rounded bg-[var(--panel2)] text-purple-400">[[#Project Name]]</code> Filter project</span>
+            </div>
+          </div>
+        </div>
       </Modal>
     </div>
   );

@@ -95,6 +95,10 @@ export async function closeDesktopWindow(): Promise<void> {
  */
 export async function openTimerPopout(): Promise<void> {
   if (typeof window !== "undefined") {
+    if (window.electronAPI?.openTimerPopout) {
+      await window.electronAPI.openTimerPopout();
+      return;
+    }
     const w = 360;
     const h = 480;
     const left = Math.max(0, Math.round((window.screen.width - w) / 2));
@@ -471,21 +475,28 @@ const RUNNING_TIMER_NOTIF_ID = 88888;
 export async function showRunningTimerNotification(
   taskTitle: string,
   mode: string,
-  remainingSeconds?: number
+  remainingSeconds?: number,
+  isPaused?: boolean
 ): Promise<void> {
   if (!isNativeMobile) return;
   try {
     const modeLabel = mode === "break" ? "☕ Break" : "🎯 Focus";
-    const timeStr = remainingSeconds !== undefined ? ` · ${Math.floor(remainingSeconds / 60)}m left` : "";
+    const statusLabel = isPaused ? "⏸️ Paused" : "▶️ Active";
+    let timeStr = "";
+    if (remainingSeconds !== undefined) {
+      const mins = Math.floor(remainingSeconds / 60);
+      const secs = remainingSeconds % 60;
+      timeStr = ` · ${mins}:${secs < 10 ? "0" : ""}${secs} remaining`;
+    }
     await LocalNotifications.schedule({
       notifications: [
         {
           id: RUNNING_TIMER_NOTIF_ID,
-          title: `⏱️ ${modeLabel} Running: ${taskTitle || "Focus Session"}`,
-          body: `Focus session in progress${timeStr}. Tap to open LifeLog.`,
+          title: `⏱️ ${modeLabel} (${statusLabel}): ${taskTitle || "Focus Session"}`,
+          body: isPaused ? `Session is paused${timeStr}. Tap to resume LifeLog.` : `Focus session in progress${timeStr}. Tap to open LifeLog.`,
           schedule: { at: new Date(Date.now() + 50) },
           channelId: "focus-channel-os",
-          ongoing: true,
+          ongoing: !isPaused,
         },
       ],
     });
@@ -514,7 +525,7 @@ export async function dismissRunningTimerNotification(): Promise<void> {
  * and removed when returning to the app.
  */
 export function initRunningTimerTrayListener(
-  getActiveTimer: () => { running: boolean; taskTitle: string; mode: string; remainingSec?: number } | null
+  getActiveTimer: () => { running: boolean; taskTitle: string; mode: string; remainingSec?: number; isPaused?: boolean } | null
 ): () => void {
   if (!isNativeMobile) return () => {};
 
@@ -523,7 +534,7 @@ export function initRunningTimerTrayListener(
       // App was minimized or backgrounded
       const timer = getActiveTimer();
       if (timer && timer.running) {
-        showRunningTimerNotification(timer.taskTitle, timer.mode, timer.remainingSec);
+        showRunningTimerNotification(timer.taskTitle, timer.mode, timer.remainingSec, timer.isPaused);
       }
     } else {
       // App brought back to foreground

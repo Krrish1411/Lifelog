@@ -152,6 +152,31 @@ class WebRTCSyncEngine {
           this.tryAutoReconnect();
         }
       });
+
+      // Probe reconnect when app or mobile tab regains visibility / focus
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible") {
+          if (this.status !== "connected" && this.status !== "syncing") {
+            this.tryAutoReconnect();
+          }
+        }
+      });
+
+      window.addEventListener("focus", () => {
+        if (this.status !== "connected" && this.status !== "syncing") {
+          this.tryAutoReconnect();
+        }
+      });
+
+      // Background heartbeat: periodically probe SSE liveness if paired session exists
+      setInterval(() => {
+        if (this.status !== "connected" && this.status !== "syncing") {
+          const raw = typeof localStorage !== "undefined" ? localStorage.getItem(SYNC_STORAGE_KEY) : null;
+          if (raw) {
+            this.tryAutoReconnect();
+          }
+        }
+      }, 25000);
     }
   }
 

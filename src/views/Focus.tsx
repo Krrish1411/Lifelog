@@ -21,9 +21,11 @@ import { fmtClock, fmtDur, isoDate, sessionMinutes, todayIso, uid, isSleepTask }
 import {
   playTimerFinishSound,
   playTimerStartSound,
+  playTimerStopSound,
   unlockAudioContext,
 } from "../utils/audio";
 import { Btn, EmptyState, SearchInput, Seg, cn } from "../components/ui";
+import { SessionTimelineBranch } from "../components/SessionTimelineBranch";
 import {
   cancelTimerEndNotification,
   playChimeSound,
@@ -176,9 +178,10 @@ export function FocusView() {
           } complete — ${fmtDur(mins)} logged`,
           "ok"
         );
-        if (live.mode === "pomodoro") setBreakOffer(true);
+        setBreakOffer(true);
       }
     } else {
+      playTimerStopSound();
       toast(`Stopped — ${fmtDur(Math.max(1, mins))} saved to the log`, "warn");
     }
     finishing.current = false;
@@ -992,12 +995,12 @@ export function FocusView() {
               return (
                 <div
                   key={s.id}
-                  className="rounded-xl border px-2.5 py-2"
+                  className="flex flex-col gap-1.5 rounded-xl border p-2.5 transition-all"
                   style={{ borderColor: "var(--line)", background: "var(--bg)" }}
                 >
                   <div className="flex items-center gap-2 text-[12px] font-bold">
                     <span
-                      className={cn("h-[7px] w-[7px] rounded-full")}
+                      className={cn("h-[7px] w-[7px] rounded-full shrink-0")}
                       style={{
                         background:
                           s.status === "running"
@@ -1008,25 +1011,15 @@ export function FocusView() {
                       }}
                     />
                     <span className="truncate">
-                      {s.mode === "break" ? "Break" : t?.title ?? "Untitled"}
+                      {s.mode === "break" ? "Break" : t?.title ?? "Untitled task"}
                     </span>
-                    <span className="ml-auto font-mono tnum" style={{ color: "var(--mut)" }}>
+                    <span className="ml-auto font-mono tnum shrink-0" style={{ color: "var(--accent)" }}>
                       {fmtDur(sessionMinutes(s))}
                     </span>
                   </div>
-                  <div
-                    className="mt-0.5 flex items-center gap-1.5 text-[10px] font-semibold tnum"
-                    style={{ color: "var(--mut)" }}
-                  >
-                    <span>
-                      {fmtClock(s.startedAt)} → {s.endedAt ? fmtClock(s.endedAt) : "now"}
-                    </span>
-                    {s.pauses.length > 0 && (
-                      <span>
-                        · {s.pauses.length} pause{s.pauses.length > 1 ? "s" : ""}
-                      </span>
-                    )}
-                    {s.status === "stopped" && <span>· stopped early</span>}
+                  {/* Visual Branch & Interval Segmented Timeline */}
+                  <div className="border-t border-[var(--line)]/50 pt-1.5">
+                    <SessionTimelineBranch session={s} />
                   </div>
                 </div>
               );

@@ -166,10 +166,18 @@ function createTimerPopoutWindow() {
     popoutWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#timer-popout`);
   } else {
     popoutWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: 'timer-popout' });
+  // Minimize main window to conserve RAM and CPU while floating timer is active
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+    trimMemory();
   }
 
   popoutWindow.on('closed', () => {
     popoutWindow = null;
+    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()) {
+      mainWindow.restore();
+      mainWindow.focus();
+    }
   });
 }
 
@@ -277,6 +285,27 @@ ipcMain.handle('lifelog:open-storage-folder', async () => {
 ipcMain.handle('lifelog:open-timer-popout', async () => {
   createTimerPopoutWindow();
   return true;
+});
+
+// 9. Focus / restore main window from popout or tray
+ipcMain.handle('lifelog:focus-main-window', async () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
+    mainWindow.focus();
+    return true;
+  }
+  return false;
+});
+
+// 10. Hide / minimize main window to conserve RAM and CPU
+ipcMain.handle('lifelog:hide-main-window', async () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.minimize();
+    trimMemory();
+    return true;
+  }
+  return false;
 });
 
 // ---------------- SQLite Native IPC Handlers ----------------

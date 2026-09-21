@@ -111,6 +111,7 @@ interface AppCtx {
   confirmReq: (ConfirmOpts & { open: boolean }) | null;
   resolveConfirm: (v: boolean) => void;
   toggleDone: (taskId: string) => void;
+  liveTick: number;
 }
 
 
@@ -203,6 +204,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
   stateRef.current = state;
   const prevStateRef = useRef<State | null>(null);
   const firedRemindersRef = useRef<Set<string>>(new Set());
+
+  // 1-second live ticker for dynamic dashboard, daylog, and reports updates during active sessions
+  const [liveTick, setLiveTick] = useState(0);
+  const hasRunningTimer = !!state?.sessions.some(
+    (s) => s.status === "running" && (s.pauses.length === 0 || s.pauses[s.pauses.length - 1].resumeAt !== null)
+  );
+
+  useEffect(() => {
+    if (!hasRunningTimer) return;
+    const interval = setInterval(() => {
+      setLiveTick((t) => (t + 1) % 1000000);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [hasRunningTimer]);
 
   /* ----- sync engine listener for incoming remote changes ----- */
   useEffect(() => {
@@ -710,9 +725,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
             confirmReq,
             resolveConfirm,
             toggleDone,
+            liveTick,
           }
         : null,
-    [state, set, toast, view, focusTaskId, taskDialog, syncDialogOpen, confirmReq, requestFocus, clearFocusRequest, openTaskDialog, closeTaskDialog, openSyncDialog, closeSyncDialog, confirm, resolveConfirm, toggleDone],
+    [state, set, toast, view, focusTaskId, taskDialog, syncDialogOpen, confirmReq, requestFocus, clearFocusRequest, openTaskDialog, closeTaskDialog, openSyncDialog, closeSyncDialog, confirm, resolveConfirm, toggleDone, liveTick],
   );
 
   if (!value) {

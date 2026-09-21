@@ -49,7 +49,7 @@ import {
   todayIso,
   trackedByDay,
 } from "../utils/core";
-import { playTimerChime } from "../utils/audio";
+import { playTimerChime, playTimerStopSound } from "../utils/audio";
 import { CUSTOM_FONT_FAMILY } from "../utils/fonts";
 import { toggleThemeModePatch } from "../utils/themes";
 import { useApplyTheme } from "../utils/useApplyTheme";
@@ -220,7 +220,6 @@ export function Shell() {
       const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
       if (!sess) return null;
       const isPaused = sess.pauses.length > 0 && !sess.pauses[sess.pauses.length - 1].resumeAt;
-      if (isPaused) return null;
       const task = state.tasks.find((t) => t.id === sess.taskId);
       const remainingSec = sess.plannedMin
         ? Math.max(0, sess.plannedMin * 60 - sessionSeconds(sess))
@@ -230,6 +229,7 @@ export function Shell() {
         taskTitle: task?.title ?? "Focus Session",
         mode: sess.mode,
         remainingSec,
+        isPaused,
       };
     });
     return cleanup;
@@ -1517,6 +1517,7 @@ function MiniTimer() {
   };
 
   const stop = () => {
+    playTimerStopSound();
     triggerHaptic("medium");
     const ts = Date.now();
     set((s) => ({

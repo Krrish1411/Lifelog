@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useApp } from "../store";
 import { decryptText, getDeviceKey } from "../utils/crypto";
+import { SessionTimelineBranch } from "../components/SessionTimelineBranch";
 import {
   WEEKDAYS_SHORT,
   addDaysIso,
@@ -478,37 +479,41 @@ ${lifeHabitSection}
           {daySessions.length === 0 ? (
             <EmptyState icon={Flame} title="No sessions" body="This day has no focus sessions on record." />
           ) : (
-            <div className="mt-3 flex max-h-[330px] flex-col gap-1.5 overflow-y-auto pr-1 w-full min-w-0">
+            <div className="mt-3 flex max-h-[360px] flex-col gap-2 overflow-y-auto pr-1 w-full min-w-0">
               {daySessions.map((s) => {
                 const t = state.tasks.find((x) => x.id === s.taskId);
                 const p = t ? state.projects.find((x) => x.id === t.projectId) : null;
                 const min = sessionMinutes(s);
                 return (
-                  <div key={s.id} className="flex items-center gap-2.5 rounded-xl border px-2.5 py-2 min-w-0 w-full" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
-                    <span className="h-[26px] w-[4px] shrink-0 rounded-full" style={{ background: s.mode === "break" ? "var(--mut)" : p?.color ?? "var(--accent)" }} />
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12.5px] font-bold flex items-center gap-1.5">
-                        {s.mode === "break" ? (
-                          <span>☕ Break</span>
-                        ) : (
-                          <>
-                            <span>{t?.emoji ?? "💻"}</span>
-                            <span className="truncate">{t?.title ?? "Untitled task"}</span>
-                            {p && (
-                              <span className="chip !py-0 !text-[9.5px] font-semibold" style={{ color: p.color, borderColor: `${p.color}40` }}>
-                                #{p.name}
-                              </span>
-                            )}
-                          </>
-                        )}
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] font-semibold tnum" style={{ color: "var(--mut)" }}>
-                        <span>{fmtClock(s.startedAt)} → {s.endedAt ? fmtClock(s.endedAt) : "…"}</span>
-                        <span className="chip !border-0 !py-0 text-[9.5px]" style={{ background: "var(--panel2)" }}>{s.mode}</span>
-                        {s.pauses.length > 0 && <span className="inline-flex items-center gap-0.5"><Pause size={9} /> {s.pauses.length} pause{s.pauses.length > 1 ? "s" : ""}</span>}
+                  <div key={s.id} className="flex flex-col gap-1.5 rounded-xl border p-2.5 min-w-0 w-full transition-all" style={{ borderColor: "var(--line)", background: "var(--bg)" }}>
+                    <div className="flex items-center gap-2.5 min-w-0 w-full">
+                      <span className="h-[20px] w-[4px] shrink-0 rounded-full" style={{ background: s.mode === "break" ? "var(--mut)" : p?.color ?? "var(--accent)" }} />
+                      <div className="min-w-0 flex-1 flex items-center justify-between gap-2">
+                        <div className="truncate text-[12.5px] font-bold flex items-center gap-1.5 min-w-0">
+                          {s.mode === "break" ? (
+                            <span>☕ Break</span>
+                          ) : (
+                            <>
+                              <span>{t?.emoji ?? "💻"}</span>
+                              <span className="truncate">{t?.title ?? "Untitled task"}</span>
+                              {p && (
+                                <span className="chip !py-0 !text-[9.5px] font-semibold shrink-0" style={{ color: p.color, borderColor: `${p.color}40` }}>
+                                  #{p.name}
+                                </span>
+                              )}
+                            </>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <span className="chip !border-0 !py-0 text-[9.5px]" style={{ background: "var(--panel2)" }}>{s.mode}</span>
+                          <span className="tnum font-mono text-[13px] font-bold" style={{ color: "var(--accent)" }}>{fmtDur(min)}</span>
+                        </div>
                       </div>
                     </div>
-                    <span className="tnum shrink-0 font-mono text-[13px] font-bold" style={{ color: "var(--accent)" }}>{fmtDur(min)}</span>
+                    {/* Visual Branch & Interval Segmented Timeline */}
+                    <div className="pl-3.5 border-t border-[var(--line)]/50 pt-1.5">
+                      <SessionTimelineBranch session={s} />
+                    </div>
                   </div>
                 );
               })}

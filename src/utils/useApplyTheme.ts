@@ -73,9 +73,12 @@ export function useApplyTheme(s: Settings) {
     root.style.setProperty("--accent-soft", `color-mix(in srgb, ${accent} 14%, transparent)`);
     root.style.setProperty("--uizoom", String(Math.max(1, Math.min(2, s.uiZoom / 100))));
 
+    const fontDef = FONT_PAIRS[s.fontPair];
     const fam = s.customFontName
       ? `'${CUSTOM_FONT_FAMILY}', sans-serif`
-      : `'${FONT_PAIRS[s.fontPair]?.family ?? "Manrope"}', sans-serif`;
+      : s.fontPair === "system"
+      ? fontDef?.family ?? "system-ui, sans-serif"
+      : `'${fontDef?.family ?? "Manrope"}', sans-serif`;
     root.style.setProperty("--font-body", fam);
     root.style.setProperty("--font-display", fam);
     document.body.style.fontFamily = fam;

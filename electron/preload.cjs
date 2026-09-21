@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getStorageInfo: () => ipcRenderer.invoke('lifelog:get-storage-info'),
   openStorageFolder: () => ipcRenderer.invoke('lifelog:open-storage-folder'),
   openTimerPopout: () => ipcRenderer.invoke('lifelog:open-timer-popout'),
+  focusMainWindow: () => ipcRenderer.invoke('lifelog:focus-main-window'),
+  hideMainWindow: () => ipcRenderer.invoke('lifelog:hide-main-window'),
 
   // Native SQLite operations
   dbInit: () => ipcRenderer.invoke('lifelog:db-init'),

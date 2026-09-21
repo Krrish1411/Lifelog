@@ -7,7 +7,7 @@ export type Priority = "low" | "medium" | "high" | "urgent";
 export type LayoutMode = "planify" | "control" | "glass" | "zen" | "desk";
 export type MobileLayoutMode = "classic" | "liquid";
 export type ThemeMode = "dark" | "light";
-export type FontPair = "manrope" | "sora" | "outfit" | "plex" | "jakarta" | "nunito";
+export type FontPair = "manrope" | "sora" | "outfit" | "plex" | "jakarta" | "nunito" | "system";
 export type TimerMode = "pomodoro" | "countdown" | "flow";
 export type ViewId =
   | "dashboard"
@@ -370,7 +370,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.4";
+export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.5";
 
 export interface AppVersionInfo {
   version: string;
@@ -417,6 +417,7 @@ export const FONT_PAIRS: Record<FontPair, { label: string; family: string }> = {
   plex: { label: "IBM Plex Sans", family: "IBM Plex Sans" },
   jakarta: { label: "Plus Jakarta Sans", family: "Plus Jakarta Sans" },
   nunito: { label: "Nunito Sans", family: "Nunito Sans" },
+  system: { label: "System Default (Native OS)", family: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, Cantarell, sans-serif" },
 };
 
 export interface SqliteAllData {
@@ -443,6 +444,8 @@ export interface ElectronAPI {
   getStorageInfo: () => Promise<{ dir: string; file: string; sqliteFile?: string; attachmentsDir?: string; platform: string }>;
   openStorageFolder: () => Promise<boolean>;
   openTimerPopout: () => Promise<boolean>;
+  focusMainWindow?: () => Promise<boolean>;
+  hideMainWindow?: () => Promise<boolean>;
 
   // SQLite IPC methods
   dbInit: () => Promise<{ success: boolean; path?: string; error?: string }>;

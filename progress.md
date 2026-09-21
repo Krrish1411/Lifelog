@@ -412,3 +412,67 @@ This document provides a complete, authoritative, and chronological record of th
 
 ### E. Buy Me a Coffee Typography Standardization
 - Replaced the cursive `"Cookie"` font in both [`src/views/Welcome.tsx`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/views/Welcome.tsx) and [`src/views/Settings.tsx`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/views/Settings.tsx) with clean, modern, high-contrast bold sans-serif UI typography.
+
+---
+
+## 14. Real-Time Dynamic Ticking, Multi-Pause Branch Timeline, Popout Lifecycle, Obsidian Vault Mirroring & Background Sync (v1.1.5)
+
+### A. Dynamic 1-Second Live Ticking Engine (`src/store.tsx`)
+- **Problem**: When a countdown or timer was running, switching away from Focus or staying on the Dashboard for 10 minutes showed static metrics; dashboard focus minutes and report totals failed to tick dynamically without manually navigating tabs.
+- **Resolution**:
+  - Added `liveTick: number` to `AppCtx`.
+  - Configured a 1000ms heartbeat interval inside `AppProvider` active whenever `hasRunningTimer === true`.
+  - Exposed `liveTick` in the context value. All consumer views (`Dashboard`, `Reports`, `DayLog`) now automatically re-evaluate active session minutes dynamically on every tick with **0 additional database writes**.
+
+### B. Notes Editor Cursor Preservation, Encrypted SQLite Storage & Formatting Shortcuts (`src/views/Notes.tsx`)
+- **Autosave Cursor Jump Fix**:
+  - *Root Cause*: `flushSave()` updated `state.notes`, triggering `useEffect([selId, state.notes])`. Because `note.updatedAt > lastLoadedUpdatedAt.current`, the loader treated local saves as remote updates, asynchronously wiping `draft.text = ""` and re-decrypting, resetting textarea cursor position mid-typing.
+  - *Fix*: Recorded `lastSavedTs.current = saveTs; lastLoadedUpdatedAt.current = saveTs;` in `flushSave()`. In the loader effect, guarded with `note.updatedAt > (lastSavedTs.current || 0)`. Local saves now never trigger re-decryption or caret resets.
+- **Scroll-to-Top on Note Open**:
+  - Implemented `requestAnimationFrame` on note switch setting `scrollTop = 0, selectionStart = 0, selectionEnd = 0`, ensuring notes always open cleanly at the very top.
+- **Encrypted SQLite Sovereign Storage & Zero Plaintext Disk Leaks**:
+  - Preserved sovereign client-side Zero-Knowledge encryption: all notes are stored inside the local SQLite WAL database with AES-256-GCM authenticated encryption (`notes` table storing `{ ciphertext, iv, salt }`).
+  - Removed unencrypted plaintext disk dumping to ensure no plaintext markdown files leak onto the disk or into OS search indexers.
+- **On-Demand Direct `.md` Export**:
+  - Added a 1-click **"Download Note as .md"** export button in the note toolbar, enabling users to export individual decrypted Markdown files whenever needed for external tools like Obsidian.
+- **Markdown Formatting Keyboard Shortcuts**:
+  - Supported <kbd>Ctrl+B</kbd> (Bold), <kbd>Ctrl+I</kbd> (Italic), <kbd>Ctrl+U</kbd> (Underline), <kbd>Ctrl+Shift+X</kbd> (Strikethrough), <kbd>Ctrl+Shift+H</kbd> (Highlight), <kbd>Ctrl+Shift+C</kbd> (Inline Code), <kbd>Ctrl+Shift+T</kbd> (Checklist Todo `- [ ] `), <kbd>Ctrl+Shift+1/2/3</kbd> (H1/H2/H3), <kbd>Ctrl+Shift+8</kbd> (Bullet list), <kbd>Ctrl+Shift+.</kbd> (Blockquote), <kbd>Ctrl+K</kbd> (Link), and <kbd>Ctrl+S</kbd> (Save & Encrypt).
+- **On-Screen Cheatsheet Modal**:
+  - Added an on-screen Shortcuts button (`?`) in the note header and properties bar opening an interactive **Markdown & Keyboard Shortcuts Cheatsheet Modal**.
+
+### C. Focus Popout Lifecycle, Universal Breaks & Memory Trimming (`src/components/TimerPopout.tsx`, `electron/main.cjs`, `src/views/Focus.tsx`, `src/utils/audio.ts`)
+- **Auto-Finalization at 0:00**:
+  - When remaining seconds reach 0, the popout auto-transitions to `status: "done"`, eliminating frozen screens with stuck pause/stop controls.
+- **Universal Completion & Break Card**:
+  - Renders celebratory completion card with 1-click break offers (+5m / +15m) and next session triggers across all modes (Pomodoro, Countdown, Flow).
+- **IPC Window Management & RAM Optimization**:
+  - Added `lifelog:focus-main-window` and `lifelog:hide-main-window` IPC handlers.
+  - Launching the popout minimizes the main window and invokes `trimMemory()`, conserving system RAM and GPU resources. Closing the popout or clicking "Open Main Window" restores and focuses the main window.
+- **Acoustic Downward Stopping Chime**:
+  - Added `playTimerStopSound()` synthesizing an acoustic downward resolving chime (440Hz &rarr; 220Hz exponential decay) played on Stop across Focus view, Timer Popout, and Shell mini-timer.
+
+### D. Multi-Pause Session Branch Timeline (`src/components/SessionTimelineBranch.tsx`)
+- **Proportional Segmented Timeline**:
+  - Renders a color-coded bar showing active focus periods (emerald/accent) and pause periods (amber), with pause interval tooltips.
+- **Expandable Vertical Branch-Tree Diagram**:
+  - Displays branching nodes tracking exact start timestamps, pause intervals (e.g., `11:45 AM → 12:15 PM`), pause durations, resume timestamps, and net focus time across multiple pauses.
+- **Universal Integration**:
+  - Integrated into [`src/views/DayLog.tsx`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/views/DayLog.tsx), [`src/views/Focus.tsx`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/views/Focus.tsx), and [`src/views/Reports.tsx`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/views/Reports.tsx).
+
+### E. Detailed Pause Analytics in Reports (`src/views/Reports.tsx`)
+- Added calculation and dedicated card for:
+  - Average pause duration across filtered sessions.
+  - Shortest pause and longest pause recorded.
+  - Continuous flow sessions (0 pauses).
+  - Focus efficiency percentage (`netFocusTime / (netFocusTime + pauseTime)`).
+
+### F. System Default Native OS Font (`src/types.ts`, `src/utils/useApplyTheme.ts`)
+- Added `"system"` font option to Settings using unquoted system font stack (`system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, Cantarell, sans-serif`).
+
+### G. Background Sync Keepalive & Mobile Android Shade Controls (`src/sync/syncEngine.ts`, `src/utils/native.ts`, `src/components/Shell.tsx`)
+- Added `visibilitychange`, `focus`, and 25s background polling to `syncEngine` for automatic reconnection without opening Settings.
+- Enhanced Android notification shade to display active vs. paused status and countdown minutes when minimized.
+
+### H. Demo Seed Data Deletion & Tombstone Reconciliation (`src/utils/cleanSeed.ts`)
+- Purged hardcoded demo daily note ("Intentions for today..."), cleaned demo `dayLogs`, and created deletion tombstones for proper SQLite synchronization.
+

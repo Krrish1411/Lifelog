@@ -1,10 +1,10 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Coffee, Pause, Play, Square, Target, Timer, Plus, ExternalLink, Sparkles } from "lucide-react";
+import { Coffee, Pause, Play, Square, Target, Timer, Plus, ExternalLink, Sparkles, Flame, Clock } from "lucide-react";
 import { useApp } from "../store";
 import type { Session } from "../types";
 import { fmtHMS, sessionSeconds } from "../utils/core";
 import { triggerHaptic } from "../utils/native";
-import { playTimerFinishSound } from "../utils/audio";
+import { playTimerFinishSound, playTimerStopSound, playTimerStartSound } from "../utils/audio";
 import { useApplyTheme } from "../utils/useApplyTheme";
 import { Btn, cn } from "./ui";
 
@@ -12,6 +12,7 @@ export function TimerPopout() {
   const { state, set, toast } = useApp();
   const [, force] = useState(0);
   const finishedRef = useRef<string | null>(null);
+  const [completedOffer, setCompletedOffer] = useState<{ mode: string; plannedMin: number | null } | null>(null);
 
   // Apply user theme, tokens, fonts, and dark/light modes
   useApplyTheme(state.settings);
@@ -39,15 +40,35 @@ export function TimerPopout() {
       ? Math.min(100, (elapsedSec / (running.plannedMin * 60)) * 100)
       : 0;
 
-  // Sound chime when planned countdown reaches zero
+  // Auto-complete session when countdown reaches zero (don't stay stuck on 0:00 screen!)
   useEffect(() => {
     if (running && remainingSec === 0 && finishedRef.current !== running.id) {
       finishedRef.current = running.id;
-      playTimerFinishSound();
+      const ts = Date.now();
+      const finishedMode = running.mode;
+      const finishedPlanned = running.plannedMin;
+      setCompletedOffer({ mode: finishedMode, plannedMin: finishedPlanned });
+
+      set((s) => ({
+        ...s,
+        sessions: s.sessions.map((x) =>
+          x.id === running.id
+            ? {
+                ...x,
+                endedAt: ts,
+                status: "done" as const,
+                updatedAt: ts,
+                pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
+              }
+            : x
+        ),
+      }));
+
+      playTimerFinishSound(finishedMode === "break" ? "break" : "complete");
       triggerHaptic("success");
-      toast("Focus session complete!", "ok");
+      toast(finishedMode === "break" ? "Break finished! Ready to focus." : "Focus session complete!", "ok");
     }
-  }, [running, remainingSec, toast]);
+  }, [running, remainingSec, toast, set]);
 
   const togglePause = () => {
     if (!running) return;
@@ -73,6 +94,7 @@ export function TimerPopout() {
 
   const stop = () => {
     if (!running) return;
+    playTimerStopSound();
     triggerHaptic("medium");
     const ts = Date.now();
     set((s) => ({
@@ -105,7 +127,10 @@ export function TimerPopout() {
     toast(`+${min}m added`, "ok");
   };
 
-  const startQuickSession = (min: number, mode: "pomodoro" | "break" = "pomodoro") => {
+  const startQuickSession = (min: number | null, mode: "pomodoro" | "countdown" | "flow" | "break" = "pomodoro") => {
+    playTimerStartSound();
+    triggerHaptic("light");
+    setCompletedOffer(null);
     const now = Date.now();
     const newSess: Session = {
       id: "sess_" + Date.now() + "_" + Math.random().toString(36).slice(2, 7),
@@ -113,7 +138,7 @@ export function TimerPopout() {
       endedAt: null,
       plannedMin: min,
       status: "running",
-      mode: mode === "break" ? "break" : "pomodoro",
+      mode: mode === "break" ? "break" : mode,
       taskId: null,
       subtaskId: null,
       pauses: [],
@@ -128,12 +153,25 @@ export function TimerPopout() {
         newSess,
       ],
     }));
-    toast(mode === "break" ? "Break started" : `Started ${min}m session`, "ok");
+    toast(
+      mode === "break"
+        ? `${min ?? 5}m Break started`
+        : mode === "flow"
+        ? "Flow session started (open-ended)"
+        : `Started ${min}m ${mode === "pomodoro" ? "Pomodoro" : "Countdown"}`,
+      "ok"
+    );
   };
 
-  const focusMainWindow = () => {
+  const focusMainWindow = async () => {
+    if (window.electronAPI?.focusMainWindow) {
+      await window.electronAPI.focusMainWindow();
+      return;
+    }
     if (typeof window !== "undefined" && window.opener) {
-      window.opener.focus();
+      try {
+        window.opener.focus();
+      } catch {}
     }
   };
 
@@ -255,46 +293,178 @@ export function TimerPopout() {
             </div>
           )}
         </div>
-      ) : (
-        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3.5 text-center p-3 w-full">
+      ) : completedOffer ? (
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 text-center p-3 w-full animate-fade-in">
           <div
-            className="flex h-12 w-12 items-center justify-center rounded-2xl border text-[var(--accent)]"
+            className="flex h-12 w-12 items-center justify-center rounded-2xl border text-[var(--ok)] ring-pulse"
+            style={{
+              background: "var(--panel2)",
+              borderColor: "var(--ok)",
+            }}
+          >
+            <Sparkles size={24} />
+          </div>
+          <div className="space-y-0.5">
+            <div className="text-[15px] font-bold" style={{ color: "var(--text)" }}>
+              {completedOffer.mode === "break" ? "Break Finished!" : "🎉 Session Complete!"}
+            </div>
+            <div className="text-xs font-semibold text-[var(--mut)]">
+              {completedOffer.mode === "break"
+                ? "Feeling refreshed? Time to dive back in."
+                : "Great momentum! Take a break or start your next block."}
+            </div>
+          </div>
+
+          {/* Break and Focus options */}
+          <div className="flex flex-col gap-2 mt-1 w-full max-w-[270px]">
+            {completedOffer.mode !== "break" ? (
+              <>
+                <div className="flex gap-2">
+                  <Btn
+                    size="sm"
+                    variant="soft"
+                    onClick={() => startQuickSession(5, "break")}
+                    className="flex-1 text-xs py-2 !border-[var(--ok)]/40 text-[var(--ok)]"
+                  >
+                    <Coffee size={13} />
+                    <span>5m Break</span>
+                  </Btn>
+                  <Btn
+                    size="sm"
+                    variant="soft"
+                    onClick={() => startQuickSession(15, "break")}
+                    className="flex-1 text-xs py-2 text-[var(--mut)]"
+                  >
+                    <Coffee size={13} />
+                    <span>15m Long</span>
+                  </Btn>
+                </div>
+                <div className="flex gap-2">
+                  <Btn
+                    size="sm"
+                    variant="primary"
+                    onClick={() => startQuickSession(25, "pomodoro")}
+                    className="flex-1 text-xs py-2"
+                  >
+                    <Play size={12} />
+                    <span>25m Focus</span>
+                  </Btn>
+                  <Btn
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => startQuickSession(null, "flow")}
+                    className="flex-1 text-xs py-2"
+                  >
+                    <Flame size={12} />
+                    <span>Flow Mode</span>
+                  </Btn>
+                </div>
+              </>
+            ) : (
+              <div className="flex gap-2">
+                <Btn
+                  size="sm"
+                  variant="primary"
+                  onClick={() => startQuickSession(25, "pomodoro")}
+                  className="flex-1 text-xs py-2"
+                >
+                  <Play size={12} />
+                  <span>25m Focus</span>
+                </Btn>
+                <Btn
+                  size="sm"
+                  variant="soft"
+                  onClick={() => startQuickSession(null, "flow")}
+                  className="flex-1 text-xs py-2"
+                >
+                  <Flame size={12} />
+                  <span>Flow Mode</span>
+                </Btn>
+              </div>
+            )}
+          </div>
+
+          <button
+            onClick={focusMainWindow}
+            className="text-[11px] font-bold text-[var(--mut)] hover:text-[var(--text)] transition-colors underline decoration-dotted cursor-pointer mt-1"
+          >
+            Open main window
+          </button>
+        </div>
+      ) : (
+        <div className="relative z-10 flex flex-1 flex-col items-center justify-center gap-3 text-center p-3 w-full">
+          <div
+            className="flex h-11 w-11 items-center justify-center rounded-2xl border text-[var(--accent)]"
             style={{
               background: "var(--panel2)",
               borderColor: "var(--line)",
             }}
           >
-            <Timer size={24} />
+            <Timer size={22} />
           </div>
           <div className="space-y-0.5">
             <div className="text-sm font-bold" style={{ color: "var(--text)" }}>
               No active session
             </div>
             <div className="text-xs font-semibold text-[var(--mut)]">
-              Start a session or return to LifeLog
+              Pick a mode or return to LifeLog
             </div>
           </div>
 
-          {/* Quick Start Buttons */}
-          <div className="flex flex-wrap items-center justify-center gap-2 mt-1 w-full max-w-[280px]">
-            <Btn
-              size="sm"
-              variant="primary"
-              onClick={() => startQuickSession(25, "pomodoro")}
-              className="flex-1 text-xs"
-            >
-              <Play size={12} />
-              <span>25m Focus</span>
-            </Btn>
-            <Btn
-              size="sm"
-              variant="soft"
-              onClick={() => startQuickSession(5, "break")}
-              className="text-xs px-3"
-            >
-              <Coffee size={12} />
-              <span>5m Break</span>
-            </Btn>
+          {/* Multi-mode Quick Start Grid */}
+          <div className="flex flex-col gap-1.5 mt-1 w-full max-w-[270px]">
+            <div className="flex gap-1.5">
+              <Btn
+                size="sm"
+                variant="primary"
+                onClick={() => startQuickSession(25, "pomodoro")}
+                className="flex-1 text-xs py-1.5"
+                title="Standard 25-minute Pomodoro block"
+              >
+                <Play size={12} />
+                <span>25m Focus</span>
+              </Btn>
+              <Btn
+                size="sm"
+                variant="soft"
+                onClick={() => startQuickSession(null, "flow")}
+                className="flex-1 text-xs py-1.5"
+                title="Open-ended stopwatch flow session"
+              >
+                <Flame size={12} />
+                <span>Flow</span>
+              </Btn>
+            </div>
+            <div className="flex gap-1.5">
+              <Btn
+                size="sm"
+                variant="ghost"
+                onClick={() => startQuickSession(15, "countdown")}
+                className="flex-1 text-[11px] py-1 text-[var(--mut)]"
+              >
+                <Clock size={11} />
+                <span>15m Timer</span>
+              </Btn>
+              <Btn
+                size="sm"
+                variant="ghost"
+                onClick={() => startQuickSession(45, "countdown")}
+                className="flex-1 text-[11px] py-1 text-[var(--mut)]"
+              >
+                <Clock size={11} />
+                <span>45m Timer</span>
+              </Btn>
+              <Btn
+                size="sm"
+                variant="soft"
+                onClick={() => startQuickSession(5, "break")}
+                className="text-[11px] px-2.5 py-1"
+                title="Take a quick 5-minute break"
+              >
+                <Coffee size={11} />
+                <span>5m</span>
+              </Btn>
+            </div>
           </div>
 
           <button

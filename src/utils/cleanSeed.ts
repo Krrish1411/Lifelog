@@ -111,7 +111,10 @@ export function isSeedProject(p: Project): boolean {
  */
 export function isSeedNote(n: Note): boolean {
   const normTitle = n.title.trim().toLowerCase();
-  return SEED_NOTE_TITLES.has(normTitle);
+  if (SEED_NOTE_TITLES.has(normTitle)) return true;
+  // Check if it's the starter daily note with default demo intentions
+  if (n.folderId === "f-daily" && (normTitle.includes("daily note") || normTitle.includes("intentions"))) return true;
+  return false;
 }
 
 /**
@@ -129,6 +132,11 @@ export function isFreshSeedState(s: State): boolean {
  */
 export function cleanSeedData(state: State): SeedCleanResult {
   const seedTaskIds = new Set<string>();
+  const now = Date.now();
+  const removedTaskTombstones: Record<string, number> = {};
+  const removedHabitTombstones: Record<string, number> = {};
+  const removedProjectTombstones: Record<string, number> = {};
+  const removedNoteTombstones: Record<string, number> = {};
 
   // Filter tasks
   const keptTasks: Task[] = [];
@@ -136,6 +144,7 @@ export function cleanSeedData(state: State): SeedCleanResult {
   for (const t of state.tasks) {
     if (isSeedTask(t)) {
       seedTaskIds.add(t.id);
+      removedTaskTombstones[t.id] = now;
       tasksRemoved++;
     } else {
       keptTasks.push(t);
@@ -147,6 +156,7 @@ export function cleanSeedData(state: State): SeedCleanResult {
   let habitsRemoved = 0;
   for (const h of state.habits) {
     if (isSeedHabit(h)) {
+      removedHabitTombstones[h.id] = now;
       habitsRemoved++;
     } else {
       keptHabits.push(h);
@@ -159,6 +169,7 @@ export function cleanSeedData(state: State): SeedCleanResult {
   let projectsRemoved = 0;
   for (const p of state.projects) {
     if (isSeedProject(p) && !remainingProjectIds.has(p.id)) {
+      removedProjectTombstones[p.id] = now;
       projectsRemoved++;
     } else {
       keptProjects.push(p);
@@ -170,6 +181,7 @@ export function cleanSeedData(state: State): SeedCleanResult {
   let notesRemoved = 0;
   for (const n of state.notes) {
     if (isSeedNote(n)) {
+      removedNoteTombstones[n.id] = now;
       notesRemoved++;
     } else {
       keptNotes.push(n);
@@ -187,6 +199,17 @@ export function cleanSeedData(state: State): SeedCleanResult {
     }
   }
 
+  // Reset or filter dayLogs if only demo entries
+  const cleanedDayLogs: State["dayLogs"] = {};
+  if (state.dayLogs) {
+    for (const [day, log] of Object.entries(state.dayLogs)) {
+      // If the log was created with empty mood and energy, or default text
+      if (log.mood || log.energy !== null || log.moodEmoji) {
+        cleanedDayLogs[day] = log;
+      }
+    }
+  }
+
   const cleanedState: State = {
     ...state,
     tasks: keptTasks,
@@ -194,6 +217,13 @@ export function cleanSeedData(state: State): SeedCleanResult {
     projects: keptProjects,
     notes: keptNotes,
     sessions: keptSessions,
+    dayLogs: cleanedDayLogs,
+    deleted: {
+      tasks: { ...(state.deleted?.tasks ?? {}), ...removedTaskTombstones },
+      habits: { ...(state.deleted?.habits ?? {}), ...removedHabitTombstones },
+      projects: { ...(state.deleted?.projects ?? {}), ...removedProjectTombstones },
+      notes: { ...(state.deleted?.notes ?? {}), ...removedNoteTombstones },
+    },
   };
 
   return {

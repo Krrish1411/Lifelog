@@ -283,6 +283,39 @@ export function playTimerToggleSound(isPausing = false): void {
 }
 
 /**
+ * Soothing, downward acoustic resolving chime when clicking Stop on any timer.
+ */
+export function playTimerStopSound(): void {
+  try {
+    const ctx = getAudioContext();
+    if (!ctx) return;
+    if (ctx.state === "suspended") {
+      ctx.resume().catch(() => {});
+    }
+
+    const now = ctx.currentTime;
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(440, now); // A4
+    osc.frequency.exponentialRampToValueAtTime(220, now + 0.28); // down to A3
+
+    gain.gain.setValueAtTime(0.001, now);
+    gain.gain.linearRampToValueAtTime(0.32, now + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.32);
+
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+
+    osc.start(now);
+    osc.stop(now + 0.32);
+  } catch {
+    // Audio autoplay restrictions
+  }
+}
+
+/**
  * Tactile pop feedback when checking or unchecking a task item.
  */
 export function playTaskToggleSound(done = true): void {

@@ -4,6 +4,41 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.5 — Real-Time Live Ticking, Multi-Pause Branch Timeline, Notes Markdown Shortcuts & Sovereign Encrypted Storage (2026-09-21)
+
+### ⚡ 1. Dynamic Real-Time Live Ticking Engine
+- **1-Second Dynamic Heartbeat:** Added an active 1000ms ticker (`liveTick`) to application state whenever any session is running.
+- **Zero-Switch Reactive Dashboard:** Focus minutes, daily progress meters, and report charts update live on screen every second without requiring users to switch tabs or refresh.
+
+### 🌿 2. Multi-Pause Session Branch Timeline & Visual Segmented Bar
+- **Proportional Segmented Interval Bar:** Displays a visual colored bar showing active focus periods (emerald) and pauses (amber) with interval duration tooltips.
+- **Expandable Vertical Branch-Tree Diagram:** Fully plots complex multi-pause sessions tracking exact start time, pause intervals (e.g., `11:45 AM → 12:15 PM`), duration badges, resume timestamps, and net focus duration across unlimited pauses.
+- **Universal Integration:** Active in Day Log session lists, Focus view "Today" history, and Reports.
+
+### 📊 3. Deep Pause Analytics & Focus Efficiency Inspector
+- **Dedicated Pause Diagnostics:** Reports now feature a comprehensive Pause Analytics widget tracking average pause duration, shortest pause, longest pause, continuous flow sessions (0 pauses), and overall focus efficiency percentage (`netFocus / totalSpan`).
+
+### 📝 4. Notes Editor Stability, Caret Preservation & Direct .md Export
+- **Autosave Cursor Jump Fix:** Resolved race condition in debounced autosave that wiped draft text and re-decrypted asynchronously mid-sentence. Cursor stays locked to caret position.
+- **Viewport Reset:** Notes open pinned cleanly to top (`scrollTop = 0, caret = 0`).
+- **Direct 1-Click .md Export:** Export any decrypted note instantly as a standard `.md` file for use in Obsidian or any Markdown editor.
+- **Sovereign Encrypted SQLite Storage:** Preserved client-side AES-256-GCM authenticated encryption; zero unencrypted plaintext files dumped to disk.
+
+### ⌨️ 5. Markdown Formatting Keyboard Shortcuts & Cheatsheet
+- **Rich Editor Shortcuts:** Added <kbd>Ctrl+B</kbd> (Bold), <kbd>Ctrl+I</kbd> (Italic), <kbd>Ctrl+U</kbd> (Underline), <kbd>Ctrl+Shift+X</kbd> (Strikethrough), <kbd>Ctrl+Shift+H</kbd> (Highlight), <kbd>Ctrl+Shift+C</kbd> (Inline Code), <kbd>Ctrl+Shift+T</kbd> (Checklist Todo `- [ ] `), <kbd>Ctrl+Shift+1/2/3</kbd> (Headings), <kbd>Ctrl+Shift+8</kbd> (Bullet list), <kbd>Ctrl+Shift+.</kbd> (Blockquote), <kbd>Ctrl+K</kbd> (Link), and <kbd>Ctrl+S</kbd> (Save).
+- **On-Screen Cheatsheet Modal:** Interactive `?` button opens a complete Markdown syntax and shortcuts cheat sheet.
+
+### ⏱️ 6. Focus Popout Lifecycle, Universal Breaks & Memory Trimming
+- **Auto-Finalization at 0:00:** Popout cleanly transitions to `status: "done"` when countdown ends; no stuck screen.
+- **Universal Completion & Break Card:** Offers 1-click +5m and +15m breaks across Pomodoro, Countdown, and Flow.
+- **IPC Window Management & RAM Optimization:** Minimizes main window and trims memory on popout open; restores and focuses main window via IPC on demand.
+- **Acoustic Downward Stopping Chime:** Soothing resolving downward chime (440Hz &rarr; 220Hz decay) on Stop across all timer interfaces.
+
+### 🔤 7. System Default Native OS Font
+- Added `"system"` font pair option in Settings rendering the native OS font stack (`system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Ubuntu, Cantarell, sans-serif`).
+
+---
+
 ## 🌟 v1.1.4 — Instant Zero-Debounce Real-Time Sync, Dynamic Timer Reactivity & Multi-Relay Fan-Out (2026-09-18)
 
 ### ⚡ 1. Instant Zero-Debounce Delta Synchronization (<150ms)
