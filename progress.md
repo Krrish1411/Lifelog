@@ -490,7 +490,8 @@ This document provides a complete, authoritative, and chronological record of th
   - **Background Ticking Engine**: Configured 5-second interval heartbeat in `initRunningTimerTrayListener` keeping the notification countdown accurate while the phone screen is locked.
 - **Linux / Desktop Window Restoration & System Tray Indicator (`electron/main.cjs`)**:
   - **Single Instance Lock**: Added `app.requestSingleInstanceLock()` and `app.on('second-instance')` with `restoreAndFocusApp()`, so clicking the LifeLog desktop launcher icon or running `lifelog` while a timer or session is running instantly restores, un-minimizes, and focuses the existing window.
-  - **System Tray App Indicator**: Implemented `createTray()` creating a permanent 22×22px system tray app indicator with tooltip, left/double-click restore handlers, and context menu ("Open LifeLog", "Open Floating Timer", "Quit LifeLog").
+  - **System Tray App Indicator & GNOME AppIndicator Support**: Cached tray icon to `userData/tray-icon.png` so GNOME's AppIndicator extension can read the icon from physical disk over D-Bus outside `.asar`. Added fallback creation and quick action context menu.
+  - **Window Display Safeguards**: Added 1200ms safety timeout ensuring the main window is brought to screen even if the `ready-to-show` event is delayed on Wayland/X11, plus resolved parse and scope issues in `createTimerPopoutWindow`.
 - **Tag-Only GitHub Actions Triggers (`.github/workflows/build-apk.yml`, `.github/workflows/build-electron.yml`, `.github/workflows/deploy.yml`)**:
   - Removed all `branches: [ "main" ]` triggers across all workflows.
   - Restricted push execution strictly to git release tags (`tags: [ "v*" ]`) and manual `workflow_dispatch`, ensuring standard git pushes to `main` branch never trigger CI/CD builds or runner consumption.

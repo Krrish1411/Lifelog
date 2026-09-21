@@ -11,6 +11,7 @@ let tray = null;
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
+  process.exit(0);
 } else {
   app.on('second-instance', () => {
     restoreAndFocusApp();
@@ -33,16 +34,63 @@ function restoreAndFocusApp() {
   createMainWindow();
 }
 
+function trimMemory() {
+  try {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.session.clearCache().catch(() => {});
+    }
+  } catch {}
+}
+
+function getTrayIconPath() {
+  try {
+    const userData = app.getPath('userData');
+    const diskIconPath = path.join(userData, 'tray-icon.png');
+    const bundledIconPath = path.join(__dirname, 'icons/icon.png');
+
+    if (fs.existsSync(bundledIconPath)) {
+      try {
+        const iconBuffer = fs.readFileSync(bundledIconPath);
+        fs.writeFileSync(diskIconPath, iconBuffer);
+        return diskIconPath;
+      } catch (e) {
+        console.warn('Could not cache tray icon to disk:', e);
+      }
+    }
+    if (fs.existsSync(diskIconPath)) {
+      return diskIconPath;
+    }
+  } catch (e) {
+    console.warn('Error resolving tray icon path:', e);
+  }
+  return path.join(__dirname, 'icons/icon.png');
+}
+
 function createTray() {
   if (tray && !tray.isDestroyed()) return;
-  const iconPath = path.join(__dirname, 'icons/icon.png');
-  if (!fs.existsSync(iconPath)) return;
 
   try {
-    let trayIcon = nativeImage.createFromPath(iconPath);
-    trayIcon = trayIcon.resize({ width: 22, height: 22 });
+    const iconPath = getTrayIconPath();
+    if (!fs.existsSync(iconPath)) {
+      console.warn('System tray icon not found at:', iconPath);
+      return;
+    }
 
-    tray = new Tray(trayIcon);
+    // On Linux with libappindicator / GNOME AppIndicator, a physical filesystem path is required over D-Bus
+    let trayIcon;
+    try {
+      if (process.platform === 'linux') {
+        trayIcon = iconPath;
+      } else {
+        trayIcon = nativeImage.createFromPath(iconPath).resize({ width: 22, height: 22 });
+      }
+      tray = new Tray(trayIcon);
+    } catch (createErr) {
+      console.warn('Primary tray icon failed, falling back to nativeImage:', createErr);
+      const img = nativeImage.createFromPath(iconPath).resize({ width: 22, height: 22 });
+      tray = new Tray(img);
+    }
+
     tray.setToolTip('LifeLog — Sovereign Personal OS');
 
     const contextMenu = Menu.buildFromTemplate([
@@ -74,7 +122,7 @@ function createTray() {
       restoreAndFocusApp();
     });
   } catch (err) {
-    console.warn('Could not create system tray indicator:', err);
+    console.error('Could not create system tray indicator:', err);
   }
 }
 
@@ -105,6 +153,13 @@ function getStoragePaths() {
 }
 
 function createMainWindow() {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    if (!mainWindow.isVisible()) mainWindow.show();
+    mainWindow.focus();
+    return;
+  }
+
   const isDev = !app.isPackaged && process.env.NODE_ENV !== 'production';
 
   mainWindow = new BrowserWindow({
@@ -146,7 +201,16 @@ function createMainWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+    mainWindow.focus();
   });
+
+  // Safety fallback: Ensure main window is shown even if ready-to-show event is missed or delayed on Linux
+  setTimeout(() => {
+    if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isVisible()) {
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  }, 1200);
 
   // Open external web links in default system browser
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -167,21 +231,12 @@ function createMainWindow() {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));
   }
 
-  // Purge unused display and memory caches when window loses focus or minimizes
-  const trimMemory = () => {
-    try {
-      if (mainWindow && !mainWindow.isDestroyed()) {
-        mainWindow.webContents.session.clearCache().catch(() => {});
-      }
-    } catch {}
-  };
-
   mainWindow.on('blur', trimMemory);
   mainWindow.on('minimize', trimMemory);
 
   mainWindow.on('closed', () => {
     mainWindow = null;
-    if (popoutWindow) {
+    if (popoutWindow && !popoutWindow.isDestroyed()) {
       popoutWindow.close();
     }
   });
@@ -189,7 +244,8 @@ function createMainWindow() {
 
 function createTimerPopoutWindow() {
   if (popoutWindow && !popoutWindow.isDestroyed()) {
-    popoutWindow.show();
+    if (popoutWindow.isMinimized()) popoutWindow.restore();
+    if (!popoutWindow.isVisible()) popoutWindow.show();
     popoutWindow.focus();
     return;
   }
@@ -238,6 +294,8 @@ function createTimerPopoutWindow() {
     popoutWindow.loadURL(`${process.env.VITE_DEV_SERVER_URL}#timer-popout`);
   } else {
     popoutWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: 'timer-popout' });
+  }
+
   // Minimize main window to conserve RAM and CPU while floating timer is active
   if (mainWindow && !mainWindow.isDestroyed()) {
     mainWindow.minimize();
