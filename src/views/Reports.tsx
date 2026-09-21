@@ -3,7 +3,7 @@ import { Flame, Lightbulb, Settings2, Target, Clock, Printer, Check, Search, Pau
 import { useApp } from "../store";
 import {
   MONTHS, WEEKDAYS_SHORT, addDaysIso, fmtDayShort, fmtDur, isoDate, listDates, parseIso,
-  sessionMinutes, streakStats, todayIso, weekStartIso, fmtClock,
+  sessionMinutes, streakStats, todayIso, weekStartIso, fmtClock, getSessionActiveIntervals,
 } from "../utils/core";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID } from "../types";
 import { BarRow, Btn, EmptyState, Modal, Seg, cn } from "../components/ui";
@@ -12,7 +12,7 @@ import { SessionTimelineBranch } from "../components/SessionTimelineBranch";
 type Preset = "week" | "last7" | "month" | "last30" | "all" | "custom";
 
 export function ReportsView() {
-  const { state, setView } = useApp();
+  const { state, setView, liveTick } = useApp();
   const today = todayIso();
   const [preset, setPreset] = useState<Preset>("month");
   const [from, setFrom] = useState(() => {
@@ -47,48 +47,49 @@ export function ReportsView() {
 
   const sessions = useMemo(
     () => state.sessions.filter((s) => { const d = isoDate(new Date(s.startedAt)); return d >= from && d <= to; }),
-    [state.sessions, from, to],
+    [state.sessions, from, to, liveTick],
   );
 
   // Pure work sessions (exclude Life Log routine streams so deep work stats stay clean)
   const workSessions = useMemo(
     () => sessions.filter((s) => s.taskId && s.mode !== "break" && !isLifeTask(s.taskId)),
-    [sessions, state.tasks],
+    [sessions, state.tasks, liveTick],
   );
   const totalMin = useMemo(
     () => workSessions.reduce((a, s) => a + sessionMinutes(s), 0),
-    [workSessions],
+    [workSessions, liveTick],
   );
 
   // Sessions tracked on Life Log tasks
   const lifeSessions = useMemo(
     () => sessions.filter((s) => s.taskId && s.mode !== "break" && isLifeTask(s.taskId)),
-    [sessions, state.tasks],
+    [sessions, state.tasks, liveTick],
   );
 
   const w = state.settings.reportWidgets;
   const anyWidget = Object.values(w).some(Boolean);
 
-  /* ---- time of day (sliced proportionally across hourly boundaries) ---- */
+  /* ---- time of day (sliced proportionally across hourly boundaries, strictly active intervals) ---- */
   const hourBuckets = useMemo(() => {
     const b = Array(24).fill(0) as number[];
     for (const s of workSessions) {
-      if (!s.startedAt) continue;
-      const endTs = s.endedAt ?? (s.startedAt + sessionMinutes(s) * 60000);
-      let curr = s.startedAt;
-      while (curr < endTs) {
-        const d = new Date(curr);
-        d.setMinutes(60, 0, 0); // start of next hour
-        const nextHourTs = d.getTime();
-        const sliceEnd = Math.min(endTs, nextHourTs);
-        const mins = Math.max(0, (sliceEnd - curr) / 60000);
-        const h = new Date(curr).getHours();
-        b[h] += Math.round(mins);
-        curr = sliceEnd;
+      const intervals = getSessionActiveIntervals(s);
+      for (const { start, end } of intervals) {
+        let curr = start;
+        while (curr < end) {
+          const d = new Date(curr);
+          d.setMinutes(60, 0, 0); // start of next hour
+          const nextHourTs = d.getTime();
+          const sliceEnd = Math.min(end, nextHourTs);
+          const mins = Math.max(0, (sliceEnd - curr) / 60000);
+          const h = new Date(curr).getHours();
+          b[h] += mins;
+          curr = sliceEnd;
+        }
       }
     }
-    return b;
-  }, [workSessions]);
+    return b.map((v) => Math.round(v));
+  }, [workSessions, liveTick]);
   const peakHour = hourBuckets.indexOf(Math.max(...hourBuckets));
 
   /* ---- projects / tags ---- */
@@ -102,7 +103,7 @@ export function ReportsView() {
       }
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [workSessions, state.tasks]);
+  }, [workSessions, state.tasks, liveTick]);
   const byTag = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of workSessions) {
@@ -111,7 +112,7 @@ export function ReportsView() {
       for (const tag of t.tags) m.set(tag, (m.get(tag) ?? 0) + sessionMinutes(s));
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [workSessions, state.tasks]);
+  }, [workSessions, state.tasks, liveTick]);
 
   /* ---- completed work tasks + estimates (exclude routine life checklist) ---- */
   const completedIn = useMemo(() => {

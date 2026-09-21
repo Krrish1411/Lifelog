@@ -6,6 +6,7 @@ const dbManager = require('./db.cjs');
 let mainWindow = null;
 let popoutWindow = null;
 let tray = null;
+let isQuitting = false;
 
 // Single Instance Lock: Prevent multiple processes and restore existing window on second launch
 const gotTheLock = app.requestSingleInstanceLock();
@@ -38,6 +39,10 @@ function trimMemory() {
   try {
     if (mainWindow && !mainWindow.isDestroyed()) {
       mainWindow.webContents.session.clearCache().catch(() => {});
+      mainWindow.webContents.session.clearStorageData({ storages: ['cachestorage'] }).catch(() => {});
+    }
+    if (popoutWindow && !popoutWindow.isDestroyed()) {
+      popoutWindow.webContents.session.clearCache().catch(() => {});
     }
   } catch {}
 }
@@ -106,7 +111,7 @@ function createTray() {
       {
         label: 'Quit LifeLog',
         click: () => {
-          app.isQuitting = true;
+          isQuitting = true;
           app.quit();
         },
       },
@@ -234,6 +239,14 @@ function createMainWindow() {
   mainWindow.on('blur', trimMemory);
   mainWindow.on('minimize', trimMemory);
 
+  mainWindow.on('close', (event) => {
+    if (!isQuitting) {
+      event.preventDefault();
+      mainWindow.hide();
+      trimMemory();
+    }
+  });
+
   mainWindow.on('closed', () => {
     mainWindow = null;
     if (popoutWindow && !popoutWindow.isDestroyed()) {
@@ -296,16 +309,16 @@ function createTimerPopoutWindow() {
     popoutWindow.loadFile(path.join(__dirname, '../dist/index.html'), { hash: 'timer-popout' });
   }
 
-  // Minimize main window to conserve RAM and CPU while floating timer is active
+  // Hide main window completely from Alt+Tab and taskbar while floating timer is active
   if (mainWindow && !mainWindow.isDestroyed()) {
-    mainWindow.minimize();
+    mainWindow.hide();
     trimMemory();
   }
 
   popoutWindow.on('closed', () => {
     popoutWindow = null;
-    if (mainWindow && !mainWindow.isDestroyed() && mainWindow.isMinimized()) {
-      mainWindow.restore();
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.show();
       mainWindow.focus();
     }
   });
@@ -601,8 +614,14 @@ app.whenReady().then(() => {
   });
 });
 
+app.on('before-quit', () => {
+  isQuitting = true;
+});
+
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit();
+  if (isQuitting || process.platform === 'darwin') {
+    if (process.platform !== 'darwin') {
+      app.quit();
+    }
   }
 });

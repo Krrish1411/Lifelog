@@ -13,7 +13,7 @@ import { Btn, Modal, Seg, TextArea, cn } from "../components/ui";
 type Period = "this-week" | "last-week" | "this-month" | "last-month";
 
 export function ReviewView() {
-  const { state, set, setView, toast } = useApp();
+  const { state, set, setView, toast, liveTick } = useApp();
   const today = todayIso();
   const [period, setPeriod] = useState<Period>("this-week");
   const [answers, setAnswers] = useState<Record<string, string>>({});
@@ -82,7 +82,7 @@ export function ReviewView() {
     const habits = state.habits.map((h) => ({ h, st: streakStats(h.completions) })).sort((a, b) => b.st.current - a.st.current);
 
     return { total, sessions, withWork, bestDay, bestMin: Math.max(0, bestMin), done, top, avgEnergy, trend, habits };
-  }, [state, days, range]);
+  }, [state, days, range, liveTick]);
 
   const QUESTIONS = [
     { k: "wins", q: "What went well?", hint: "Wins, flow moments, things to repeat" },

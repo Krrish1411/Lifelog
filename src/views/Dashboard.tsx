@@ -72,7 +72,7 @@ const DEFAULT_DASHBOARD_WIDGETS: Record<string, boolean> = {
 
 export function Dashboard() {
   const app = useApp();
-  const { state, set, setView, requestFocus, openTaskDialog, toggleDone, toast } = app;
+  const { state, set, setView, requestFocus, openTaskDialog, toggleDone, toast, liveTick } = app;
   const today = todayIso();
   const [quick, setQuick] = useState("");
   const [flashTab, setFlashTab] = useState<"1w" | "1m" | "1y">("1w");
@@ -163,7 +163,7 @@ export function Dashboard() {
   }, [noteText, noteStatus, today]);
 
   /* ---------- derived numbers ---------- */
-  const tracked = useMemo(() => trackedByDay(state.sessions), [state.sessions]);
+  const tracked = useMemo(() => trackedByDay(state.sessions), [state.sessions, liveTick]);
   const todayMin = tracked.get(today) ?? 0;
   const startOfDay = parseIso(today).getTime();
   const weekMin = useMemo(() => {
@@ -173,7 +173,7 @@ export function Dashboard() {
   }, [tracked, today]);
   const sessionsToday = useMemo(
     () => state.sessions.filter((s) => s.startedAt >= startOfDay && s.mode !== "break"),
-    [state.sessions, startOfDay],
+    [state.sessions, startOfDay, liveTick],
   );
   const anyRunning = state.sessions.some((s) => s.status === "running");
   const lastSessionAt = sessionsToday.reduce((a, s) => Math.max(a, s.endedAt ?? s.startedAt), 0);

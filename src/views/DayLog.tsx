@@ -43,7 +43,7 @@ import { Btn, EmptyState, Modal, cn } from "../components/ui";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID, type LifeLogCategory } from "../types";
 
 export function DayLogView() {
-  const { state, setView, toast } = useApp();
+  const { state, setView, toast, liveTick } = useApp();
   const showLifeLog = state.settings.showLifeLogProject !== false;
   const today = todayIso();
   const [sel, setSel] = useState(today);
@@ -63,11 +63,11 @@ export function DayLogView() {
       map.set(key, (map.get(key) ?? 0) + sessionMinutes(s));
     }
     return map;
-  }, [state.sessions]);
+  }, [state.sessions, liveTick]);
 
   const daySessions = useMemo(() => {
     return state.sessions.filter((s) => isoDate(new Date(s.startedAt)) === sel);
-  }, [state.sessions, sel]);
+  }, [state.sessions, sel, liveTick]);
 
   const dayDone = useMemo(
     () =>
@@ -89,7 +89,7 @@ export function DayLogView() {
       m.set(pid, (m.get(pid) ?? 0) + sessionMinutes(s));
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [daySessions, state.tasks, state.settings.showLifeLogProject]);
+  }, [daySessions, state.tasks, state.settings.showLifeLogProject, liveTick]);
 
   const allCategories: LifeLogCategory[] = useMemo(() => {
     return [...LIFE_LOG_CATEGORIES, ...(state.settings.customLifeLogCategories ?? [])];

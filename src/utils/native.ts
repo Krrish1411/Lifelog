@@ -293,15 +293,15 @@ export async function initNotificationChannels(): Promise<void> {
           {
             id: "TIMER_RUNNING_ACTIONS",
             actions: [
-              { id: "action_pause", title: "⏸️ Pause" },
-              { id: "action_stop", title: "⏹️ Stop", destructive: true },
+              { id: "action_pause", title: "⏸ Pause" },
+              { id: "action_stop", title: "⏹ Stop", destructive: true },
             ],
           },
           {
             id: "TIMER_PAUSED_ACTIONS",
             actions: [
-              { id: "action_resume", title: "▶️ Resume" },
-              { id: "action_stop", title: "⏹️ Stop", destructive: true },
+              { id: "action_resume", title: "▶ Resume" },
+              { id: "action_stop", title: "⏹ Stop", destructive: true },
             ],
           },
         ],
@@ -376,7 +376,7 @@ export async function scheduleTaskDueNotification(
             title: customTitle ?? (leadMinutes > 0 ? `Task Due in ${leadMinutes}m ⏱️` : "Task Due Now ⏱️"),
             body: task.title,
             schedule: { at: new Date(targetTime), allowWhileIdle: true },
-            channelId: "task-channel-os",
+            channelId: "task-channel-v3",
           },
         ],
       });
@@ -414,7 +414,7 @@ export async function testNotificationAlert(): Promise<boolean> {
             title: "🔔 LifeLog Test Alarm",
             body: "Your notifications and alarm channel are working properly!",
             schedule: { at: new Date(Date.now() + 1000), allowWhileIdle: true },
-            channelId: "task-channel-os",
+            channelId: "task-channel-v3",
           },
         ],
       });
@@ -509,41 +509,77 @@ export async function sendNativeTestNotification(): Promise<void> {
 const RUNNING_TIMER_NOTIF_ID = 88888;
 
 /**
- * Show a persistent/running timer status notification on the Android lock screen and shade.
- * Uses focus-running-channel-v3 with VISIBILITY_PUBLIC so it displays in full on lock screens.
+ * Show an aesthetic, persistent running timer status notification on the Android lock screen and shade.
+ * Uses focus-running-channel-v3 with VISIBILITY_PUBLIC so it displays in full on lock screens,
+ * even when OS "Hide sensitive notification content" is enabled.
+ * Dispatched with 0ms latency directly via notificationManager.notify without AlarmManager delays.
  */
 export async function showRunningTimerNotification(
   taskTitle: string,
   mode: string,
   remainingSeconds?: number,
-  isPaused?: boolean
+  isPaused?: boolean,
+  totalSeconds?: number
 ): Promise<void> {
   if (!isNativeMobile) return;
   try {
-    const modeLabel = mode === "break" ? "☕ Break" : "🎯 Focus";
+    const isBreak = mode === "break";
+    const modeLabel = isBreak ? "Break" : "Focus";
     let timeStr = "";
+    let progressPercent: number | null = null;
+
     if (remainingSeconds !== undefined) {
       const mins = Math.floor(remainingSeconds / 60);
       const secs = remainingSeconds % 60;
       timeStr = `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+
+      if (totalSeconds && totalSeconds > 0) {
+        const elapsed = Math.max(0, totalSeconds - remainingSeconds);
+        progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalSeconds) * 100)));
+      }
     }
 
-    const title = isPaused
-      ? `⏸️ Paused${timeStr ? ` (${timeStr})` : ""}: ${taskTitle || "Focus Session"}`
-      : `🎯 ${modeLabel}${timeStr ? ` · ${timeStr}` : ""}: ${taskTitle || "Deep Work"}`;
+    // Build aesthetic text progress bar: [██████░░░░] 60%
+    let progressBar = "";
+    if (progressPercent !== null) {
+      const filled = Math.round(progressPercent / 10);
+      progressBar = `[${"█".repeat(filled)}${"░".repeat(10 - filled)}] ${progressPercent}%`;
+    }
 
-    const body = isPaused
-      ? `Timer is paused${timeStr ? ` at ${timeStr}` : ""}. Tap or use buttons below to resume.`
-      : `${modeLabel} in progress${timeStr ? ` (${timeStr} remaining)` : ""}. Tap to open LifeLog.`;
+    // Modern task title header
+    const displayTask = taskTitle.trim() || (isBreak ? "Rest & Recharge" : "Deep Work");
+    const title = isPaused ? `⏸️ Paused: ${displayTask}` : `${isBreak ? "☕" : "🎯"} ${displayTask}`;
 
+    // Modern body formatting
+    let body = "";
+    if (isPaused) {
+      body = `Timer paused at ${timeStr || "0:00"} · Tap or use controls below to resume`;
+    } else if (progressBar) {
+      body = `${progressBar} · ${timeStr} left`;
+    } else if (timeStr) {
+      body = `${timeStr} remaining · Stay in flow`;
+    } else {
+      body = `${modeLabel} in progress · Tap to open LifeLog`;
+    }
+
+    const largeBody = [
+      `Task: ${displayTask}`,
+      `Status: ${isPaused ? "Paused" : isBreak ? "Break Time" : "Deep Focus Active"}`,
+      timeStr ? `Time: ${timeStr} ${remainingSeconds !== undefined ? "left" : "elapsed"}` : null,
+      progressBar ? `Progress: ${progressBar}` : null,
+    ]
+      .filter(Boolean)
+      .join("\n");
+
+    // Immediate 0ms dispatch (no schedule property ensures instantaneous notificationManager.notify)
     await LocalNotifications.schedule({
       notifications: [
         {
           id: RUNNING_TIMER_NOTIF_ID,
           title,
           body,
+          largeBody,
           summaryText: timeStr ? `${timeStr} · ${modeLabel}` : modeLabel,
-          schedule: { at: new Date(Date.now() + 50) },
           channelId: "focus-running-channel-v3",
           ongoing: !isPaused,
           autoCancel: false,
@@ -603,9 +639,17 @@ export function initNotificationActionListener(handlers: {
  * Register App State Change listener so when app is minimized,
  * if a timer is running, a running notification is posted to the Android tray,
  * and removed when returning to the app.
+ * Uses 10s intervals in the background to maximize battery conservation and minimize CPU usage.
  */
 export function initRunningTimerTrayListener(
-  getActiveTimer: () => { running: boolean; taskTitle: string; mode: string; remainingSec?: number; isPaused?: boolean } | null
+  getActiveTimer: () => {
+    running: boolean;
+    taskTitle: string;
+    mode: string;
+    remainingSec?: number;
+    totalSec?: number;
+    isPaused?: boolean;
+  } | null
 ): () => void {
   if (!isNativeMobile) return () => {};
 
@@ -613,11 +657,17 @@ export function initRunningTimerTrayListener(
 
   const handle = CapApp.addListener("appStateChange", (state) => {
     if (!state.isActive) {
-      // App was minimized or backgrounded: show immediately and tick every 5s
+      // App minimized or backgrounded: show immediately (0ms) and tick every 10s for battery conservation
       const updateNotif = () => {
         const timer = getActiveTimer();
         if (timer && timer.running) {
-          showRunningTimerNotification(timer.taskTitle, timer.mode, timer.remainingSec, timer.isPaused);
+          showRunningTimerNotification(
+            timer.taskTitle,
+            timer.mode,
+            timer.remainingSec,
+            timer.isPaused,
+            timer.totalSec
+          );
         } else {
           dismissRunningTimerNotification();
           if (intervalId) {
@@ -629,7 +679,7 @@ export function initRunningTimerTrayListener(
 
       updateNotif();
       if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(updateNotif, 5000);
+      intervalId = setInterval(updateNotif, 10000);
     } else {
       // App brought back to foreground: clear ticker and dismiss running shade notification
       if (intervalId) {

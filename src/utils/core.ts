@@ -462,6 +462,43 @@ export function sessionSeconds(s: Session, now = Date.now()): number {
   }
   return Math.max(0, Math.floor(ms / 1000));
 }
+
+/**
+ * Extracts only active, unpaused working time intervals for a session.
+ * Used to distribute focus time accurately across 24h hourly buckets without inflating pauses.
+ */
+export function getSessionActiveIntervals(s: Session, now = Date.now()): Array<{ start: number; end: number }> {
+  const sessionEnd = s.endedAt ?? now;
+  if (!s.startedAt || sessionEnd <= s.startedAt) return [];
+
+  if (!s.pauses || s.pauses.length === 0) {
+    return [{ start: s.startedAt, end: sessionEnd }];
+  }
+
+  const sortedPauses = [...s.pauses].sort((a, b) => a.at - b.at);
+  const intervals: Array<{ start: number; end: number }> = [];
+  let currentStart = s.startedAt;
+
+  for (const p of sortedPauses) {
+    if (p.at > currentStart) {
+      intervals.push({ start: currentStart, end: Math.min(p.at, sessionEnd) });
+    }
+    if (p.resumeAt) {
+      currentStart = Math.max(currentStart, p.resumeAt);
+    } else {
+      // Still paused up to sessionEnd
+      currentStart = sessionEnd;
+      break;
+    }
+  }
+
+  if (currentStart < sessionEnd) {
+    intervals.push({ start: currentStart, end: sessionEnd });
+  }
+
+  return intervals.filter((iv) => iv.end > iv.start);
+}
+
 export function fmtHMS(totalSec: number): string {
   const h = Math.floor(totalSec / 3600);
   const m = Math.floor((totalSec % 3600) / 60);

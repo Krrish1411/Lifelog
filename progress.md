@@ -487,7 +487,7 @@ This document provides a complete, authoritative, and chronological record of th
   - **Public Lockscreen Visibility**: Created new notification channels `focus-running-channel-v3` and `focus-alarm-channel-v3` with explicit `visibility: 1` (`Notification.VISIBILITY_PUBLIC`), ensuring Android lock screens render the notification regardless of the device OS setting *"Don't show sensitive notifications on lock screen"*.
   - **Dynamic Title & Time Formatting**: Replaced generic static text with dynamic format `🎯 Focus · MM:SS: <Task Name>` (or `⏸️ Paused (MM:SS): <Task Name>`), matching notification shade and lock screen visibility.
   - **Interactive Action Buttons**: Configured `TIMER_RUNNING_ACTIONS` (`action_pause`, `action_stop`) and `TIMER_PAUSED_ACTIONS` (`action_resume`, `action_stop`) with direct intent listeners in `Shell.tsx` allowing 1-tap pause, resume, and cancellation from lockscreen and shade without opening the app.
-  - **Background Ticking Engine**: Configured 5-second interval heartbeat in `initRunningTimerTrayListener` keeping the notification countdown accurate while the phone screen is locked.
+  - **Background Ticking Engine**: Configured periodic interval heartbeat in `initRunningTimerTrayListener` keeping the notification countdown accurate while the phone screen is locked.
 - **Linux / Desktop Window Restoration & System Tray Indicator (`electron/main.cjs`)**:
   - **Single Instance Lock**: Added `app.requestSingleInstanceLock()` and `app.on('second-instance')` with `restoreAndFocusApp()`, so clicking the LifeLog desktop launcher icon or running `lifelog` while a timer or session is running instantly restores, un-minimizes, and focuses the existing window.
   - **System Tray App Indicator & GNOME AppIndicator Support**: Cached tray icon to `userData/tray-icon.png` so GNOME's AppIndicator extension can read the icon from physical disk over D-Bus outside `.asar`. Added fallback creation and quick action context menu.
@@ -495,4 +495,29 @@ This document provides a complete, authoritative, and chronological record of th
 - **Tag-Only GitHub Actions Triggers (`.github/workflows/build-apk.yml`, `.github/workflows/build-electron.yml`, `.github/workflows/deploy.yml`)**:
   - Removed all `branches: [ "main" ]` triggers across all workflows.
   - Restricted push execution strictly to git release tags (`tags: [ "v*" ]`) and manual `workflow_dispatch`, ensuring standard git pushes to `main` branch never trigger CI/CD builds or runner consumption.
+
+### K. v1.1.6 — Rhythm of Time Accuracy, Universal Markdown Top-Row Shortcuts, Stealth Popout, and Instant Android Notifications
+- **Accurate Rhythm of Time & Active Hour Slicing (`src/utils/core.ts`, `src/views/Reports.tsx`)**:
+  - Developed `getSessionActiveIntervals(s, now)` in `core.ts` returning exact focus intervals while subtracting all paused time spans.
+  - Refactored `hourBuckets` calculation in `Reports.tsx` to iterate only over unpaused active intervals, eliminating pause time inflation in hourly distribution charts.
+  - Destructured `liveTick` into `useMemo` dependencies across `Reports.tsx`, `Dashboard.tsx`, `DayLog.tsx`, and `Review.tsx`, enabling real-time per-second metric updates during active timers without tab switching.
+- **Universal Markdown Shortcuts & Caret Auto-Placement (`src/views/Notes.tsx`)**:
+  - Enhanced `handleEditorKeyDown` with `e.code` checks (`Digit1`, `Digit2`, `Digit3`, `Digit8`, `Period`) and shifted character handling, restoring <kbd>Ctrl+Shift+1/2/3/8/.</kbd> shortcuts across standard top-row number keyboards.
+  - Enhanced "Write" tab switch to automatically focus the textarea, insert a trailing newline if needed, and place the cursor at the very end of content.
+  - Auto-focused blank notes at position (0, 0) on load.
+- **Resilient Audio Synthesis & Universal Break Offers (`src/utils/audio.ts`, `src/views/Focus.tsx`, `src/components/TimerPopout.tsx`, `src/components/Shell.tsx`)**:
+  - Wrapped Web AudioContext oscillator synthesis in `withActiveAudioContext` to reliably resume suspended audio contexts before playing cues.
+  - Added toggle sound cues on pause and resume across all timer interfaces.
+  - Added universal break prompts (+5m / +15m) when stopping timers manually across Focus, Popout, and bottom mini-timer bar.
+- **Stealth Desktop Popout & Tray Backgrounding (`electron/main.cjs`)**:
+  - Hidden main window completely (`mainWindow.hide()`) when floating popout opens, excluding it from Alt+Tab window switcher.
+  - Intercepted `mainWindow.on('close')` to hide to the system tray (`mainWindow.hide()`) and trim V8 cache/RAM instead of terminating.
+  - Added `app.on('before-quit')` ensuring clean process shutdown when Quit is selected from tray.
+- **Instant Android Lock Screen Notifications & Battery Conservation (`scripts/patch-local-notifications.js`, `android/app/src/main/res/drawable/ic_stat_lifelog.xml`, `capacitor.config.ts`, `src/utils/native.ts`, `src/components/Shell.tsx`)**:
+  - Created automated postinstall patcher setting `NotificationCompat.VISIBILITY_PUBLIC` in `@capacitor/local-notifications`, bypassing Android OS "Hide sensitive content" restriction on lock screens.
+  - Created monochrome vector status bar icon `ic_stat_lifelog.xml` and configured `capacitor.config.ts` to prevent white square notification icons.
+  - Modernized notification formatting with task title header, aesthetic text progress bar `[██████░░░░] 60%`, and clean action buttons (`⏸ Pause`, `▶ Resume`, `⏹ Stop`).
+  - Removed artificial schedule delay in `showRunningTimerNotification` for instant 0ms delivery.
+  - Optimized background ticker interval to 10 seconds for battery conservation, while maintaining instant 0ms updates on button taps.
+
 

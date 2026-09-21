@@ -4,7 +4,7 @@ import { useApp } from "../store";
 import type { Session } from "../types";
 import { fmtHMS, sessionSeconds } from "../utils/core";
 import { triggerHaptic } from "../utils/native";
-import { playTimerFinishSound, playTimerStopSound, playTimerStartSound } from "../utils/audio";
+import { playTimerFinishSound, playTimerStopSound, playTimerStartSound, playTimerToggleSound } from "../utils/audio";
 import { useApplyTheme } from "../utils/useApplyTheme";
 import { Btn, cn } from "./ui";
 
@@ -12,7 +12,7 @@ export function TimerPopout() {
   const { state, set, toast } = useApp();
   const [, force] = useState(0);
   const finishedRef = useRef<string | null>(null);
-  const [completedOffer, setCompletedOffer] = useState<{ mode: string; plannedMin: number | null } | null>(null);
+  const [completedOffer, setCompletedOffer] = useState<{ mode: string; plannedMin?: number | null; title?: string } | null>(null);
 
   // Apply user theme, tokens, fonts, and dark/light modes
   useApplyTheme(state.settings);
@@ -72,6 +72,8 @@ export function TimerPopout() {
 
   const togglePause = () => {
     if (!running) return;
+    playTimerToggleSound(openPause ? false : true);
+    triggerHaptic("light");
     const ts = Date.now();
     set((s) => ({
       ...s,
@@ -97,6 +99,8 @@ export function TimerPopout() {
     playTimerStopSound();
     triggerHaptic("medium");
     const ts = Date.now();
+    const stoppedTaskTitle = task?.title || (running.mode === "break" ? "Break" : "Focus Session");
+    const stoppedMode = running.mode;
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
@@ -112,6 +116,7 @@ export function TimerPopout() {
       ),
     }));
     toast("Timer stopped", "ok");
+    setCompletedOffer({ title: stoppedTaskTitle, mode: stoppedMode });
   };
 
   const extend = (min: number) => {
@@ -306,7 +311,11 @@ export function TimerPopout() {
           </div>
           <div className="space-y-0.5">
             <div className="text-[15px] font-bold" style={{ color: "var(--text)" }}>
-              {completedOffer.mode === "break" ? "Break Finished!" : "🎉 Session Complete!"}
+              {completedOffer.mode === "break"
+                ? "Break Finished!"
+                : completedOffer.title
+                ? `🎉 ${completedOffer.title}`
+                : "🎉 Session Complete!"}
             </div>
             <div className="text-xs font-semibold text-[var(--mut)]">
               {completedOffer.mode === "break"

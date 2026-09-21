@@ -211,9 +211,13 @@ export function NotesView() {
       getDeviceKey().then((k) => decryptText(k, note.blob)).then((text) => {
         setDraft((d) => (loadedFor.current === selId ? { ...d, text } : d));
         if (loadedFor.current === selId && isSwitching) {
-          setPreview(text.trim().length === 0 ? "write" : "preview");
+          const isEmpty = text.trim().length === 0;
+          setPreview(isEmpty ? "write" : "preview");
           requestAnimationFrame(() => {
             if (taRef.current) {
+              if (isEmpty) {
+                taRef.current.focus();
+              }
               taRef.current.scrollTop = 0;
               taRef.current.selectionStart = 0;
               taRef.current.selectionEnd = 0;
@@ -533,32 +537,32 @@ export function NotesView() {
       prefix("- [ ] ");
       return;
     }
-    // Ctrl+Shift+1 -> Heading 1
-    if (e.key === "1" && e.shiftKey) {
+    // Ctrl+Shift+1 -> Heading 1 (supports top-row Digit1 and Numpad1)
+    if ((e.key === "1" || e.key === "!" || e.code === "Digit1" || e.code === "Numpad1") && e.shiftKey) {
       e.preventDefault();
       prefix("# ");
       return;
     }
-    // Ctrl+Shift+2 -> Heading 2
-    if (e.key === "2" && e.shiftKey) {
+    // Ctrl+Shift+2 -> Heading 2 (supports top-row Digit2 and Numpad2)
+    if ((e.key === "2" || e.key === "@" || e.code === "Digit2" || e.code === "Numpad2") && e.shiftKey) {
       e.preventDefault();
       prefix("## ");
       return;
     }
-    // Ctrl+Shift+3 -> Heading 3
-    if (e.key === "3" && e.shiftKey) {
+    // Ctrl+Shift+3 -> Heading 3 (supports top-row Digit3 and Numpad3)
+    if ((e.key === "3" || e.key === "#" || e.code === "Digit3" || e.code === "Numpad3") && e.shiftKey) {
       e.preventDefault();
       prefix("### ");
       return;
     }
-    // Ctrl+Shift+8 -> Bullet item
-    if (e.key === "8" && e.shiftKey) {
+    // Ctrl+Shift+8 -> Bullet item (supports top-row Digit8 and Numpad8)
+    if ((e.key === "8" || e.key === "*" || e.code === "Digit8" || e.code === "Numpad8") && e.shiftKey) {
       e.preventDefault();
       prefix("- ");
       return;
     }
     // Ctrl+Shift+. or Ctrl+> -> Blockquote
-    if (e.key === ">" || (e.key === "." && e.shiftKey)) {
+    if (e.key === ">" || ((e.key === "." || e.code === "Period") && e.shiftKey)) {
       e.preventDefault();
       prefix("> ");
       return;
@@ -1059,7 +1063,41 @@ export function NotesView() {
                     { value: "preview", label: "Preview" },
                   ]}
                   value={preview}
-                  onChange={setPreview}
+                  onChange={(next) => {
+                    setPreview(next);
+                    if (next === "write") {
+                      requestAnimationFrame(() => {
+                        if (taRef.current) {
+                          taRef.current.focus();
+                          const val = taRef.current.value;
+                          if (!val || val.trim().length === 0) {
+                            taRef.current.selectionStart = 0;
+                            taRef.current.selectionEnd = 0;
+                            taRef.current.scrollTop = 0;
+                          } else {
+                            const needsNewline = !val.endsWith("\n");
+                            if (needsNewline) {
+                              setDraft((d) => ({ ...d, text: d.text + "\n" }));
+                              dirty.current = true;
+                              setTimeout(() => {
+                                if (taRef.current) {
+                                  const len = taRef.current.value.length;
+                                  taRef.current.selectionStart = len;
+                                  taRef.current.selectionEnd = len;
+                                  taRef.current.scrollTop = taRef.current.scrollHeight;
+                                }
+                              }, 15);
+                            } else {
+                              const len = val.length;
+                              taRef.current.selectionStart = len;
+                              taRef.current.selectionEnd = len;
+                              taRef.current.scrollTop = taRef.current.scrollHeight;
+                            }
+                          }
+                        }
+                      });
+                    }
+                  }}
                 />
 
                 <button

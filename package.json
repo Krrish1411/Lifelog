@@ -1,7 +1,7 @@
 {
   "name": "lifelog",
   "productName": "LifeLog",
-  "version": "1.1.5",
+  "version": "1.1.6",
   "description": "LifeLog Sovereign Productivity Operating System",
   "author": {
     "name": "Krrish1411",
@@ -26,7 +26,8 @@
     "electron:build:win": "vite build && electron-builder --win",
     "electron:build:mac": "vite build && electron-builder --mac",
     "electron:build:all": "vite build && electron-builder -mwl",
-    "deploy:web": "bash scripts/deploy-release-web.sh"
+    "deploy:web": "bash scripts/deploy-release-web.sh",
+    "postinstall": "node scripts/patch-local-notifications.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.1",

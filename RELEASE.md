@@ -4,6 +4,32 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.6 — Rhythm of Time Accuracy, Universal Markdown Top-Row Shortcuts, Stealth Popout & Instant Android Notifications (2026-09-21)
+
+### 🕒 1. Accurate Rhythm of Time & Active Hour Slicing
+- **Pause-Exclusion Interval Slicing:** Fixed hourly time-of-day distribution in Reports by introducing `getSessionActiveIntervals(s, now)`. Paused time spans are completely excluded from hourly activity buckets. If a user tracks a 4-hour session with 2 hours of pause, Reports accurately attributes only the 2 genuine active focus hours.
+- **Dynamic Real-Time Live Ticking across All Views:** Connected `liveTick` into `useMemo` dependency arrays across `Reports.tsx`, `Dashboard.tsx`, `DayLog.tsx`, and `Review.tsx`. Focus minutes, today's totals, and charts dynamically tick live every second without requiring view switching.
+
+### ⌨️ 2. Universal Markdown Shortcuts & Smart Caret Placement
+- **Top-Row Number Support:** Resolved shortcut failures on standard keyboards where top-row digits emit shifted characters (<kbd>Ctrl+Shift+1</kbd> -> `!`, <kbd>2</kbd> -> `@`, <kbd>3</kbd> -> `#`, <kbd>8</kbd> -> `*`, <kbd>.</kbd> -> `>`) by matching `e.code` (`Digit1`, `Digit2`, `Digit3`, `Digit8`, `Period`).
+- **Seamless Caret Auto-Placement:** Switching from Preview to Write tab automatically focuses the textarea, inserts a trailing newline if needed, and positions the caret at the very end of content. Opening blank notes automatically focuses the editor at the top.
+
+### 🎵 3. Resilient Audio Synthesis & Universal Break Offers
+- **AudioContext Auto-Resumption:** Introduced `withActiveAudioContext` to reliably resume suspended Web Audio contexts before synthesizing tone cues for pause, resume, and stop across Focus view, floating popout, and the bottom mini-timer bar.
+- **Universal Break Offers on Stop:** Manually stopping any timer universally presents 1-click break offers (+5m / +15m) across all timer interfaces.
+
+### 🖥️ 4. Stealth Desktop Popout & Tray Backgrounding
+- **Alt+Tab Exclusion:** Opening the floating popout completely hides the main window from the desktop window manager and Alt+Tab switcher (`mainWindow.hide()`), keeping the workspace clean.
+- **Close to System Tray:** Closing the main window (`X`) minimizes to the system tray with memory and V8 cache trimming (`trimMemory`), preventing accidental termination while keeping resource usage ultra-low.
+
+### 📱 5. Instant Android Lock Screen Notifications & Battery Conservation
+- **0ms Instant Notification Delivery:** Removed artificial schedule delays, dispatching notifications immediately through `notificationManager.notify()` on start, pause, resume, and stop.
+- **Lock Screen Visibility Bypass:** Patched `@capacitor/local-notifications` to enforce `NotificationCompat.VISIBILITY_PUBLIC`, guaranteeing that focus timers, task titles, and action buttons appear on the lock screen even when Android OS "Hide sensitive notifications" is enabled.
+- **Aesthetic Formatting & Text Progress Bar:** Modern notification presentation displaying task title as the primary header, text progress bar `[██████░░░░] 60%`, clean action buttons (`⏸ Pause`, `▶ Resume`, `⏹ Stop`), and dedicated monochrome status bar vector icon (`ic_stat_lifelog.xml`).
+- **Low-Power Background Heartbeat:** 10-second battery-saving update interval while minimized, with instantaneous 0ms visual updates on interactive button taps.
+
+---
+
 ## 🌟 v1.1.5 — Real-Time Live Ticking, Multi-Pause Branch Timeline, Notes Markdown Shortcuts & Sovereign Encrypted Storage (2026-09-21)
 
 ### ⚡ 1. Dynamic Real-Time Live Ticking Engine

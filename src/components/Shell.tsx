@@ -49,7 +49,7 @@ import {
   todayIso,
   trackedByDay,
 } from "../utils/core";
-import { playTimerChime, playTimerStopSound } from "../utils/audio";
+import { playTimerChime, playTimerStopSound, playTimerToggleSound, playTimerStartSound, playTimerFinishSound } from "../utils/audio";
 import { CUSTOM_FONT_FAMILY } from "../utils/fonts";
 import { toggleThemeModePatch } from "../utils/themes";
 import { useApplyTheme } from "../utils/useApplyTheme";
@@ -76,6 +76,8 @@ import {
   initNotificationActionListener,
   sendDesktopNotification,
   openTimerPopout,
+  showRunningTimerNotification,
+  dismissRunningTimerNotification,
 } from "../utils/native";
 import { Dashboard } from "../views/Dashboard";
 import { TasksView } from "../views/Tasks";
@@ -225,11 +227,13 @@ export function Shell() {
       const remainingSec = sess.plannedMin
         ? Math.max(0, sess.plannedMin * 60 - sessionSeconds(sess))
         : undefined;
+      const totalSec = sess.plannedMin ? sess.plannedMin * 60 : undefined;
       return {
         running: true,
         taskTitle: task?.title ?? "Focus Session",
         mode: sess.mode,
         remainingSec,
+        totalSec,
         isPaused,
       };
     });
@@ -245,6 +249,11 @@ export function Shell() {
         const isPaused = sess.pauses.length > 0 && !sess.pauses[sess.pauses.length - 1].resumeAt;
         if (isPaused) return;
         const ts = Date.now();
+        const task = state.tasks.find((t) => t.id === sess.taskId);
+        const remainingSec = sess.plannedMin
+          ? Math.max(0, sess.plannedMin * 60 - sessionSeconds(sess))
+          : undefined;
+        const totalSec = sess.plannedMin ? sess.plannedMin * 60 : undefined;
         set((s) => ({
           ...s,
           sessions: s.sessions.map((x) =>
@@ -253,6 +262,7 @@ export function Shell() {
               : x
           ),
         }));
+        showRunningTimerNotification(task?.title ?? "Focus Session", sess.mode, remainingSec, true, totalSec);
       },
       onResume: () => {
         const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
@@ -260,6 +270,11 @@ export function Shell() {
         const isPaused = sess.pauses.length > 0 && !sess.pauses[sess.pauses.length - 1].resumeAt;
         if (!isPaused) return;
         const ts = Date.now();
+        const task = state.tasks.find((t) => t.id === sess.taskId);
+        const remainingSec = sess.plannedMin
+          ? Math.max(0, sess.plannedMin * 60 - sessionSeconds(sess))
+          : undefined;
+        const totalSec = sess.plannedMin ? sess.plannedMin * 60 : undefined;
         set((s) => ({
           ...s,
           sessions: s.sessions.map((x) =>
@@ -272,6 +287,7 @@ export function Shell() {
               : x
           ),
         }));
+        showRunningTimerNotification(task?.title ?? "Focus Session", sess.mode, remainingSec, false, totalSec);
       },
       onStop: () => {
         const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
@@ -292,10 +308,11 @@ export function Shell() {
               : x
           ),
         }));
+        dismissRunningTimerNotification();
       },
     });
     return cleanup;
-  }, [state.sessions]);
+  }, [state.sessions, state.tasks]);
 
   // Sync view with URL hash
   useEffect(() => {
@@ -1560,7 +1577,11 @@ function MiniTimer() {
   const pct = remainingSec !== null ? Math.min(100, (elapsedSec / (running.plannedMin! * 60)) * 100) : null;
 
   const togglePause = () => {
+    playTimerToggleSound(openPause ? false : true);
+    triggerHaptic("light");
     const ts = Date.now();
+    const taskTitle = state.tasks.find((t) => t.id === running.taskId)?.title || "Focus Session";
+    const nextPaused = !openPause;
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) => {
@@ -1576,6 +1597,8 @@ function MiniTimer() {
       }),
     }));
     toast(openPause ? "Resumed" : "Paused — timestamps kept", "ok");
+    const totalSec = running.plannedMin ? running.plannedMin * 60 : undefined;
+    showRunningTimerNotification(taskTitle, running.mode, remainingSec ?? undefined, nextPaused, totalSec);
   };
 
   const stop = () => {
@@ -1597,6 +1620,7 @@ function MiniTimer() {
       ),
     }));
     toast(`Stopped — ${fmtDur(Math.max(1, Math.round(elapsedSec / 60)))} saved to your log`, "ok");
+    dismissRunningTimerNotification();
   };
 
   const big = remainingSec !== null ? fmtHMS(remainingSec) : fmtHMS(elapsedSec);

@@ -35,16 +35,33 @@ export function unlockAudioContext(): void {
 }
 
 /**
+ * Helper to ensure AudioContext is fully running before synthesising tones.
+ * Resolves dropped audio in Chromium and Electron when the context was suspended.
+ */
+export function withActiveAudioContext(fn: (ctx: AudioContext) => void): void {
+  const ctx = getAudioContext();
+  if (!ctx) return;
+  if (ctx.state === "suspended") {
+    ctx
+      .resume()
+      .then(() => {
+        try {
+          fn(ctx);
+        } catch {}
+      })
+      .catch(() => {});
+  } else {
+    try {
+      fn(ctx);
+    } catch {}
+  }
+}
+
+/**
  * Inspiring, crisp upward start chime when countdown/Pomodoro begins.
  */
 export function playTimerStartSound(): void {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-
+  withActiveAudioContext((ctx) => {
     const now = ctx.currentTime;
     const notes = [698.46, 880.0]; // F5 -> A5
     notes.forEach((freq, idx) => {
@@ -67,9 +84,7 @@ export function playTimerStartSound(): void {
       osc.start(startTime);
       osc.stop(startTime + duration);
     });
-  } catch {
-    // Audio autoplay restrictions
-  }
+  });
 }
 
 /**
@@ -77,13 +92,7 @@ export function playTimerStartSound(): void {
  * Boosted ~2.5x louder with smooth harmonic envelope without clipping.
  */
 export function playTimerFinishSound(type: "complete" | "break" = "complete"): void {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-
+  withActiveAudioContext((ctx) => {
     const now = ctx.currentTime;
     const freqs = type === "complete" ? [528.0, 792.0, 1056.0] : [440.0, 659.25, 880.0];
 
@@ -107,9 +116,7 @@ export function playTimerFinishSound(type: "complete" | "break" = "complete"): v
       osc.start(startTime);
       osc.stop(startTime + duration);
     });
-  } catch {
-    // Audio autoplay restrictions
-  }
+  });
 }
 
 export function playTimerChime(type: "complete" | "break" = "complete"): void {
@@ -248,13 +255,7 @@ export function playHabitChime(): void {
  * Subtle, tactile acoustic click when toggling timer pause/resume.
  */
 export function playTimerToggleSound(isPausing = false): void {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-
+  withActiveAudioContext((ctx) => {
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -277,22 +278,14 @@ export function playTimerToggleSound(isPausing = false): void {
 
     osc.start(now);
     osc.stop(now + 0.06);
-  } catch {
-    // Muted or restricted
-  }
+  });
 }
 
 /**
  * Soothing, downward acoustic resolving chime when clicking Stop on any timer.
  */
 export function playTimerStopSound(): void {
-  try {
-    const ctx = getAudioContext();
-    if (!ctx) return;
-    if (ctx.state === "suspended") {
-      ctx.resume().catch(() => {});
-    }
-
+  withActiveAudioContext((ctx) => {
     const now = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
@@ -310,9 +303,7 @@ export function playTimerStopSound(): void {
 
     osc.start(now);
     osc.stop(now + 0.32);
-  } catch {
-    // Audio autoplay restrictions
-  }
+  });
 }
 
 /**

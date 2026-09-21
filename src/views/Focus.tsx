@@ -22,6 +22,7 @@ import {
   playTimerFinishSound,
   playTimerStartSound,
   playTimerStopSound,
+  playTimerToggleSound,
   unlockAudioContext,
 } from "../utils/audio";
 import { Btn, EmptyState, SearchInput, Seg, cn } from "../components/ui";
@@ -183,6 +184,7 @@ export function FocusView() {
     } else {
       playTimerStopSound();
       toast(`Stopped — ${fmtDur(Math.max(1, mins))} saved to the log`, "warn");
+      setBreakOffer(true);
     }
     finishing.current = false;
   };
@@ -303,6 +305,7 @@ export function FocusView() {
 
   const pause = () => {
     if (!live || paused) return;
+    playTimerToggleSound(true);
     cancelTimerEndNotification();
     triggerHaptic("light");
     const ts = Date.now();
@@ -317,6 +320,7 @@ export function FocusView() {
 
   const resume = () => {
     if (!live || !paused) return;
+    playTimerToggleSound(false);
     if (live.plannedMin) {
       const remainingMs = Math.max(0, live.plannedMin * 60 * 1000 - elapsedMs);
       if (remainingMs > 0) {
