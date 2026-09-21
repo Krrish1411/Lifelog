@@ -41,8 +41,31 @@ jobs:
       - name: Build Web Production Assets
         run: npm run build
 
+      - name: Cache electron-builder binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/electron
+            ~/.cache/electron-builder
+          key: ${{ runner.os }}-electron-builder-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-builder-
+
       - name: Build Linux Desktop Packages
-        run: npx electron-builder --linux --publish never
+        run: |
+          for i in 1 2 3; do
+            echo "==> Packaging Linux desktop applications (attempt $i of 3)..."
+            if npx electron-builder --linux --publish never; then
+              echo "==> Linux packages built successfully!"
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "==> Error: Packaging Linux failed after 3 attempts."
+              exit 1
+            fi
+            echo "==> Attempt $i failed (likely transient 504 Gateway Time-out from external binary host). Waiting 20s before retry..."
+            sleep 20
+          done
 
       - name: Upload Linux Artifacts
         uses: actions/upload-artifact@v4
@@ -96,8 +119,32 @@ jobs:
       - name: Build Web Production Assets
         run: npm run build
 
+      - name: Cache electron-builder binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~\AppData\Local\electron\Cache
+            ~\AppData\Local\electron-builder\Cache
+          key: ${{ runner.os }}-electron-builder-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-builder-
+
       - name: Build Windows Desktop Packages
-        run: npx electron-builder --win --publish never
+        shell: bash
+        run: |
+          for i in 1 2 3; do
+            echo "==> Packaging Windows desktop applications (attempt $i of 3)..."
+            if npx electron-builder --win --publish never; then
+              echo "==> Windows packages built successfully!"
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "==> Error: Packaging Windows failed after 3 attempts."
+              exit 1
+            fi
+            echo "==> Attempt $i failed. Retrying in 20 seconds..."
+            sleep 20
+          done
 
       - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
@@ -149,8 +196,31 @@ jobs:
       - name: Build Web Production Assets
         run: npm run build
 
+      - name: Cache electron-builder binaries
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/Library/Caches/electron
+            ~/Library/Caches/electron-builder
+          key: ${{ runner.os }}-electron-builder-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-electron-builder-
+
       - name: Build macOS Desktop Packages
-        run: npx electron-builder --mac --publish never -c.mac.identity=null
+        run: |
+          for i in 1 2 3; do
+            echo "==> Packaging macOS desktop applications (attempt $i of 3)..."
+            if npx electron-builder --mac --publish never -c.mac.identity=null; then
+              echo "==> macOS packages built successfully!"
+              break
+            fi
+            if [ "$i" -eq 3 ]; then
+              echo "==> Error: Packaging macOS failed after 3 attempts."
+              exit 1
+            fi
+            echo "==> Attempt $i failed. Retrying in 20 seconds..."
+            sleep 20
+          done
 
       - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
