@@ -1,14 +1,16 @@
 {
-  "version": "1.1.6",
-  "releaseDate": "2026-09-21",
+  "version": "1.1.7",
+  "releaseDate": "2026-09-22",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "🕒 Accurate Rhythm of Time Analytics: Replaced raw start/end slicing with exact unpaused focus intervals (getSessionActiveIntervals), eliminating pause time inflation in Reports",
-    "⚡ Real-Time Live Dashboard & Report Ticking: Dynamic per-second session calculation (liveTick) updates Dashboard focus minutes, today's totals, Day Log, Review, and Reports in real time without view switching",
-    "⌨️ Universal Markdown Top-Row Shortcuts & Smart Caret: Full support for top-row number keys (Ctrl+Shift+1/2/3/8/.), auto-focus on 'Write' toggle, and seamless caret positioning at end of document or top of blank notes",
-    "🎵 Robust Audio Feedback & Universal Break Offers: Web AudioContext auto-resumption ensures reliable audio cues on pause, resume, and stop across Focus, Popout, and bottom bar, with 1-click break offers (+5m / +15m) on manual stops",
-    "🖥️ Stealth Popout & Low-Resource System Tray: Floating popout completely hides the main window from the Alt+Tab task switcher; closing (X) cleanly minimizes to system tray with memory and V8 cache trimming",
-    "📱 Instant Android Lock Screen Notifications & Battery Conservation: 0ms immediate notification dispatch, VISIBILITY_PUBLIC bypass for OS 'hide sensitive content' setting, aesthetic text progress bar [██████░░░░] 60%, crisp monochrome status icon (ic_stat_lifelog), and battery-conserving background ticker"
+    "📱 Android Notification Silence & Polish: Eliminated sound/vibrate loops via native Kotlin silent channel guard; restored native OS progress bar and Flow chronometer count-up; fixed ongoing sticky notification (unswipeable)",
+    "🎯 Mandatory Task Binding: No focus session (Pomodoro, Countdown, Flow) can start without choosing a task in both Focus view and desktop Timer Popout",
+    "✨ Clean UI & Dedicated Session Editor: Removed distracting link/change chips from Day Log and Focus; added compact edit modal in Today's Focus Log and Calendar to adjust duration and start/end times",
+    "📅 Google Calendar Side-by-Side Columns: Overlapping tasks cleanly split side-by-side (| Task 1 | Task 2 |) across the full width of the day column",
+    "⚡ Focus Sessions & Pauses on Calendar Timeline: Automatically blocks completed focus sessions with duration and pause counts on the calendar timeline, seamlessly updating pre-scheduled tasks without duplication",
+    "🔀 Schedule Conflict Alignment Modal: Prompts user when an unscheduled focus session overlaps a planned task with 1-click options: Push forward, Move to Unscheduled Tray, Keep both, or Custom time",
+    "⏱️ Uncapped Focus Overtime Tracking: Sessions never freeze at target time; live overtime counter (+MM:SS) tracks true elapsed time (e.g. 50m + 15m = 1h 10m+) with dedicated 'Finish' button",
+    "📐 Accurate Duration Drag & 15m Resizing: Dragging from tray or grid previews the exact task duration height (no 1h bug); bottom-edge handles allow 15-minute duration resizing"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Windows-Setup.exe",
@@ -21,4 +23,3 @@
     "android": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Android.apk"
   }
 }
-

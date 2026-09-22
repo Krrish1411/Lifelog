@@ -230,11 +230,13 @@ export function Shell() {
       const totalSec = sess.plannedMin ? sess.plannedMin * 60 : undefined;
       return {
         running: true,
-        taskTitle: sess.mode === "break" ? "Break" : task?.title ?? "Quick Focus",
+        taskTitle: sess.mode === "break" ? "Break" : task?.title ?? "Focus Session",
         mode: sess.mode,
         remainingSec,
         totalSec,
         isPaused,
+        startedAt: sess.startedAt,
+        elapsedSec: sessionSeconds(sess),
       };
     });
     return cleanup;
@@ -263,11 +265,13 @@ export function Shell() {
           ),
         }));
         showRunningTimerNotification(
-          sess.mode === "break" ? "Break" : task?.title ?? "Quick Focus",
+          sess.mode === "break" ? "Break" : task?.title ?? "Focus Session",
           sess.mode,
           remainingSec,
           true,
-          totalSec
+          totalSec,
+          sess.startedAt,
+          sessionSeconds(sess)
         );
       },
       onResume: () => {
@@ -283,22 +287,24 @@ export function Shell() {
         const totalSec = sess.plannedMin ? sess.plannedMin * 60 : undefined;
         set((s) => ({
           ...s,
-          sessions: s.sessions.map((x) =>
-            x.id === sess.id
-              ? {
-                  ...x,
-                  updatedAt: ts,
-                  pauses: x.pauses.map((p, i) => (i === x.pauses.length - 1 ? { ...p, resumeAt: ts } : p)),
-                }
-              : x
-          ),
+          sessions: s.sessions.map((x) => {
+            if (x.id !== sess.id) return x;
+            const pauses = [...x.pauses];
+            const last = pauses[pauses.length - 1];
+            if (last && !last.resumeAt) {
+              pauses[pauses.length - 1] = { ...last, resumeAt: ts };
+            }
+            return { ...x, updatedAt: ts, pauses };
+          }),
         }));
         showRunningTimerNotification(
-          sess.mode === "break" ? "Break" : task?.title ?? "Quick Focus",
+          sess.mode === "break" ? "Break" : task?.title ?? "Focus Session",
           sess.mode,
           remainingSec,
           false,
-          totalSec
+          totalSec,
+          sess.startedAt,
+          sessionSeconds(sess)
         );
       },
       onStop: () => {

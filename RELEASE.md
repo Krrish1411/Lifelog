@@ -4,6 +4,39 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.7 — Android Notification Silence & Polish, Mandatory Task Binding, Google Calendar Side-by-Side & Schedule Alignment (2026-09-22)
+
+### 📱 1. Android Notification Silence & Polish
+- **Eliminated Sound & Vibrate Loops:** Injected `/* LifeLog Silent Channel Guard */` into Kotlin `LocalNotificationManager.kt` via `scripts/patch-local-notifications.js` to enforce `mBuilder.setSound(null)`, `mBuilder.setDefaults(0)`, `mBuilder.setVibrate(null)`, `mBuilder.setNotificationSilent()`, and `mBuilder.setOnlyAlertOnce(true)`. Migrated running timers to `focus-running-silent-v5`.
+- **Restored Native Android Progress Bar:** Omitted `NotificationCompat.BigTextStyle` from running notifications to prevent Android from obscuring the native OS progress bar (`mBuilder.setProgress(100, pct, false)`).
+- **Native Chronometer Count-Up for Flow:** Flow focus sessions natively count up in the notification shade using `setChronometerCountDown(false)`.
+- **Fixed Sticky Notification (Unswipeable):** Added `FLAG_ONGOING_EVENT` and `FLAG_NO_CLEAR` flags.
+- **Clean Aesthetic Typography:** Removed duplicate text ("Focus - AFM \n AFM \n status deep focus active") in favor of concise task titles and modern progress text (`AFM`, `24:15 left · [██████░░░░] 60%`).
+
+### 🎯 2. Mandatory Task Binding & UI Cleanup
+- **Mandatory Task Selection:** Focus sessions across Pomodoro, Countdown, and Flow cannot be started without selecting an assigned task in both Focus view and the desktop Timer Popout.
+- **Removed Cluttering Link / Change Chips:** Completely stripped distracting "+ Link Task" and "Change" chips from Day Log, Reports, and Focus stage. Day Log remains a clean, read-only audit log.
+- **Dedicated Session Editor (`EditSessionModal`):** Mounted exclusively via a small `<Pencil size={11} />` edit button on past sessions in Today's Focus Log and clickable focus blocks in Calendar, allowing task reassignment, duration adjustments (with 15m/25m/45m/60m chips), and start/end time edits.
+
+### 📅 3. Google Calendar Side-by-Side Columns & Dynamic Timeline Sync
+- **Side-by-Side Overlapping Columns:** Implemented `layoutOverlappingBlocks` partitioning intersecting tasks into parallel columns (`| Task 1 | Task 2 |`) across the full width of each day column.
+- **Dynamic Focus Sessions & Pauses on Calendar:** Executed focus sessions appear directly on the calendar timeline with pause counts, duration, and done states, deduplicating against any pre-scheduled block for the same task.
+- **Accurate Drag Previews & 15m Resizing:** Dragging 2-hour or 30-minute tasks from the tray or grid previews the exact duration height (fixing the 1-hour placeholder). Added interactive bottom-edge handles for 15-minute duration resizing.
+
+### 🔀 4. Schedule Conflict & Alignment Modal
+- **Automatic Alignment Dialog:** When an unscheduled focus session overlaps a pre-scheduled task slot, `ScheduleConflictModal` provides 1-click resolution:
+  1. *Push conflicting task forward* (moves it past the focus session).
+  2. *Move conflicting task to Unscheduled Tray* (leaves time free).
+  3. *Keep both in calendar* (displays both side-by-side as `| Task 1 | Task 2 |`).
+  4. *Pick custom reschedule time*.
+  5. *Dismiss / Don't change schedule*.
+
+### ⏱️ 5. Uncapped Focus Duration & True Overtime Tracking
+- **Eliminated Premature Session Truncation:** Re-engineered the session watchdog so work sessions (`mode !== "break"`) are never automatically frozen or truncated to the planned time.
+- **Real-Time Overtime Counter (+MM:SS):** Added glowing overtime indicator and dedicated "Finish" button across the full-screen stage and Timer Popout. Adding 15 minutes to a 50m session and working 1h 10m+ accurately records the full 1h 10m+ in reports and Day Log.
+
+---
+
 ## 🌟 v1.1.6 — Rhythm of Time Accuracy, Universal Markdown Top-Row Shortcuts, Stealth Popout & Instant Android Notifications (2026-09-21)
 
 ### 🕒 1. Accurate Rhythm of Time & Active Hour Slicing

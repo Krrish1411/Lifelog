@@ -40,7 +40,6 @@ import {
 } from "../utils/core";
 import { requestDailyNote } from "../utils/nav";
 import { Btn, EmptyState, Modal, cn } from "../components/ui";
-import { AssignTaskModal } from "../components/AssignTaskModal";
 import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID, type LifeLogCategory, type Session } from "../types";
 
 export function DayLogView() {
@@ -52,7 +51,6 @@ export function DayLogView() {
   const [notePreview, setNotePreview] = useState<string | null>(null);
   const [standupModalOpen, setStandupModalOpen] = useState(false);
   const [copiedStandup, setCopiedStandup] = useState(false);
-  const [assigningSession, setAssigningSession] = useState<Session | null>(null);
 
   const week = useMemo(() => listDates(weekStart, addDaysIso(weekStart, 6)), [weekStart]);
 
@@ -503,14 +501,6 @@ ${lifeHabitSection}
                                   #{p.name}
                                 </span>
                               )}
-                              <button
-                                type="button"
-                                onClick={() => setAssigningSession(s)}
-                                className="chip !py-0 !px-1.5 text-[9.5px] text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0 ml-1 font-semibold"
-                                title={t ? "Reassign task" : "Link a task to this session"}
-                              >
-                                {t ? "Change" : "+ Link Task"}
-                              </button>
                             </>
                           )}
                         </div>
@@ -700,23 +690,6 @@ ${lifeHabitSection}
           </div>
         </div>
       </Modal>
-
-      {assigningSession && (
-        <AssignTaskModal
-          session={assigningSession}
-          tasks={state.tasks}
-          projects={state.projects}
-          onAssign={(sessionId, taskId, subtaskId) => {
-            set((st) => ({
-              ...st,
-              sessions: st.sessions.map((x) =>
-                x.id === sessionId ? { ...x, taskId, subtaskId: subtaskId ?? null, updatedAt: Date.now() } : x
-              ),
-            }));
-          }}
-          onClose={() => setAssigningSession(null)}
-        />
-      )}
     </div>
   );
 }

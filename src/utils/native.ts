@@ -254,6 +254,8 @@ export async function initNotificationChannels(): Promise<void> {
       await LocalNotifications.deleteChannel({ id: "task-reminders-v2" });
       await LocalNotifications.deleteChannel({ id: "focus-channel-os" });
       await LocalNotifications.deleteChannel({ id: "task-channel-os" });
+      await LocalNotifications.deleteChannel({ id: "focus-running-channel-v3" });
+      await LocalNotifications.deleteChannel({ id: "focus-running-channel-v4" });
     } catch {}
 
     // 1. Completion Alarm Channel (Heads-up, vibration, sound, public)
@@ -266,12 +268,12 @@ export async function initNotificationChannels(): Promise<void> {
       vibration: true,
     });
 
-    // 2. Active Running Timer Channel for Shade & Lock Screen (Silent live countdown, public)
+    // 2. 100% Silent Running Timer Channel for Shade & Lock Screen (Zero sound, zero vibration, public)
     await LocalNotifications.createChannel({
-      id: "focus-running-channel-v3",
+      id: "focus-running-silent-v5",
       name: "Active Focus Timer & Status",
-      description: "Shows live countdown, task name, and pause/resume controls on lock screen and notification shade",
-      importance: 3, // Default priority (No sound or vibration on periodic countdown update)
+      description: "Shows live countdown, task name, and pause/resume controls silently on lock screen and notification shade",
+      importance: 2, // Low priority (Zero sound, zero vibration, purely visual)
       visibility: 1, // VISIBILITY_PUBLIC (Guarantees display on lock screen even if sensitive notifications are hidden)
       vibration: false,
     });
@@ -524,12 +526,14 @@ export async function showRunningTimerNotification(
   mode: string,
   remainingSeconds?: number,
   isPaused?: boolean,
-  totalSeconds?: number
+  totalSeconds?: number,
+  startedAt?: number,
+  elapsedSeconds?: number
 ): Promise<void> {
   if (!isNativeMobile) return;
   try {
     const isBreak = mode === "break";
-    const modeLabel = isBreak ? "Break" : "Focus";
+    const isFlow = mode === "flow";
     let timeStr = "";
     let progressPercent: number | null = null;
 
@@ -542,6 +546,10 @@ export async function showRunningTimerNotification(
         const elapsed = Math.max(0, totalSeconds - remainingSeconds);
         progressPercent = Math.min(100, Math.max(0, Math.round((elapsed / totalSeconds) * 100)));
       }
+    } else if (elapsedSeconds !== undefined) {
+      const mins = Math.floor(elapsedSeconds / 60);
+      const secs = elapsedSeconds % 60;
+      timeStr = `${mins}:${secs < 10 ? "0" : ""}${secs}`;
     }
 
     // Build aesthetic text progress bar: [██████░░░░] 60%
@@ -551,56 +559,53 @@ export async function showRunningTimerNotification(
       progressBar = `[${"█".repeat(filled)}${"░".repeat(10 - filled)}] ${progressPercent}%`;
     }
 
-    // Modern task title header without emoji clutter
+    // Clean, modern header without duplicate text
     const displayTask = taskTitle.trim() || (isBreak ? "Break Time" : "Deep Focus");
-    const title = isPaused
-      ? `Paused · ${displayTask}`
-      : isBreak
-      ? `Break · ${displayTask}`
-      : `Focus · ${displayTask}`;
+    const title = isPaused ? `Paused · ${displayTask}` : displayTask;
 
-    // Modern body formatting
+    // Modern body formatting (no robot text)
     let body = "";
     if (isPaused) {
       body = `Paused at ${timeStr || "0:00"} · Tap Resume to continue`;
-    } else if (progressBar && timeStr) {
-      body = `${progressBar} · ${timeStr} left`;
+    } else if (isFlow) {
+      body = `Flow Focus · In the zone`;
     } else if (timeStr) {
-      body = `${timeStr} remaining`;
+      body = progressBar ? `${timeStr} left · ${progressBar}` : `${timeStr} left`;
     } else {
-      body = `${modeLabel} session active`;
+      body = isBreak ? "Rest & Recharge" : "Deep Focus Active";
     }
-
-    const largeBody = [
-      displayTask,
-      isPaused ? "Status: Paused" : isBreak ? "Status: Rest & Recharge" : "Status: Deep Focus Active",
-      timeStr ? `${timeStr} ${remainingSeconds !== undefined ? "remaining" : "elapsed"}` : null,
-      progressBar ? `Progress: ${progressBar}` : null,
-    ]
-      .filter(Boolean)
-      .join("\n");
 
     const extra: any = {};
     if (progressPercent !== null) {
       extra.maxProgress = 100;
       extra.progress = progressPercent;
     }
-    if (!isPaused && remainingSeconds !== undefined) {
-      extra.usesChronometer = true;
-      extra.chronometerBase = Date.now() + remainingSeconds * 1000;
-      extra.chronometerCountDown = true;
+
+    if (!isPaused) {
+      if (remainingSeconds !== undefined) {
+        // Countdown / Pomodoro: count DOWN to 0:00 natively
+        extra.usesChronometer = true;
+        extra.chronometerBase = Date.now() + remainingSeconds * 1000;
+        extra.chronometerCountDown = true;
+      } else if (isFlow) {
+        // Flow mode: count UP from start timestamp natively
+        extra.usesChronometer = true;
+        extra.chronometerBase = startedAt || (Date.now() - (elapsedSeconds || 0) * 1000);
+        extra.chronometerCountDown = false;
+      }
+    } else {
+      extra.usesChronometer = false;
     }
 
-    // Immediate 0ms dispatch (no schedule property ensures instantaneous notificationManager.notify)
+    // Immediate 0ms dispatch to focus-running-silent-v5 channel (no largeBody to preserve system progress bar)
     await LocalNotifications.schedule({
       notifications: [
         {
           id: RUNNING_TIMER_NOTIF_ID,
           title,
           body,
-          largeBody,
-          summaryText: timeStr ? `${timeStr} · ${modeLabel}` : modeLabel,
-          channelId: "focus-running-channel-v3",
+          summaryText: isBreak ? "Break" : "Focus",
+          channelId: "focus-running-silent-v5",
           ongoing: true, // Always sticky across both running and paused states
           autoCancel: false,
           actionTypeId: isPaused ? "TIMER_PAUSED_ACTIONS" : "TIMER_RUNNING_ACTIONS",
@@ -659,8 +664,7 @@ export function initNotificationActionListener(handlers: {
 /**
  * Register App State Change listener so when app is minimized,
  * if a timer is running, a running notification is posted to the Android tray,
- * and removed when returning to the app.
- * Uses 10s intervals in the background to maximize battery conservation and minimize CPU usage.
+ * and updated cleanly.
  */
 export function initRunningTimerTrayListener(
   getActiveTimer: () => {
@@ -670,6 +674,8 @@ export function initRunningTimerTrayListener(
     remainingSec?: number;
     totalSec?: number;
     isPaused?: boolean;
+    startedAt?: number;
+    elapsedSec?: number;
   } | null
 ): () => void {
   if (!isNativeMobile) return () => {};
@@ -687,7 +693,9 @@ export function initRunningTimerTrayListener(
             timer.mode,
             timer.remainingSec,
             timer.isPaused,
-            timer.totalSec
+            timer.totalSec,
+            timer.startedAt,
+            timer.elapsedSec
           );
         } else {
           dismissRunningTimerNotification();
@@ -702,7 +710,7 @@ export function initRunningTimerTrayListener(
       if (intervalId) clearInterval(intervalId);
       intervalId = setInterval(updateNotif, 10000);
     } else {
-      // App brought back to foreground: clear background ticker, but keep/update active notification so shade controls remain available
+      // App brought back to foreground: clear background ticker, but keep active notification
       if (intervalId) {
         clearInterval(intervalId);
         intervalId = null;
@@ -716,7 +724,9 @@ export function initRunningTimerTrayListener(
           timer.mode,
           timer.remainingSec,
           timer.isPaused,
-          timer.totalSec
+          timer.totalSec,
+          timer.startedAt,
+          timer.elapsedSec
         );
       }
     }

@@ -167,6 +167,10 @@ export function TimerPopout() {
   };
 
   const startQuickSession = (min: number | null, mode: "pomodoro" | "countdown" | "flow" | "break" = "pomodoro") => {
+    if (mode !== "break" && !selectedTaskId) {
+      toast("Please select a task to focus on", "err");
+      return;
+    }
     playTimerStartSound();
     triggerHaptic("light");
     setCompletedOffer(null);
@@ -479,13 +483,13 @@ export function TimerPopout() {
 
           {/* Task Link Selector */}
           <div className="w-full max-w-[270px] flex flex-col gap-1 text-left my-1">
-            <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">Task</label>
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">Task (Required)</label>
             <select
               value={selectedTaskId || ""}
               onChange={(e) => setSelectedTaskId(e.target.value ? e.target.value : null)}
               className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium bg-[var(--panel2)] border-[var(--line)] text-[var(--text)] outline-none focus:border-[var(--accent)]"
             >
-              <option value="">⚡ Quick Focus (No Task)</option>
+              <option value="">Select a task to focus on...</option>
               {state.tasks.filter((t) => !t.done && t.projectId !== LIFE_LOG_PROJECT_ID).map((t) => (
                 <option key={t.id} value={t.id}>
                   {t.title}

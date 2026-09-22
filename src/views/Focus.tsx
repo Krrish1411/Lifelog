@@ -28,7 +28,14 @@ import {
 } from "../utils/audio";
 import { Btn, EmptyState, SearchInput, Seg, cn } from "../components/ui";
 import { SessionTimelineBranch } from "../components/SessionTimelineBranch";
-import { AssignTaskModal } from "../components/AssignTaskModal";
+import { EditSessionModal } from "../components/EditSessionModal";
+import { ScheduleConflictModal, type ConflictData } from "../components/ScheduleConflictModal";
+import {
+  detectScheduleConflict,
+  autoBlockUnscheduledSession,
+  resolveScheduleConflict,
+} from "../utils/calendarSync";
+import { Pencil } from "lucide-react";
 import {
   cancelTimerEndNotification,
   playChimeSound,
@@ -81,11 +88,12 @@ export function FocusView() {
 
   const finishing = useRef(false);
   const hasAlarmedRef = useRef<Set<string>>(new Set());
-  const [assigningSession, setAssigningSession] = useState<Session | null>(null);
+  const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const [pendingConflict, setPendingConflict] = useState<ConflictData | null>(null);
 
   const live = state.sessions.find((s) => s.status === "running") ?? null;
   const paused = useMemo(() => {
-    if (!live) return false;
+    if (!live || live.pauses.length === 0) return false;
     const lp = live.pauses[live.pauses.length - 1];
     return !!lp && lp.resumeAt === null;
   }, [live]);
@@ -137,23 +145,37 @@ export function FocusView() {
     finishing.current = true;
     const ts = Date.now();
     const mins = sessionMinutes(live, ts);
+
+    const finishedSession: Session = {
+      ...live,
+      endedAt: ts,
+      status: kind,
+      updatedAt: ts,
+      pauses: live.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
+    };
+
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
-        x.id === live.id
-          ? {
-              ...x,
-              endedAt: ts,
-              status: kind,
-              updatedAt: ts,
-              pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
-            }
-          : x
+        x.id === live.id ? finishedSession : x
       ),
     }));
 
     cancelTimerEndNotification();
     triggerHaptic(kind === "done" ? "heavy" : "medium");
+
+    // Detect calendar conflict or auto-block unscheduled session
+    if (live.mode !== "break" && live.taskId) {
+      const conflict = detectScheduleConflict(finishedSession, state.tasks);
+      if (conflict) {
+        setPendingConflict(conflict);
+      } else {
+        set((s) => ({
+          ...s,
+          tasks: autoBlockUnscheduledSession(finishedSession, s.tasks),
+        }));
+      }
+    }
 
     if (kind === "done") {
       playTimerFinishSound(live.mode === "break" ? "break" : "complete");
@@ -192,6 +214,25 @@ export function FocusView() {
       setBreakOffer(true);
     }
     finishing.current = false;
+  };
+
+  const handleResolveConflict = (action: {
+    type: "push_forward" | "move_to_tray" | "custom_time" | "keep_both" | "dismiss";
+    customTime?: string;
+  }) => {
+    if (!pendingConflict) return;
+    const updatedTasks = resolveScheduleConflict(pendingConflict, state.tasks, action);
+    set((s) => ({ ...s, tasks: updatedTasks }));
+    setPendingConflict(null);
+    if (action.type === "push_forward") {
+      toast(`Pushed ${pendingConflict.conflictingTask.title} forward & aligned calendar`, "ok");
+    } else if (action.type === "move_to_tray") {
+      toast(`Moved ${pendingConflict.conflictingTask.title} to Unscheduled Tray`, "ok");
+    } else if (action.type === "keep_both") {
+      toast("Kept both tasks side-by-side in calendar", "ok");
+    } else if (action.type === "custom_time") {
+      toast(`Rescheduled ${pendingConflict.conflictingTask.title} to ${action.customTime}`, "ok");
+    }
   };
 
   // Auto-complete breaks; notify on focus goal reached without truncating session
@@ -523,14 +564,6 @@ export function FocusView() {
                   {task.estimateMin > 0 && <span>est {fmtDur(task.estimateMin)}</span>}
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setAssigningSession(live)}
-                className="chip !py-1 !px-2 text-[11px] text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0 font-bold"
-                title="Change or reassign task"
-              >
-                Change
-              </button>
             </div>
           ) : live.mode === "break" ? (
             <div className="chip" style={{ color: "var(--mut)" }}>
@@ -544,17 +577,10 @@ export function FocusView() {
               <div className="flex items-center gap-3 min-w-0">
                 <span className="text-[20px] shrink-0">⚡</span>
                 <div className="min-w-0">
-                  <div className="truncate text-[16px] font-bold">Quick Focus (No Task)</div>
-                  <div className="text-[11px] text-[var(--mut)]">Open session</div>
+                  <div className="truncate text-[16px] font-bold">Focus Session</div>
+                  <div className="text-[11px] text-[var(--mut)]">Active session</div>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={() => setAssigningSession(live)}
-                className="chip !py-1 !px-2.5 text-xs text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0 font-bold"
-              >
-                + Link Task
-              </button>
             </div>
           )}
 
@@ -1097,14 +1123,14 @@ export function FocusView() {
                     <span className="truncate">
                       {s.mode === "break" ? "Break" : t?.title ?? "⚡ Quick Focus (No Task)"}
                     </span>
-                    {s.mode !== "break" && (
+                    {s.status !== "running" && s.mode !== "break" && (
                       <button
                         type="button"
-                        onClick={() => setAssigningSession(s)}
-                        className="chip !py-0.5 !px-1.5 text-[10px] text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0"
-                        title={t ? "Reassign task" : "Link task to this session"}
+                        onClick={() => setEditingSession(s)}
+                        className="p-1 rounded hover:bg-[var(--line)]/50 text-[var(--mut)] hover:text-[var(--text)] transition-colors cursor-pointer shrink-0"
+                        title="Edit session details & time"
                       >
-                        {t ? "Change" : "+ Link Task"}
+                        <Pencil size={11} />
                       </button>
                     )}
                     <span className="ml-auto font-mono tnum shrink-0" style={{ color: "var(--accent)" }}>
@@ -1125,20 +1151,35 @@ export function FocusView() {
         </div>
       </div>
 
-      {assigningSession && (
-        <AssignTaskModal
-          session={assigningSession}
+      {editingSession && (
+        <EditSessionModal
+          session={editingSession}
           tasks={state.tasks}
           projects={state.projects}
-          onAssign={(sessionId, taskId, subtaskId) => {
+          onSave={(updated) => {
             set((st) => ({
               ...st,
-              sessions: st.sessions.map((x) =>
-                x.id === sessionId ? { ...x, taskId, subtaskId: subtaskId ?? null, updatedAt: Date.now() } : x
-              ),
+              sessions: st.sessions.map((x) => (x.id === updated.id ? updated : x)),
             }));
+            toast("Focus session updated", "ok");
           }}
-          onClose={() => setAssigningSession(null)}
+          onDelete={(sessionId) => {
+            set((st) => ({
+              ...st,
+              sessions: st.sessions.filter((x) => x.id !== sessionId),
+            }));
+            toast("Focus session deleted", "ok");
+          }}
+          onClose={() => setEditingSession(null)}
+        />
+      )}
+
+      {pendingConflict && (
+        <ScheduleConflictModal
+          conflict={pendingConflict}
+          projects={state.projects}
+          onResolve={handleResolveConflict}
+          onClose={() => setPendingConflict(null)}
         />
       )}
     </div>
