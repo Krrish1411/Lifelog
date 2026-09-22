@@ -520,4 +520,43 @@ This document provides a complete, authoritative, and chronological record of th
   - Removed artificial schedule delay in `showRunningTimerNotification` for instant 0ms delivery.
   - Optimized background ticker interval to 10 seconds for battery conservation, while maintaining instant 0ms updates on button taps.
 
+---
+
+## 15. v1.1.7 — Android Notifications Redraft, Uncapped Focus Duration & Overtime Tracking, Retroactive Task Linking, and Native Progress Bar / Chronometer Integration
+
+### A. Focus Session Duration Truncation Fix & Overtime Tracking (`src/components/Shell.tsx`, `src/views/Focus.tsx`, `src/components/TimerPopout.tsx`)
+- **Root Cause**: Previously, an aggressive interval in `Shell.tsx`, `Focus.tsx`, and `TimerPopout.tsx` auto-completed focus sessions the instant `sessionSeconds >= plannedMin * 60` and froze `endedAt` to that exact target timestamp. If a user started a 50m session, added 15m, and worked for 1h 10m+, the session was prematurely locked at 50m, discarding all overtime work.
+- **Resolution**:
+  - Re-engineered session watchdog: Only breaks (`running.mode === "break"`) auto-finalize to `"done"` on completion.
+  - Work sessions (`mode !== "break"`) alert once on reaching goal (`hasAlarmedRef` / `alertedGoalSessionsRef` chime + push alert) but remain active in `status: "running"`.
+  - Added real-time **Overtime display** (`+MM:SS`) with emerald glowing badges and dedicated **"Finish"** buttons across the full-screen stage and Timer Popout.
+  - `endedAt` is only recorded upon explicit user action ("Finish" or "Stop"), capturing the true total elapsed focus time (e.g., full 1h 10m+).
+  - Clean `extend(min)` logic ensures planned time increments (`plannedMin += min`) and revives sessions to `status: "running"` with `endedAt: null`.
+
+### B. Unassigned Focus Session Aggregation & Retroactive Task Linking (`src/utils/core.ts`, `src/views/Reports.tsx`, `src/views/DayLog.tsx`, `src/views/Focus.tsx`, `src/components/AssignTaskModal.tsx`)
+- **Root Cause**: `core.ts` (`trackedByDay`, `minutesInRange`) and `Reports.tsx` (`workSessions`) filtered by `if (s.taskId === null) continue;`, mistakenly assuming all sessions without tasks were breaks. Quick sessions started from the popout or quick timer had `taskId: null` and were discarded from daily tracked totals and reports.
+- **Resolution**:
+  - Updated filters to `s.mode !== "break"`, ensuring every focus session counts toward total tracked minutes regardless of whether a task was assigned.
+  - Mapped unlinked sessions in Reports and DayLog under `"⚡ Quick Focus (No Task)"`.
+  - Created reusable [`AssignTaskModal`](file:///home/krish/Downloads/Coding/gemini/Coding/Lifelog-main/src/components/AssignTaskModal.tsx) with search filtering and 1-tap task assignment.
+  - Added inline `+ Link Task` and `Change` chips across Today's history in Focus view, Focus Stage, and DayLog timeline, allowing users to retroactively link any past or active session to a task.
+  - Added task picker dropdown directly to `TimerPopout` idle screen so new sessions can be assigned upfront.
+
+### C. Android Lock Screen & Notification Redraft (`src/utils/native.ts`, `scripts/patch-local-notifications.js`, `node_modules/@capacitor/local-notifications`)
+- **Bypass "Hide Sensitive Content" on Lock Screen**:
+  - Notification channels configured with `visibility: 1` (`VISIBILITY_PUBLIC`).
+  - Patched `LocalNotificationManager.kt` via `scripts/patch-local-notifications.js` to ensure `mBuilder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)`. Android now displays the full timer, task name, and action controls on the lock screen even when system privacy hiding is enabled.
+- **Fixed Notification Disappearing on Pause / Resume**:
+  - Root cause 1: Capacitor's Kotlin plugin unconditionally called `dismissVisibleNotification(notificationId)` on any action tap. Patched `LocalNotificationManager.kt` to preserve notification visibility when `action_pause` or `action_resume` is clicked.
+  - Root cause 2: `initRunningTimerTrayListener` in `native.ts` dismissed the notification whenever `state.isActive` became true (app foregrounded). Since tapping action buttons launched the activity, foregrounding immediately wiped the notification. Updated listener to preserve and update active timer notifications on foreground transitions.
+  - Sticky Ongoing State: Set `ongoing: true` across both active and paused states so paused timers cannot be accidentally swiped away.
+- **Native Android Progress Bar & Chronometer Integration**:
+  - Added hook in `LocalNotificationManager.kt` reading `extra.maxProgress`, `extra.progress`, and `extra.usesChronometer` from `LocalNotification`.
+  - Dispatches native system progress bar (`mBuilder.setProgress(100, pct, false)`) and native system chronometer countdown (`mBuilder.setUsesChronometer(true)` with `setChronometerCountDown(true)`).
+- **Clean Aesthetic Typography (No Emoji Clutter)**:
+  - Replaced messy emoji notifications with modern productivity app aesthetics (TickTick / Google Calendar / Forest style).
+  - Timer Notifications: `Focus · Task Title` / `[██████░░░░] 60% · 24m left` (or `Paused at 14:20 · Tap Resume to continue`). Clean action buttons: `[ Pause ]   [ Stop ]` / `[ Resume ]   [ Stop ]`.
+  - Task Reminders: Title = Task title, Body = `Due in 15m (14:00)` or `Due now (14:00)`, Summary = `Task Reminder`.
+
+
 

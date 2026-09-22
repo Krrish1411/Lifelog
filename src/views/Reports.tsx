@@ -50,9 +50,9 @@ export function ReportsView() {
     [state.sessions, from, to, liveTick],
   );
 
-  // Pure work sessions (exclude Life Log routine streams so deep work stats stay clean)
+  // Pure work sessions (exclude Life Log routine streams so deep work stats stay clean, include unassigned focus sessions)
   const workSessions = useMemo(
-    () => sessions.filter((s) => s.taskId && s.mode !== "break" && !isLifeTask(s.taskId)),
+    () => sessions.filter((s) => s.mode !== "break" && (!s.taskId || !isLifeTask(s.taskId))),
     [sessions, state.tasks, liveTick],
   );
   const totalMin = useMemo(
@@ -96,10 +96,16 @@ export function ReportsView() {
   const byProject = useMemo(() => {
     const m = new Map<string, number>();
     for (const s of workSessions) {
+      if (!s.taskId) {
+        m.set("unassigned", (m.get("unassigned") ?? 0) + sessionMinutes(s));
+        continue;
+      }
       const t = state.tasks.find((x) => x.id === s.taskId);
       if (t) {
         if (t.projectId === LIFE_LOG_PROJECT_ID) continue;
         m.set(t.projectId, (m.get(t.projectId) ?? 0) + sessionMinutes(s));
+      } else {
+        m.set("unassigned", (m.get("unassigned") ?? 0) + sessionMinutes(s));
       }
     }
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
@@ -706,6 +712,9 @@ export function ReportsView() {
           byProject.length === 0 ? <div className="py-6 text-center text-[12.5px]" style={{ color: "var(--mut)" }}>No tracked time in range.</div> : (
             <div className="flex max-h-[300px] flex-col overflow-y-auto pr-1">
               {byProject.map(([pid, min]) => {
+                if (pid === "unassigned") {
+                  return <BarRow key="unassigned" label={<>⚡ Quick Focus (No Task)</>} value={min} max={byProject[0][1]} color="var(--accent)" right={`${fmtDur(min)} · ${Math.round((min / Math.max(1, totalMin)) * 100)}%`} />;
+                }
                 const p = state.projects.find((x) => x.id === pid);
                 return <BarRow key={pid} label={<>{p?.emoji} {p?.name ?? "Deleted project"}</>} value={min} max={byProject[0][1]} color={p?.color ?? "var(--accent)"} right={`${fmtDur(min)} · ${Math.round((min / Math.max(1, totalMin)) * 100)}%`} />;
               })}

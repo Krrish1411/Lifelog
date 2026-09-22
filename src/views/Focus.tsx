@@ -13,6 +13,7 @@ import {
   Layers,
   Sparkles,
   Activity,
+  Check,
 } from "lucide-react";
 import type { Session, TimerMode, TaskTimeBlock } from "../types";
 import { LIFE_LOG_PROJECT_ID } from "../types";
@@ -27,6 +28,7 @@ import {
 } from "../utils/audio";
 import { Btn, EmptyState, SearchInput, Seg, cn } from "../components/ui";
 import { SessionTimelineBranch } from "../components/SessionTimelineBranch";
+import { AssignTaskModal } from "../components/AssignTaskModal";
 import {
   cancelTimerEndNotification,
   playChimeSound,
@@ -78,6 +80,8 @@ export function FocusView() {
   const [stretchStep, setStretchStep] = useState(0);
 
   const finishing = useRef(false);
+  const hasAlarmedRef = useRef<Set<string>>(new Set());
+  const [assigningSession, setAssigningSession] = useState<Session | null>(null);
 
   const live = state.sessions.find((s) => s.status === "running") ?? null;
   const paused = useMemo(() => {
@@ -126,6 +130,7 @@ export function FocusView() {
   const elapsedMs = live ? elapsedMsOf(live, now) : 0;
   const plannedMs = live?.plannedMin ? live.plannedMin * 60000 : null;
   const remainingMs = plannedMs !== null ? Math.max(0, plannedMs - elapsedMs) : null;
+  const isOvertime = live?.mode !== "break" && plannedMs !== null && elapsedMs >= plannedMs;
 
   const finalize = (kind: "done" | "stopped") => {
     if (!live || finishing.current) return;
@@ -189,9 +194,26 @@ export function FocusView() {
     finishing.current = false;
   };
 
-  // Auto-complete planned sessions
+  // Auto-complete breaks; notify on focus goal reached without truncating session
   useEffect(() => {
-    if (live && plannedMs !== null && !paused && elapsedMs >= plannedMs) finalize("done");
+    if (live && plannedMs !== null && !paused && elapsedMs >= plannedMs) {
+      if (live.mode === "break") {
+        finalize("done");
+      } else if (!hasAlarmedRef.current.has(live.id)) {
+        hasAlarmedRef.current.add(live.id);
+        playTimerFinishSound("complete");
+        triggerHaptic("heavy");
+        const hasPerm = typeof Notification !== "undefined" && Notification.permission === "granted";
+        if (hasPerm || settings.notifyEnabled) {
+          try {
+            new Notification("Goal Reached! Great job!", {
+              body: `${live.mode === "pomodoro" ? "Pomodoro" : "Timer"} target completed. Keep flowing or tap Finish when done.`,
+            });
+          } catch {}
+        }
+        toast("Goal reached! Keep going or tap Finish to log.", "ok");
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [now, live?.id, paused]);
 
@@ -352,13 +374,14 @@ export function FocusView() {
   };
 
   const extend = (min: number) => {
-    if (!live || !live.plannedMin) return;
-    const newPlanned = live.plannedMin + min;
+    if (!live) return;
+    const currentPlanned = live.plannedMin ?? Math.ceil(elapsedMs / 60000);
+    const newPlanned = currentPlanned + min;
     const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
-        x.id === live.id ? { ...x, plannedMin: newPlanned, updatedAt: ts } : x
+        x.id === live.id ? { ...x, plannedMin: newPlanned, status: "running", endedAt: null, updatedAt: ts } : x
       ),
     }));
     const remainingMs = Math.max(0, newPlanned * 60 * 1000 - elapsedMs);
@@ -397,7 +420,7 @@ export function FocusView() {
         .sort((a, b) => b.startedAt - a.startedAt),
     [state.sessions, today]
   );
-  const todayTotal = todaySessions.reduce((a, s) => (s.taskId ? a + sessionMinutes(s) : a), 0);
+  const todayTotal = todaySessions.reduce((a, s) => (s.mode !== "break" ? a + sessionMinutes(s) : a), 0);
   const progress =
     plannedMs !== null
       ? Math.min(1, elapsedMs / plannedMs)
@@ -409,11 +432,16 @@ export function FocusView() {
   if (stage && live) {
     const task = state.tasks.find((t) => t.id === live.taskId);
     const proj = task ? state.projects.find((p) => p.id === task.projectId) : null;
-    const big = remainingMs !== null ? fmtMs(remainingMs) : fmtMs(elapsedMs);
+    const big =
+      plannedMs !== null
+        ? isOvertime
+          ? `+${fmtMs(elapsedMs - plannedMs)}`
+          : fmtMs(remainingMs ?? 0)
+        : fmtMs(elapsedMs);
     const R = 132;
     const C = 2 * Math.PI * R;
     const doneToday = todaySessions.filter(
-      (s) => s.taskId && s.mode !== "break" && s.endedAt
+      (s) => s.mode !== "break" && s.endedAt
     ).length;
 
     return (
@@ -495,10 +523,38 @@ export function FocusView() {
                   {task.estimateMin > 0 && <span>est {fmtDur(task.estimateMin)}</span>}
                 </div>
               </div>
+              <button
+                type="button"
+                onClick={() => setAssigningSession(live)}
+                className="chip !py-1 !px-2 text-[11px] text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0 font-bold"
+                title="Change or reassign task"
+              >
+                Change
+              </button>
             </div>
-          ) : (
+          ) : live.mode === "break" ? (
             <div className="chip" style={{ color: "var(--mut)" }}>
               <Coffee size={13} /> Break — stretch, hydrate, breathe
+            </div>
+          ) : (
+            <div
+              className="pop flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 min-w-0"
+              style={{ borderColor: "var(--line)", background: "var(--panel)" }}
+            >
+              <div className="flex items-center gap-3 min-w-0">
+                <span className="text-[20px] shrink-0">⚡</span>
+                <div className="min-w-0">
+                  <div className="truncate text-[16px] font-bold">Quick Focus (No Task)</div>
+                  <div className="text-[11px] text-[var(--mut)]">Open session</div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAssigningSession(live)}
+                className="chip !py-1 !px-2.5 text-xs text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0 font-bold"
+              >
+                + Link Task
+              </button>
             </div>
           )}
 
@@ -511,7 +567,7 @@ export function FocusView() {
                 cy="150"
                 r={R}
                 fill="none"
-                stroke={paused ? "var(--warn)" : "var(--accent)"}
+                stroke={paused ? "var(--warn)" : isOvertime ? "var(--ok)" : "var(--accent)"}
                 strokeWidth="10"
                 strokeLinecap="round"
                 strokeDasharray={C}
@@ -522,15 +578,15 @@ export function FocusView() {
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <div
                 className={cn("stage-num font-mono font-bold", paused && "opacity-60")}
-                style={{ fontSize: 54, color: "var(--text)" }}
+                style={{ fontSize: 54, color: isOvertime ? "var(--ok)" : "var(--text)" }}
               >
                 {big}
               </div>
               <div
                 className="mt-1 text-[11.5px] font-bold uppercase tracking-[0.16em]"
-                style={{ color: paused ? "var(--warn)" : "var(--mut)" }}
+                style={{ color: paused ? "var(--warn)" : isOvertime ? "var(--ok)" : "var(--mut)" }}
               >
-                {paused ? "Paused" : remainingMs !== null ? "remaining" : "flowing"}
+                {paused ? "Paused" : isOvertime ? "Goal reached · Overtime" : remainingMs !== null ? "remaining" : "flowing"}
               </div>
             </div>
           </div>
@@ -546,27 +602,51 @@ export function FocusView() {
               {paused ? <Play size={17} /> : <Pause size={17} />} {paused ? "Resume" : "Pause"}
             </Btn>
             {plannedMs !== null && (
-              <Btn
-                variant="soft"
-                size="lg"
-                onClick={() => extend(5)}
-                title="Add 5 minutes"
-              >
-                <Plus size={15} /> 5m
-              </Btn>
+              <>
+                <Btn
+                  variant="soft"
+                  size="lg"
+                  onClick={() => extend(5)}
+                  title="Add 5 minutes"
+                >
+                  <Plus size={15} /> 5m
+                </Btn>
+                <Btn
+                  variant="soft"
+                  size="lg"
+                  onClick={() => extend(15)}
+                  title="Add 15 minutes"
+                >
+                  <Plus size={15} /> 15m
+                </Btn>
+              </>
             )}
+            {isOvertime ? (
+              <Btn
+                variant="primary"
+                size="lg"
+                onClick={() => finalize("done")}
+                className="!px-6 !py-3"
+              >
+                <Check size={16} /> Finish
+              </Btn>
+            ) : null}
             <Btn
-              variant="danger"
+              variant={isOvertime ? "soft" : "danger"}
               size="lg"
-              onClick={() => finalize("stopped")}
+              onClick={() => finalize(isOvertime ? "done" : "stopped")}
               className="!px-6 !py-3"
-              style={{
-                background: "var(--danger)",
-                color: "#fff",
-                borderColor: "var(--danger)",
-              }}
+              style={
+                isOvertime
+                  ? undefined
+                  : {
+                      background: "var(--danger)",
+                      color: "#fff",
+                      borderColor: "var(--danger)",
+                    }
+              }
             >
-              <Square size={15} /> Stop
+              <Square size={15} /> {isOvertime ? "Stop & Log" : "Stop"}
             </Btn>
           </div>
 
@@ -1015,8 +1095,18 @@ export function FocusView() {
                       }}
                     />
                     <span className="truncate">
-                      {s.mode === "break" ? "Break" : t?.title ?? "Untitled task"}
+                      {s.mode === "break" ? "Break" : t?.title ?? "⚡ Quick Focus (No Task)"}
                     </span>
+                    {s.mode !== "break" && (
+                      <button
+                        type="button"
+                        onClick={() => setAssigningSession(s)}
+                        className="chip !py-0.5 !px-1.5 text-[10px] text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0"
+                        title={t ? "Reassign task" : "Link task to this session"}
+                      >
+                        {t ? "Change" : "+ Link Task"}
+                      </button>
+                    )}
                     <span className="ml-auto font-mono tnum shrink-0" style={{ color: "var(--accent)" }}>
                       {fmtDur(sessionMinutes(s))}
                     </span>
@@ -1034,6 +1124,23 @@ export function FocusView() {
           </div>
         </div>
       </div>
+
+      {assigningSession && (
+        <AssignTaskModal
+          session={assigningSession}
+          tasks={state.tasks}
+          projects={state.projects}
+          onAssign={(sessionId, taskId, subtaskId) => {
+            set((st) => ({
+              ...st,
+              sessions: st.sessions.map((x) =>
+                x.id === sessionId ? { ...x, taskId, subtaskId: subtaskId ?? null, updatedAt: Date.now() } : x
+              ),
+            }));
+          }}
+          onClose={() => setAssigningSession(null)}
+        />
+      )}
     </div>
   );
 }

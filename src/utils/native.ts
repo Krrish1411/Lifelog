@@ -293,15 +293,15 @@ export async function initNotificationChannels(): Promise<void> {
           {
             id: "TIMER_RUNNING_ACTIONS",
             actions: [
-              { id: "action_pause", title: "⏸ Pause" },
-              { id: "action_stop", title: "⏹ Stop", destructive: true },
+              { id: "action_pause", title: "Pause" },
+              { id: "action_stop", title: "Stop", destructive: true },
             ],
           },
           {
             id: "TIMER_PAUSED_ACTIONS",
             actions: [
-              { id: "action_resume", title: "▶ Resume" },
-              { id: "action_stop", title: "⏹ Stop", destructive: true },
+              { id: "action_resume", title: "Resume" },
+              { id: "action_stop", title: "Stop", destructive: true },
             ],
           },
         ],
@@ -354,7 +354,7 @@ export async function checkNativeNotificationPermission(): Promise<boolean> {
  * Schedule a native reminder for a task using Android AlarmManager or desktop notification.
  */
 export async function scheduleTaskDueNotification(
-  task: { id: string; title: string; due?: string | null; dueTime?: string | null },
+  task: { id: string; title: string; due?: string | null; dueTime?: string | null; projectId?: string },
   leadMinutes = 0,
   customTitle?: string
 ): Promise<void> {
@@ -369,12 +369,15 @@ export async function scheduleTaskDueNotification(
     if (targetTime <= Date.now()) return;
 
     if (isNativeMobile) {
+      const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+      const subtitle = leadMinutes > 0 ? `Due in ${leadMinutes}m (${timeStr})` : `Due now (${timeStr})`;
       await LocalNotifications.schedule({
         notifications: [
           {
             id: hashStringToInt(`task-${task.id}`),
-            title: customTitle ?? (leadMinutes > 0 ? `Task Due in ${leadMinutes}m ⏱️` : "Task Due Now ⏱️"),
-            body: task.title,
+            title: customTitle ?? task.title,
+            body: customTitle ? task.title : subtitle,
+            summaryText: "Task Reminder",
             schedule: { at: new Date(targetTime), allowWhileIdle: true },
             channelId: "task-channel-v3",
           },
@@ -447,15 +450,17 @@ export async function scheduleTimerEndNotification(
   if (durationMs <= 0) return;
   if (!isNativeMobile) return;
   try {
+    const isBreak = mode === "break";
     const targetDate = new Date(Date.now() + durationMs);
+    const cleanTitle = title.trim() || (isBreak ? "Break" : "Focus Session");
     await LocalNotifications.schedule({
       notifications: [
         {
           id: TIMER_NOTIFICATION_ID,
-          title: mode === "break" ? "Break Finished! ☕" : "Focus Session Complete! 🎯",
-          body: title
-            ? `Completed: "${title}". Great job! Tap to review.`
-            : "Session ended. Time to stretch or start your next block.",
+          title: isBreak ? "Break Complete" : "Focus Goal Achieved",
+          body: isBreak
+            ? "Your break is finished. Ready to start your next focus block?"
+            : `Completed: ${cleanTitle}. Tap to review and log your progress.`,
           schedule: { at: targetDate, allowWhileIdle: true },
           channelId: "focus-alarm-channel-v3",
         },
@@ -546,30 +551,45 @@ export async function showRunningTimerNotification(
       progressBar = `[${"█".repeat(filled)}${"░".repeat(10 - filled)}] ${progressPercent}%`;
     }
 
-    // Modern task title header
-    const displayTask = taskTitle.trim() || (isBreak ? "Rest & Recharge" : "Deep Work");
-    const title = isPaused ? `⏸️ Paused: ${displayTask}` : `${isBreak ? "☕" : "🎯"} ${displayTask}`;
+    // Modern task title header without emoji clutter
+    const displayTask = taskTitle.trim() || (isBreak ? "Break Time" : "Deep Focus");
+    const title = isPaused
+      ? `Paused · ${displayTask}`
+      : isBreak
+      ? `Break · ${displayTask}`
+      : `Focus · ${displayTask}`;
 
     // Modern body formatting
     let body = "";
     if (isPaused) {
-      body = `Timer paused at ${timeStr || "0:00"} · Tap or use controls below to resume`;
-    } else if (progressBar) {
+      body = `Paused at ${timeStr || "0:00"} · Tap Resume to continue`;
+    } else if (progressBar && timeStr) {
       body = `${progressBar} · ${timeStr} left`;
     } else if (timeStr) {
-      body = `${timeStr} remaining · Stay in flow`;
+      body = `${timeStr} remaining`;
     } else {
-      body = `${modeLabel} in progress · Tap to open LifeLog`;
+      body = `${modeLabel} session active`;
     }
 
     const largeBody = [
-      `Task: ${displayTask}`,
-      `Status: ${isPaused ? "Paused" : isBreak ? "Break Time" : "Deep Focus Active"}`,
-      timeStr ? `Time: ${timeStr} ${remainingSeconds !== undefined ? "left" : "elapsed"}` : null,
+      displayTask,
+      isPaused ? "Status: Paused" : isBreak ? "Status: Rest & Recharge" : "Status: Deep Focus Active",
+      timeStr ? `${timeStr} ${remainingSeconds !== undefined ? "remaining" : "elapsed"}` : null,
       progressBar ? `Progress: ${progressBar}` : null,
     ]
       .filter(Boolean)
       .join("\n");
+
+    const extra: any = {};
+    if (progressPercent !== null) {
+      extra.maxProgress = 100;
+      extra.progress = progressPercent;
+    }
+    if (!isPaused && remainingSeconds !== undefined) {
+      extra.usesChronometer = true;
+      extra.chronometerBase = Date.now() + remainingSeconds * 1000;
+      extra.chronometerCountDown = true;
+    }
 
     // Immediate 0ms dispatch (no schedule property ensures instantaneous notificationManager.notify)
     await LocalNotifications.schedule({
@@ -581,9 +601,10 @@ export async function showRunningTimerNotification(
           largeBody,
           summaryText: timeStr ? `${timeStr} · ${modeLabel}` : modeLabel,
           channelId: "focus-running-channel-v3",
-          ongoing: !isPaused,
+          ongoing: true, // Always sticky across both running and paused states
           autoCancel: false,
           actionTypeId: isPaused ? "TIMER_PAUSED_ACTIONS" : "TIMER_RUNNING_ACTIONS",
+          extra,
         },
       ],
     });
@@ -681,12 +702,23 @@ export function initRunningTimerTrayListener(
       if (intervalId) clearInterval(intervalId);
       intervalId = setInterval(updateNotif, 10000);
     } else {
-      // App brought back to foreground: clear ticker and dismiss running shade notification
+      // App brought back to foreground: clear background ticker, but keep/update active notification so shade controls remain available
       if (intervalId) {
         clearInterval(intervalId);
         intervalId = null;
       }
-      dismissRunningTimerNotification();
+      const timer = getActiveTimer();
+      if (!timer || !timer.running) {
+        dismissRunningTimerNotification();
+      } else {
+        showRunningTimerNotification(
+          timer.taskTitle,
+          timer.mode,
+          timer.remainingSec,
+          timer.isPaused,
+          timer.totalSec
+        );
+      }
     }
   });
 

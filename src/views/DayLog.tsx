@@ -40,10 +40,11 @@ import {
 } from "../utils/core";
 import { requestDailyNote } from "../utils/nav";
 import { Btn, EmptyState, Modal, cn } from "../components/ui";
-import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID, type LifeLogCategory } from "../types";
+import { AssignTaskModal } from "../components/AssignTaskModal";
+import { LIFE_LOG_CATEGORIES, LIFE_LOG_PROJECT_ID, type LifeLogCategory, type Session } from "../types";
 
 export function DayLogView() {
-  const { state, setView, toast, liveTick } = useApp();
+  const { state, set, setView, toast, liveTick } = useApp();
   const showLifeLog = state.settings.showLifeLogProject !== false;
   const today = todayIso();
   const [sel, setSel] = useState(today);
@@ -51,6 +52,7 @@ export function DayLogView() {
   const [notePreview, setNotePreview] = useState<string | null>(null);
   const [standupModalOpen, setStandupModalOpen] = useState(false);
   const [copiedStandup, setCopiedStandup] = useState(false);
+  const [assigningSession, setAssigningSession] = useState<Session | null>(null);
 
   const week = useMemo(() => listDates(weekStart, addDaysIso(weekStart, 6)), [weekStart]);
 
@@ -58,7 +60,7 @@ export function DayLogView() {
   const tracked = useMemo(() => {
     const map = new Map<string, number>();
     for (const s of state.sessions) {
-      if (s.mode === "break" || !s.taskId) continue;
+      if (s.mode === "break") continue;
       const key = isoDate(new Date(s.startedAt));
       map.set(key, (map.get(key) ?? 0) + sessionMinutes(s));
     }
@@ -135,7 +137,7 @@ export function DayLogView() {
 
   const log = state.dayLogs[sel];
   const totalMin = tracked.get(sel) ?? 0;
-  const focusSessions = daySessions.filter((s) => s.taskId && s.mode !== "break");
+  const focusSessions = daySessions.filter((s) => s.mode !== "break");
 
   const dayTotalLoggedMin = sleepMin + routineMin + totalMin;
   const dayPct = Math.min(100, Math.round((dayTotalLoggedMin / 1440) * 100));
@@ -441,9 +443,9 @@ ${lifeHabitSection}
               <div className="mt-3 flex flex-col gap-2">
                 {byProject.map(([pid, min]) => {
                   const p = state.projects.find((x) => x.id === pid);
-                  const pName = pid === "__unassigned" ? "Archived / Unassigned" : (p?.name ?? "Deleted project");
-                  const pColor = pid === "__unassigned" ? "var(--mut)" : (p?.color ?? "#888");
-                  const pEmoji = pid === "__unassigned" ? "📁" : (p?.emoji ?? "▸");
+                  const pName = pid === "__unassigned" ? "⚡ Quick Focus (No Task)" : (p?.name ?? "Deleted project");
+                  const pColor = pid === "__unassigned" ? "var(--accent)" : (p?.color ?? "#888");
+                  const pEmoji = pid === "__unassigned" ? "⚡" : (p?.emoji ?? "▸");
                   return (
                     <div key={pid} className="flex items-center gap-2.5">
                       <span className="flex h-8 w-8 items-center justify-center rounded-lg text-[15px]" style={{ background: `color-mix(in srgb, ${pColor} 20%, transparent)` }}>{pEmoji}</span>
@@ -494,13 +496,21 @@ ${lifeHabitSection}
                             <span>☕ Break</span>
                           ) : (
                             <>
-                              <span>{t?.emoji ?? "💻"}</span>
-                              <span className="truncate">{t?.title ?? "Untitled task"}</span>
+                              <span>{t?.emoji ?? "⚡"}</span>
+                              <span className="truncate">{t?.title ?? "Quick Focus (No Task)"}</span>
                               {p && (
                                 <span className="chip !py-0 !text-[9.5px] font-semibold shrink-0" style={{ color: p.color, borderColor: `${p.color}40` }}>
                                   #{p.name}
                                 </span>
                               )}
+                              <button
+                                type="button"
+                                onClick={() => setAssigningSession(s)}
+                                className="chip !py-0 !px-1.5 text-[9.5px] text-[var(--accent)] border-[var(--accent)]/40 hover:bg-[var(--accent)]/10 cursor-pointer shrink-0 ml-1 font-semibold"
+                                title={t ? "Reassign task" : "Link a task to this session"}
+                              >
+                                {t ? "Change" : "+ Link Task"}
+                              </button>
                             </>
                           )}
                         </div>
@@ -690,6 +700,23 @@ ${lifeHabitSection}
           </div>
         </div>
       </Modal>
+
+      {assigningSession && (
+        <AssignTaskModal
+          session={assigningSession}
+          tasks={state.tasks}
+          projects={state.projects}
+          onAssign={(sessionId, taskId, subtaskId) => {
+            set((st) => ({
+              ...st,
+              sessions: st.sessions.map((x) =>
+                x.id === sessionId ? { ...x, taskId, subtaskId: subtaskId ?? null, updatedAt: Date.now() } : x
+              ),
+            }));
+          }}
+          onClose={() => setAssigningSession(null)}
+        />
+      )}
     </div>
   );
 }

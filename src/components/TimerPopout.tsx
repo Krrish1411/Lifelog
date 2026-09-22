@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Coffee, Pause, Play, Square, Target, Timer, Plus, ExternalLink, Sparkles, Flame, Clock } from "lucide-react";
+import { Coffee, Pause, Play, Square, Target, Timer, Plus, ExternalLink, Sparkles, Flame, Clock, Check } from "lucide-react";
 import { useApp } from "../store";
 import type { Session } from "../types";
+import { LIFE_LOG_PROJECT_ID } from "../types";
 import { fmtHMS, sessionSeconds } from "../utils/core";
 import { triggerHaptic } from "../utils/native";
 import { playTimerFinishSound, playTimerStopSound, playTimerStartSound, playTimerToggleSound } from "../utils/audio";
@@ -12,7 +13,8 @@ export function TimerPopout() {
   const { state, set, toast } = useApp();
   const [, force] = useState(0);
   const finishedRef = useRef<string | null>(null);
-  const [completedOffer, setCompletedOffer] = useState<{ mode: string; plannedMin?: number | null; title?: string } | null>(null);
+  const [completedOffer, setCompletedOffer] = useState<{ mode: string; plannedMin?: number | null; title?: string; sessionId?: string } | null>(null);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
 
   // Apply user theme, tokens, fonts, and dark/light modes
   useApplyTheme(state.settings);
@@ -40,33 +42,41 @@ export function TimerPopout() {
       ? Math.min(100, (elapsedSec / (running.plannedMin * 60)) * 100)
       : 0;
 
-  // Auto-complete session when countdown reaches zero (don't stay stuck on 0:00 screen!)
+  // Auto-complete breaks; notify on focus goal reached without truncating session
   useEffect(() => {
     if (running && remainingSec === 0 && finishedRef.current !== running.id) {
-      finishedRef.current = running.id;
-      const ts = Date.now();
-      const finishedMode = running.mode;
-      const finishedPlanned = running.plannedMin;
-      setCompletedOffer({ mode: finishedMode, plannedMin: finishedPlanned });
+      if (running.mode === "break") {
+        finishedRef.current = running.id;
+        const ts = Date.now();
+        const finishedMode = running.mode;
+        const finishedPlanned = running.plannedMin;
+        const finishedId = running.id;
+        setCompletedOffer({ mode: finishedMode, plannedMin: finishedPlanned, sessionId: finishedId });
 
-      set((s) => ({
-        ...s,
-        sessions: s.sessions.map((x) =>
-          x.id === running.id
-            ? {
-                ...x,
-                endedAt: ts,
-                status: "done" as const,
-                updatedAt: ts,
-                pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
-              }
-            : x
-        ),
-      }));
+        set((s) => ({
+          ...s,
+          sessions: s.sessions.map((x) =>
+            x.id === running.id
+              ? {
+                  ...x,
+                  endedAt: ts,
+                  status: "done" as const,
+                  updatedAt: ts,
+                  pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
+                }
+              : x
+          ),
+        }));
 
-      playTimerFinishSound(finishedMode === "break" ? "break" : "complete");
-      triggerHaptic("success");
-      toast(finishedMode === "break" ? "Break finished! Ready to focus." : "Focus session complete!", "ok");
+        playTimerFinishSound("break");
+        triggerHaptic("success");
+        toast("Break finished! Ready to focus.", "ok");
+      } else {
+        finishedRef.current = running.id;
+        playTimerFinishSound("complete");
+        triggerHaptic("success");
+        toast("Goal reached! Continuing in overtime until stopped.", "ok");
+      }
     }
   }, [running, remainingSec, toast, set]);
 
@@ -94,13 +104,20 @@ export function TimerPopout() {
     toast(openPause ? "Resumed" : "Paused", "ok");
   };
 
-  const stop = () => {
+  const stop = (kind: "done" | "stopped" = "done") => {
     if (!running) return;
-    playTimerStopSound();
-    triggerHaptic("medium");
+    if (kind === "done") {
+      playTimerFinishSound(running.mode === "break" ? "break" : "complete");
+      triggerHaptic("success");
+    } else {
+      playTimerStopSound();
+      triggerHaptic("medium");
+    }
     const ts = Date.now();
-    const stoppedTaskTitle = task?.title || (running.mode === "break" ? "Break" : "Focus Session");
+    const stoppedTaskTitle = task?.title || (running.mode === "break" ? "Break" : "Quick Focus");
     const stoppedMode = running.mode;
+    const stoppedPlanned = running.plannedMin;
+    const runningId = running.id;
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
@@ -108,28 +125,45 @@ export function TimerPopout() {
           ? {
               ...x,
               endedAt: ts,
-              status: "stopped",
+              status: kind,
               updatedAt: ts,
               pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
             }
           : x
       ),
     }));
-    toast("Timer stopped", "ok");
-    setCompletedOffer({ title: stoppedTaskTitle, mode: stoppedMode });
+    toast(kind === "done" ? "Session saved to log!" : "Timer stopped", "ok");
+    setCompletedOffer({ title: stoppedTaskTitle, mode: stoppedMode, plannedMin: stoppedPlanned, sessionId: runningId });
   };
 
   const extend = (min: number) => {
-    if (!running || !running.plannedMin) return;
-    const newPlanned = running.plannedMin + min;
+    if (!running) return;
+    const currentPlanned = running.plannedMin ?? Math.ceil(elapsedSec / 60);
+    const newPlanned = currentPlanned + min;
     const ts = Date.now();
     set((s) => ({
       ...s,
       sessions: s.sessions.map((x) =>
-        x.id === running.id ? { ...x, plannedMin: newPlanned, updatedAt: ts } : x
+        x.id === running.id ? { ...x, plannedMin: newPlanned, status: "running", endedAt: null, updatedAt: ts } : x
       ),
     }));
     toast(`+${min}m added`, "ok");
+  };
+
+  const reviveAndExtend = (sessionId: string, min: number) => {
+    const ts = Date.now();
+    set((s) => ({
+      ...s,
+      sessions: s.sessions.map((x) =>
+        x.id === sessionId
+          ? { ...x, status: "running" as const, endedAt: null, plannedMin: (x.plannedMin || 0) + min, updatedAt: ts }
+          : x
+      ),
+    }));
+    setCompletedOffer(null);
+    playTimerStartSound();
+    triggerHaptic("light");
+    toast(`+${min}m added — session resumed!`, "ok");
   };
 
   const startQuickSession = (min: number | null, mode: "pomodoro" | "countdown" | "flow" | "break" = "pomodoro") => {
@@ -144,7 +178,7 @@ export function TimerPopout() {
       plannedMin: min,
       status: "running",
       mode: mode === "break" ? "break" : mode,
-      taskId: null,
+      taskId: mode === "break" ? null : selectedTaskId,
       subtaskId: null,
       pauses: [],
       updatedAt: now,
@@ -180,7 +214,16 @@ export function TimerPopout() {
     }
   };
 
-  const big = remainingSec !== null ? fmtHMS(remainingSec) : fmtHMS(elapsedSec);
+  const isOvertime =
+    running?.mode !== "break" && running?.plannedMin
+      ? elapsedSec >= running.plannedMin * 60
+      : false;
+  const big =
+    remainingSec !== null
+      ? isOvertime
+        ? `+${fmtHMS(elapsedSec - running!.plannedMin! * 60)}`
+        : fmtHMS(remainingSec)
+      : fmtHMS(elapsedSec);
 
   return (
     <div
@@ -213,10 +256,13 @@ export function TimerPopout() {
         <div className="flex items-center gap-2">
           <span
             className={cn("h-2.5 w-2.5 rounded-full shrink-0", running && !openPause && "ring-pulse")}
-            style={{ background: openPause ? "var(--warn)" : running ? "var(--ok)" : "var(--mut)" }}
+            style={{ background: openPause ? "var(--warn)" : isOvertime ? "var(--ok)" : running ? "var(--ok)" : "var(--mut)" }}
           />
-          <span className="font-display text-xs font-bold uppercase tracking-wider text-[var(--accent)]">
-            {running ? (openPause ? "Paused" : running.mode) : "Ready"}
+          <span
+            className="font-display text-xs font-bold uppercase tracking-wider"
+            style={{ color: openPause ? "var(--warn)" : isOvertime ? "var(--ok)" : "var(--accent)" }}
+          >
+            {running ? (openPause ? "Paused" : isOvertime ? "Goal reached · Overtime" : running.mode) : "Ready"}
           </span>
         </div>
         <button
@@ -254,7 +300,7 @@ export function TimerPopout() {
           <div className="relative flex items-center justify-center my-0.5">
             <div
               className="font-mono text-[46px] font-extrabold tracking-tight tnum drop-shadow-sm"
-              style={{ color: openPause ? "var(--warn)" : "var(--text)" }}
+              style={{ color: openPause ? "var(--warn)" : isOvertime ? "var(--ok)" : "var(--text)" }}
             >
               {big}
             </div>
@@ -326,6 +372,17 @@ export function TimerPopout() {
 
           {/* Break and Focus options */}
           <div className="flex flex-col gap-2 mt-1 w-full max-w-[270px]">
+            {completedOffer.mode !== "break" && completedOffer.sessionId && (
+              <Btn
+                size="sm"
+                variant="outline"
+                onClick={() => reviveAndExtend(completedOffer.sessionId!, 15)}
+                className="w-full text-xs py-2 mb-0.5 border-[var(--accent)] text-[var(--accent)] font-semibold"
+              >
+                <Plus size={13} />
+                <span>+15m Keep Going</span>
+              </Btn>
+            )}
             {completedOffer.mode !== "break" ? (
               <>
                 <div className="flex gap-2">
@@ -420,8 +477,25 @@ export function TimerPopout() {
             </div>
           </div>
 
+          {/* Task Link Selector */}
+          <div className="w-full max-w-[270px] flex flex-col gap-1 text-left my-1">
+            <label className="text-[10px] font-bold uppercase tracking-wider text-[var(--mut)]">Task</label>
+            <select
+              value={selectedTaskId || ""}
+              onChange={(e) => setSelectedTaskId(e.target.value ? e.target.value : null)}
+              className="w-full rounded-lg border px-2.5 py-1.5 text-xs font-medium bg-[var(--panel2)] border-[var(--line)] text-[var(--text)] outline-none focus:border-[var(--accent)]"
+            >
+              <option value="">⚡ Quick Focus (No Task)</option>
+              {state.tasks.filter((t) => !t.done && t.projectId !== LIFE_LOG_PROJECT_ID).map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Multi-mode Quick Start Grid */}
-          <div className="flex flex-col gap-1.5 mt-1 w-full max-w-[270px]">
+          <div className="flex flex-col gap-1.5 w-full max-w-[270px]">
             <div className="flex gap-1.5">
               <Btn
                 size="sm"
@@ -499,13 +573,23 @@ export function TimerPopout() {
             {openPause ? <Play size={14} /> : <Pause size={14} />}
             <span>{openPause ? "Resume" : "Pause"}</span>
           </Btn>
+          {isOvertime ? (
+            <Btn
+              variant="primary"
+              className="text-xs font-bold px-4 py-2"
+              onClick={() => stop("done")}
+            >
+              <Check size={13} />
+              <span>Finish</span>
+            </Btn>
+          ) : null}
           <Btn
-            variant="danger"
+            variant={isOvertime ? "soft" : "danger"}
             className="text-xs font-bold px-4 py-2"
-            onClick={stop}
+            onClick={() => stop(isOvertime ? "done" : "stopped")}
           >
             <Square size={13} />
-            <span>Stop</span>
+            <span>{isOvertime ? "Stop & Log" : "Stop"}</span>
           </Btn>
         </div>
       )}

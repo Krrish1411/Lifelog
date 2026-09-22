@@ -3,10 +3,13 @@
 /**
  * scripts/patch-local-notifications.js
  *
- * Patches @capacitor/local-notifications to set NotificationCompat.VISIBILITY_PUBLIC
- * on Android. This ensures that focus session notifications, progress bars, and
- * action buttons remain visible on the lock screen even when Android OS has
- * "Hide sensitive content" enabled.
+ * Patches @capacitor/local-notifications on Android to:
+ * 1. Set NotificationCompat.VISIBILITY_PUBLIC so timer notifications and buttons
+ *    are fully visible on the lock screen even when OS "Hide sensitive content" is active.
+ * 2. Prevent premature notification dismissal when "Pause" or "Resume" actions are tapped,
+ *    keeping the notification sticky in the notification shade with updated state.
+ * 3. Support native Android Progress Bar (mBuilder.setProgress) and Chronometer countdown
+ *    via localNotification.extra parameters for a sleek, modern system timer display.
  */
 
 import fs from 'fs';
@@ -28,21 +31,71 @@ if (!fs.existsSync(targetFile)) {
 
 try {
   let content = fs.readFileSync(targetFile, 'utf8');
+  let modified = false;
 
-  if (content.includes('mBuilder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)')) {
-    console.log('[LifeLog Patch] LocalNotificationManager.kt already patched with VISIBILITY_PUBLIC.');
-    process.exit(0);
+  // 1. Ensure VISIBILITY_PUBLIC and setOnlyAlertOnce
+  if (!content.includes('mBuilder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)')) {
+    if (content.includes('mBuilder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)')) {
+      content = content.replace(
+        'mBuilder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)',
+        'mBuilder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)'
+      );
+      modified = true;
+    } else if (content.includes('val mBuilder = NotificationCompat.Builder')) {
+      content = content.replace(
+        'val mBuilder = NotificationCompat.Builder(context, channelId)',
+        'val mBuilder = NotificationCompat.Builder(context, channelId)\n            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)'
+      );
+      modified = true;
+    }
   }
 
-  if (content.includes('mBuilder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)')) {
-    content = content.replace(
-      'mBuilder.setVisibility(NotificationCompat.VISIBILITY_PRIVATE)',
-      'mBuilder.setVisibility(NotificationCompat.VISIBILITY_PUBLIC)'
-    );
+  // 2. Prevent dismissing notification when user taps Pause or Resume action buttons
+  const oldDismissPattern = 'val menuAction = data.getStringExtra(ACTION_INTENT_KEY)\n\n        dismissVisibleNotification(notificationId)';
+  const newDismissPattern = 'val menuAction = data.getStringExtra(ACTION_INTENT_KEY)\n\n        if (menuAction != "action_pause" && menuAction != "action_resume") {\n            dismissVisibleNotification(notificationId)\n        }';
+  if (content.includes(oldDismissPattern)) {
+    content = content.replace(oldDismissPattern, newDismissPattern);
+    modified = true;
+    console.log('[LifeLog Patch] Patched action handling to prevent dismissing notification on Pause/Resume.');
+  }
+
+  // 3. Add native Android Progress Bar and Chronometer support via localNotification.extra
+  const progressHookMarker = '/* LifeLog Native Progress & Chronometer Hook */';
+  if (!content.includes(progressHookMarker)) {
+    const targetAnchor = 'mBuilder.setOnlyAlertOnce(true)';
+    if (content.includes(targetAnchor)) {
+      const progressPatch = `${targetAnchor}
+        ${progressHookMarker}
+        try {
+            val extraVal = localNotification.extra
+            if (extraVal is JSONObject) {
+                if (extraVal.has("maxProgress") && extraVal.has("progress")) {
+                    val maxP = extraVal.getInt("maxProgress")
+                    val curP = extraVal.getInt("progress")
+                    mBuilder.setProgress(maxP, curP, false)
+                }
+                if (extraVal.optBoolean("usesChronometer", false)) {
+                    val base = extraVal.optLong("chronometerBase", System.currentTimeMillis())
+                    mBuilder.setUsesChronometer(true)
+                    mBuilder.setWhen(base)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N && extraVal.optBoolean("chronometerCountDown", false)) {
+                        mBuilder.setChronometerCountDown(true)
+                    }
+                }
+            }
+        } catch (e: Exception) {}`;
+
+      content = content.replace(targetAnchor, progressPatch);
+      modified = true;
+      console.log('[LifeLog Patch] Added native progress bar and chronometer countdown support.');
+    }
+  }
+
+  if (modified) {
     fs.writeFileSync(targetFile, content, 'utf8');
-    console.log('[LifeLog Patch] Successfully patched LocalNotificationManager.kt with VISIBILITY_PUBLIC.');
+    console.log('[LifeLog Patch] Successfully updated LocalNotificationManager.kt.');
   } else {
-    console.warn('[LifeLog Patch] Warning: Could not locate setVisibility call in LocalNotificationManager.kt');
+    console.log('[LifeLog Patch] LocalNotificationManager.kt already contains all required patches.');
   }
 } catch (err) {
   console.error('[LifeLog Patch] Error patching LocalNotificationManager.kt:', err);

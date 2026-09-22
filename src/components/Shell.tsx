@@ -230,7 +230,7 @@ export function Shell() {
       const totalSec = sess.plannedMin ? sess.plannedMin * 60 : undefined;
       return {
         running: true,
-        taskTitle: task?.title ?? "Focus Session",
+        taskTitle: sess.mode === "break" ? "Break" : task?.title ?? "Quick Focus",
         mode: sess.mode,
         remainingSec,
         totalSec,
@@ -262,7 +262,13 @@ export function Shell() {
               : x
           ),
         }));
-        showRunningTimerNotification(task?.title ?? "Focus Session", sess.mode, remainingSec, true, totalSec);
+        showRunningTimerNotification(
+          sess.mode === "break" ? "Break" : task?.title ?? "Quick Focus",
+          sess.mode,
+          remainingSec,
+          true,
+          totalSec
+        );
       },
       onResume: () => {
         const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
@@ -287,7 +293,13 @@ export function Shell() {
               : x
           ),
         }));
-        showRunningTimerNotification(task?.title ?? "Focus Session", sess.mode, remainingSec, false, totalSec);
+        showRunningTimerNotification(
+          sess.mode === "break" ? "Break" : task?.title ?? "Quick Focus",
+          sess.mode,
+          remainingSec,
+          false,
+          totalSec
+        );
       },
       onStop: () => {
         const sess = state.sessions.find((s) => s.status === "running" && !s.endedAt);
@@ -352,37 +364,45 @@ export function Shell() {
   };
 
   /* ---------- global session watchdog: finish countdowns wherever you are ---------- */
+  const alertedGoalSessionsRef = useRef<Set<string>>(new Set());
   useEffect(() => {
     const t = setInterval(() => {
       const running = state.sessions.find((s) => s.status === "running");
 
       if (!running || running.mode === "flow" || !running.plannedMin) return;
       if (sessionSeconds(running) >= running.plannedMin * 60) {
-        const ts = Date.now();
-        set((st) => ({
-          ...st,
-          sessions: st.sessions.map((x) =>
-            x.id === running.id
-              ? {
-                  ...x,
-                  endedAt: ts,
-                  status: "done",
-                  updatedAt: ts,
-                  pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
-                }
-              : x
-          ),
-        }));
-        playTimerChime(running.mode === "break" ? "break" : "complete");
-        if (state.settings.notifyEnabled) {
-          sendDesktopNotification(
-            running.mode === "break" ? "Break Finished ☕" : "LifeLog Timer Complete 🎯",
-            running.mode === "break"
-              ? "Break is over — ready to focus again."
-              : "Focus session finished and saved to your log."
-          );
+        if (running.mode === "break") {
+          const ts = Date.now();
+          set((st) => ({
+            ...st,
+            sessions: st.sessions.map((x) =>
+              x.id === running.id
+                ? {
+                    ...x,
+                    endedAt: ts,
+                    status: "done",
+                    updatedAt: ts,
+                    pauses: x.pauses.map((p) => (p.resumeAt ? p : { ...p, resumeAt: ts })),
+                  }
+                : x
+            ),
+          }));
+          playTimerChime("break");
+          if (state.settings.notifyEnabled) {
+            sendDesktopNotification("Break Finished", "Break is over — ready to focus again.");
+          }
+          toast("Break over — back to it", "ok");
+        } else if (!alertedGoalSessionsRef.current.has(running.id)) {
+          alertedGoalSessionsRef.current.add(running.id);
+          playTimerChime("complete");
+          if (state.settings.notifyEnabled) {
+            sendDesktopNotification(
+              "Focus Goal Reached",
+              `Target achieved (${running.plannedMin}m). Keep flowing or finish when done.`
+            );
+          }
+          toast("Focus goal reached! Continuing in overtime until stopped.", "ok");
         }
-        toast(running.mode === "break" ? "Break over — back to it" : "Timer complete — session saved to your log", "warn");
       }
     }, 1000);
     return () => clearInterval(t);

@@ -517,7 +517,7 @@ export function tagColor(tag: string): string {
 export function trackedByDay(sessions: Session[]): Map<string, number> {
   const map = new Map<string, number>();
   for (const s of sessions) {
-    if (s.taskId === null) continue; // breaks don't count as work
+    if (s.mode === "break") continue; // breaks don't count as work, but all focus sessions (with or without task) count
     const key = isoDate(new Date(s.startedAt));
     map.set(key, (map.get(key) ?? 0) + sessionMinutes(s));
   }
@@ -526,7 +526,7 @@ export function trackedByDay(sessions: Session[]): Map<string, number> {
 export function minutesInRange(sessions: Session[], fromIso: string, toIso: string): number {
   let total = 0;
   for (const s of sessions) {
-    if (s.taskId === null) continue;
+    if (s.mode === "break") continue;
     const key = isoDate(new Date(s.startedAt));
     if (dayNum(key) >= dayNum(fromIso) && dayNum(key) <= dayNum(toIso)) total += sessionMinutes(s);
   }
