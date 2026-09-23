@@ -1,16 +1,17 @@
 {
-  "version": "1.1.7",
-  "releaseDate": "2026-09-22",
+  "version": "1.1.8",
+  "releaseDate": "2026-09-23",
   "minRequiredVersion": "1.0.0",
   "changelog": [
-    "📱 Android Notification Silence & Polish: Eliminated sound/vibrate loops via native Kotlin silent channel guard; restored native OS progress bar and Flow chronometer count-up; fixed ongoing sticky notification (unswipeable)",
+    "📱 Android Notification Stability & Zero Spam: Eliminated repeated 10-second re-posting to stop notification history spam (no more 5-7 duplicates per minute) and flickering; Android OS Chronometer counts down/up natively in hardware",
+    "👆 Swipe-to-Dismiss Notifications: Made active timer notifications fully dismissable (ongoing: false, autoCancel: true) so you can swipe away the notification from your shade whenever you want",
+    "🎨 Inter Normal Universal Default Font: Imported Inter (weights 400, 500, 600, 700) and set it as the universal default typeface across the entire app for clean, crisp legibility",
+    "⚡ Calendar-Day Startup Update Check: Checks for updates exactly once on the first app launch of each calendar day, consuming < 1 KB of data (< 30 KB/month) and skipping subsequent opens",
     "🎯 Mandatory Task Binding: No focus session (Pomodoro, Countdown, Flow) can start without choosing a task in both Focus view and desktop Timer Popout",
     "✨ Clean UI & Dedicated Session Editor: Removed distracting link/change chips from Day Log and Focus; added compact edit modal in Today's Focus Log and Calendar to adjust duration and start/end times",
     "📅 Google Calendar Side-by-Side Columns: Overlapping tasks cleanly split side-by-side (| Task 1 | Task 2 |) across the full width of the day column",
-    "⚡ Focus Sessions & Pauses on Calendar Timeline: Automatically blocks completed focus sessions with duration and pause counts on the calendar timeline, seamlessly updating pre-scheduled tasks without duplication",
-    "🔀 Schedule Conflict Alignment Modal: Prompts user when an unscheduled focus session overlaps a planned task with 1-click options: Push forward, Move to Unscheduled Tray, Keep both, or Custom time",
-    "⏱️ Uncapped Focus Overtime Tracking: Sessions never freeze at target time; live overtime counter (+MM:SS) tracks true elapsed time (e.g. 50m + 15m = 1h 10m+) with dedicated 'Finish' button",
-    "📐 Accurate Duration Drag & 15m Resizing: Dragging from tray or grid previews the exact task duration height (no 1h bug); bottom-edge handles allow 15-minute duration resizing"
+    "⏱️ Uncapped Focus Overtime Tracking: Sessions never freeze at target time; live overtime counter (+MM:SS) tracks true elapsed time with dedicated 'Finish' button",
+    "📐 Accurate Duration Drag & 15m Resizing: Dragging from tray or grid previews the exact task duration height; bottom-edge handles allow 15-minute duration resizing"
   ],
   "downloads": {
     "windows": "https://github.com/Krrish1411/Lifelog-Releases/releases/latest/download/LifeLog-Windows-Setup.exe",

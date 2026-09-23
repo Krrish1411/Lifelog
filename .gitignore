@@ -32,3 +32,4 @@ Thumbs.db
 # Temporary directories
 Dump/
 ss/
+.empty_ssh_config

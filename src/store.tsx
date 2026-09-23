@@ -154,6 +154,10 @@ function mergeState(raw: Partial<State>): State {
       ...DEFAULT_SETTINGS,
       ...(base.settings ?? {}),
       layout: initialLayout,
+      fontPair:
+        !base.settings?.fontPair || base.settings.fontPair === "manrope"
+          ? "inter"
+          : base.settings.fontPair,
       accent:
         !base.settings?.accent || base.settings.accent.toLowerCase() === "#d97706"
           ? DEFAULT_SETTINGS.accent

@@ -1,6 +1,8 @@
 name: Build & Deploy Web App to Lifelog-Releases
 
 on:
+  push:
+    tags: [ "v*" ]
   workflow_dispatch:
 
 permissions:

@@ -5,8 +5,7 @@ const REMOTE_VERSION_URL =
   "https://raw.githubusercontent.com/Krrish1411/Lifelog-Releases/main/version.json";
 const FALLBACK_VERSION_URL =
   "https://krrish1411.github.io/Lifelog-Releases/version.json";
-const LAST_CHECK_KEY = "lifelog_last_update_check";
-const CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const DAILY_CHECK_DATE_KEY = "lifelog_last_update_check_date";
 
 /**
  * Compare two semver strings (e.g. "1.1.1" vs "1.1.0").
@@ -28,42 +27,41 @@ export function isNewerVersion(remote: string, current: string): boolean {
  * Fetch the latest release descriptor from the canonical public releases repository.
  * Uses native CapacitorHttp on Android (bypasses WebView CORS completely).
  * Uses simple GET without preflight headers on Web/Electron.
+ * Returns immediately upon primary URL success to minimize bandwidth consumption (< 1 KB).
  */
 export async function fetchRemoteVersionInfo(): Promise<AppVersionInfo> {
   const ts = Date.now();
   const primaryUrl = `${REMOTE_VERSION_URL}?_t=${ts}`;
   const fallbackUrl = `${FALLBACK_VERSION_URL}?_t=${ts}`;
 
-  const candidates: AppVersionInfo[] = [];
-
   // 1. On Native Android / iOS, try native CapacitorHttp (bypasses WebView CORS completely)
   if (Capacitor.isNativePlatform()) {
     try {
       const response = await CapacitorHttp.get({
         url: primaryUrl,
-        connectTimeout: 9000,
-        readTimeout: 9000,
+        connectTimeout: 7000,
+        readTimeout: 7000,
       });
       if (response.status === 200 && response.data) {
         const parsed = typeof response.data === "string" ? JSON.parse(response.data) : response.data;
-        if (parsed?.version) candidates.push(parsed);
+        if (parsed?.version) return parsed;
       }
     } catch {}
 
     try {
       const response = await CapacitorHttp.get({
         url: fallbackUrl,
-        connectTimeout: 9000,
-        readTimeout: 9000,
+        connectTimeout: 7000,
+        readTimeout: 7000,
       });
       if (response.status === 200 && response.data) {
         const parsed = typeof response.data === "string" ? JSON.parse(response.data) : response.data;
-        if (parsed?.version) candidates.push(parsed);
+        if (parsed?.version) return parsed;
       }
     } catch {}
   } else {
     // Helper for web/electron fetch with individual timeout and no custom headers (avoids CORS preflight)
-    const fetchWithTimeout = async (url: string, timeoutMs: number = 8000) => {
+    const fetchWithTimeout = async (url: string, timeoutMs: number = 7000) => {
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), timeoutMs);
       try {
@@ -79,21 +77,14 @@ export async function fetchRemoteVersionInfo(): Promise<AppVersionInfo> {
     };
 
     try {
-      const p = await fetchWithTimeout(primaryUrl, 7000);
-      if (p?.version) candidates.push(p);
+      const p = await fetchWithTimeout(primaryUrl, 6000);
+      if (p?.version) return p;
     } catch {}
 
     try {
-      const f = await fetchWithTimeout(fallbackUrl, 7000);
-      if (f?.version) candidates.push(f);
+      const f = await fetchWithTimeout(fallbackUrl, 6000);
+      if (f?.version) return f;
     } catch {}
-  }
-
-  if (candidates.length > 0) {
-    // Return candidate with the highest semver
-    return candidates.reduce((highest, current) => {
-      return isNewerVersion(current.version, highest.version) ? current : highest;
-    });
   }
 
   throw new Error("Could not reach the releases server. Verify your internet connection.");
@@ -101,23 +92,26 @@ export async function fetchRemoteVersionInfo(): Promise<AppVersionInfo> {
 
 /**
  * Silent daily update checker executed on app startup.
- * Checks at most once every 24 hours. Returns AppVersionInfo if a newer version is available.
+ * Checks exactly once per calendar day (on the first launch of that day).
+ * Consumes < 1 KB of compressed data per check.
+ * Returns AppVersionInfo if a newer version is available.
  */
 export async function checkDailyUpdate(
   currentVersion: string = APP_VERSION
 ): Promise<AppVersionInfo | null> {
   try {
-    const lastCheckStr = typeof window !== "undefined" ? localStorage.getItem(LAST_CHECK_KEY) : null;
-    const lastCheck = lastCheckStr ? parseInt(lastCheckStr, 10) : 0;
-    const now = Date.now();
+    const todayDate = new Date().toISOString().slice(0, 10); // "YYYY-MM-DD"
+    const lastCheckDate = typeof window !== "undefined" ? localStorage.getItem(DAILY_CHECK_DATE_KEY) : null;
 
-    // Only query if 24 hours have elapsed since the previous check
-    if (now - lastCheck < CHECK_INTERVAL_MS) {
+    // Only query on the very first launch of each calendar day
+    if (lastCheckDate === todayDate) {
       return null;
     }
 
     const data = await fetchRemoteVersionInfo();
-    localStorage.setItem(LAST_CHECK_KEY, now.toString());
+    if (typeof window !== "undefined") {
+      localStorage.setItem(DAILY_CHECK_DATE_KEY, todayDate);
+    }
 
     if (isNewerVersion(data.version, currentVersion)) {
       return data;

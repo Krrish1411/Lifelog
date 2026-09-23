@@ -78,7 +78,7 @@ export function useApplyTheme(s: Settings) {
       ? `'${CUSTOM_FONT_FAMILY}', sans-serif`
       : s.fontPair === "system"
       ? fontDef?.family ?? "system-ui, sans-serif"
-      : `'${fontDef?.family ?? "Manrope"}', sans-serif`;
+      : `'${fontDef?.family ?? "Inter"}', sans-serif`;
     root.style.setProperty("--font-body", fam);
     root.style.setProperty("--font-display", fam);
     document.body.style.fontFamily = fam;

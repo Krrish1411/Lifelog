@@ -606,8 +606,8 @@ export async function showRunningTimerNotification(
           body,
           summaryText: isBreak ? "Break" : "Focus",
           channelId: "focus-running-silent-v5",
-          ongoing: true, // Always sticky across both running and paused states
-          autoCancel: false,
+          ongoing: false, // Swipeable: allows user to dismiss notification from tray at will
+          autoCancel: true,
           actionTypeId: isPaused ? "TIMER_PAUSED_ACTIONS" : "TIMER_RUNNING_ACTIONS",
           extra,
         },
@@ -663,8 +663,8 @@ export function initNotificationActionListener(handlers: {
 
 /**
  * Register App State Change listener so when app is minimized,
- * if a timer is running, a running notification is posted to the Android tray,
- * and updated cleanly.
+ * if a timer is running, a running notification is posted once to the Android tray.
+ * Native Android chronometer ticks smoothly without repeated re-posting.
  */
 export function initRunningTimerTrayListener(
   getActiveTimer: () => {
@@ -680,45 +680,12 @@ export function initRunningTimerTrayListener(
 ): () => void {
   if (!isNativeMobile) return () => {};
 
-  let intervalId: any = null;
-
   const handle = CapApp.addListener("appStateChange", (state) => {
     if (!state.isActive) {
-      // App minimized or backgrounded: show immediately (0ms) and tick every 10s for battery conservation
-      const updateNotif = () => {
-        const timer = getActiveTimer();
-        if (timer && timer.running) {
-          showRunningTimerNotification(
-            timer.taskTitle,
-            timer.mode,
-            timer.remainingSec,
-            timer.isPaused,
-            timer.totalSec,
-            timer.startedAt,
-            timer.elapsedSec
-          );
-        } else {
-          dismissRunningTimerNotification();
-          if (intervalId) {
-            clearInterval(intervalId);
-            intervalId = null;
-          }
-        }
-      };
-
-      updateNotif();
-      if (intervalId) clearInterval(intervalId);
-      intervalId = setInterval(updateNotif, 10000);
-    } else {
-      // App brought back to foreground: clear background ticker, but keep active notification
-      if (intervalId) {
-        clearInterval(intervalId);
-        intervalId = null;
-      }
+      // App minimized or backgrounded: post notification once.
+      // Native Android Chronometer handles real-time ticking natively without JS re-posting.
       const timer = getActiveTimer();
-      if (!timer || !timer.running) {
-        dismissRunningTimerNotification();
-      } else {
+      if (timer && timer.running) {
         showRunningTimerNotification(
           timer.taskTitle,
           timer.mode,
@@ -728,12 +695,19 @@ export function initRunningTimerTrayListener(
           timer.startedAt,
           timer.elapsedSec
         );
+      } else {
+        dismissRunningTimerNotification();
+      }
+    } else {
+      // App brought back to foreground: if timer stopped while outside, dismiss
+      const timer = getActiveTimer();
+      if (!timer || !timer.running) {
+        dismissRunningTimerNotification();
       }
     }
   });
 
   return () => {
-    if (intervalId) clearInterval(intervalId);
     handle.then((h) => h.remove()).catch(() => {});
   };
 }

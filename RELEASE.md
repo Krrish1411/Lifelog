@@ -4,6 +4,28 @@
 
 Official release documentation and changelogs for **LifeLog** — the offline-first, zero-cloud personal operating system for tasks, notes, habits, and deep work.
 
+## 🌟 v1.1.8 — Android Notification Stability, Swipe-to-Dismiss, Inter Normal Default Font & Calendar-Day Update Check (2026-09-23)
+
+### 📱 1. Android Notification Stability & Zero Spam
+- **Eliminated Repetitive 10s Re-posting:** Removed the background JavaScript interval loop from `initRunningTimerTrayListener` that caused 5–7 duplicate notifications per minute in Android's notification history.
+- **Hardware-Level OS Chronometer:** Android OS native Chronometer handles second-by-second countdown and count-up rendering directly in the system UI and lock screen without re-posting notifications or waking the CPU.
+- **No More Blinking / Flickering:** Active timer notifications are posted once on backgrounding, updated once on state changes (pause/resume), and cleanly dismissed when stopped.
+
+### 👆 2. Swipe-to-Dismiss Notifications
+- **User-Controlled Dismissal:** Changed running timer notifications from `ongoing: true` to `ongoing: false` and enabled `autoCancel: true`. Users can now swipe away the notification from their notification shade whenever they want.
+
+### 🎨 3. Universal Inter Normal Default Typography
+- **Inter Font Integration:** Imported Google Fonts `Inter` (weights 400, 500, 600, 700) in `index.html`.
+- **Universal Default Font:** Configured `Inter` as the universal default across `--font-body` and `--font-display`, `DEFAULT_SETTINGS.fontPair`, and automatic migration for existing user sessions. All headings, body, notes, cards, and modal components inherit crisp, clean Inter typography.
+- **Typeface Picker:** Added `Inter (default)` to Settings > Typeface with 1-click switching.
+
+### ⚡ 4. Calendar-Day Startup Update Check (< 1 KB Bandwidth)
+- **Once-per-Calendar-Day Check:** Replaced millisecond interval checks with `new Date().toISOString().slice(0, 10)` calendar date comparison in `localStorage`. The update check runs exactly once on the first app launch of each day and silently skips subsequent opens.
+- **Minimal Bandwidth Usage (< 1 KB):** Releases descriptor (`version.json`) is under 2.6 KB uncompressed (< 1 KB compressed). Monthly bandwidth consumption is ~25 KB to 50 KB (less than loading half a website image in an entire month).
+- **Fast Failover:** Optimized `fetchRemoteVersionInfo()` to immediately return upon primary URL success without querying fallback URLs.
+
+---
+
 ## 🌟 v1.1.7 — Android Notification Silence & Polish, Mandatory Task Binding, Google Calendar Side-by-Side & Schedule Alignment (2026-09-22)
 
 ### 📱 1. Android Notification Silence & Polish

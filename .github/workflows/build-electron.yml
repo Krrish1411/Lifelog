@@ -1,6 +1,8 @@
 name: Build LifeLog Desktop Apps (Electron)
 
 on:
+  push:
+    tags: [ "v*" ]
   workflow_dispatch:
 
 permissions:

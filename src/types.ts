@@ -7,7 +7,7 @@ export type Priority = "low" | "medium" | "high" | "urgent";
 export type LayoutMode = "planify" | "control" | "glass" | "zen" | "desk";
 export type MobileLayoutMode = "classic" | "liquid";
 export type ThemeMode = "dark" | "light";
-export type FontPair = "manrope" | "sora" | "outfit" | "plex" | "jakarta" | "nunito" | "system";
+export type FontPair = "inter" | "manrope" | "sora" | "outfit" | "plex" | "jakarta" | "nunito" | "system";
 export type TimerMode = "pomodoro" | "countdown" | "flow";
 export type ViewId =
   | "dashboard"
@@ -318,7 +318,7 @@ export const DEFAULT_SETTINGS: Settings = {
   customQuotes: [],
   zenPanels: { plan: true, timer: true, checkin: true, insights: true },
   uiZoom: 100,
-  fontPair: "manrope",
+  fontPair: "inter",
   customFontName: null,
   reminderLeadMin: 10,
   pomodoroMin: 25,
@@ -370,7 +370,7 @@ export const DEFAULT_SETTINGS: Settings = {
 };
 
 declare const __APP_VERSION__: string | undefined;
-export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.7";
+export const APP_VERSION = typeof __APP_VERSION__ !== "undefined" ? __APP_VERSION__ : "1.1.8";
 
 export interface AppVersionInfo {
   version: string;
@@ -411,7 +411,8 @@ export const QUOTES: string[] = [
 
 /** Google-Font interface pairs (loaded in index.html, applied via CSS vars). */
 export const FONT_PAIRS: Record<FontPair, { label: string; family: string }> = {
-  manrope: { label: "Manrope (default)", family: "Manrope" },
+  inter: { label: "Inter (default)", family: "Inter" },
+  manrope: { label: "Manrope", family: "Manrope" },
   sora: { label: "Sora", family: "Sora" },
   outfit: { label: "Outfit", family: "Outfit" },
   plex: { label: "IBM Plex Sans", family: "IBM Plex Sans" },
