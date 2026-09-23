@@ -455,7 +455,15 @@ export function TaskDialog() {
         </>
       }
     >
-      <div className="flex flex-col gap-4">
+      <div
+        className="flex flex-col gap-4"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !(e.target instanceof HTMLTextAreaElement)) {
+            e.preventDefault();
+            save();
+          }
+        }}
+      >
         {/* Title & Natural Language Detection */}
         <div>
           <Labeled label="Title">
@@ -1133,7 +1141,18 @@ export function TaskDialog() {
               </div>
             ))}
             <div className="flex gap-2">
-              <TextInput value={newSub} onChange={(e) => setNewSub(e.target.value)} onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), addSub())} placeholder="Add a subtask…" />
+              <TextInput
+                value={newSub}
+                onChange={(e) => setNewSub(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    addSub();
+                  }
+                }}
+                placeholder="Add a subtask…"
+              />
               <Btn onClick={addSub}><Plus size={13} /></Btn>
             </div>
           </div>
@@ -1213,7 +1232,13 @@ export function TaskDialog() {
             value={newCatName}
             onChange={(e) => setNewCatName(e.target.value)}
             placeholder="e.g. Gaming, Guitar, Cooking, Gym"
-            onKeyDown={(e) => e.key === "Enter" && handleCreateCustomCategory()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                e.stopPropagation();
+                handleCreateCustomCategory();
+              }
+            }}
           />
         </Labeled>
         <div className="grid grid-cols-2 gap-3">

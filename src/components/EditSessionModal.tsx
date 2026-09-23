@@ -96,7 +96,15 @@ export function EditSessionModal({
 
   return (
     <Modal open title="Edit Focus Session" onClose={onClose} width={480}>
-      <div className="flex flex-col gap-4 text-xs">
+      <div
+        className="flex flex-col gap-4 text-xs"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !(e.target instanceof HTMLTextAreaElement)) {
+            e.preventDefault();
+            handleSave();
+          }
+        }}
+      >
         {/* Task Selection */}
         <div className="flex flex-col gap-1.5">
           <label className="text-[11px] font-bold uppercase tracking-wider text-[var(--mut)] flex items-center gap-1.5">

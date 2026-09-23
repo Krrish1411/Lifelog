@@ -17,9 +17,10 @@ import {
 } from "../utils/core";
 import { Btn, Seg, cn } from "../components/ui";
 import { EditSessionModal } from "../components/EditSessionModal";
+import { QuickBlockSchedulerModal } from "../components/QuickBlockSchedulerModal";
 
 type CalView = "schedule" | "day" | "3day" | "week" | "month";
-const H0 = 5; // grid starts 05:00
+const H0 = 0; // grid starts 00:00 for full 24h coverage
 const H1 = 24; // grid ends 24:00
 const HOUR_H = 44;
 const GRID_H = (H1 - H0) * HOUR_H;
@@ -29,7 +30,7 @@ function timeToMin(hm: string): number {
   return h * 60 + m;
 }
 function minToTime(min: number): string {
-  const h = Math.floor(min / 60);
+  const h = Math.floor(min / 60) % 24;
   const m = min % 60;
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 }
@@ -149,7 +150,7 @@ export interface UnscheduledItem {
 
 export function CalendarView() {
   const app = useApp();
-  const { state, set, openTaskDialog, toast } = app;
+  const { state, set, openTaskDialog, toast, requestFocus } = app;
   const [view, setView] = useState<CalView>("schedule");
   const [anchor, setAnchor] = useState(todayIso());
   const [selectedDay, setSelectedDay] = useState(todayIso());
@@ -160,12 +161,41 @@ export function CalendarView() {
     taskId: string;
     blockId?: string;
     isHabit?: boolean;
+    edge: "top" | "bottom";
     startY: number;
+    initialStartMin: number;
     initialDur: number;
+    currentStartMin: number;
     currentDur: number;
   } | null>(null);
+
+  const mouseResizeActiveRef = useRef(false);
+  const mouseResizeClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
   const justInteractedRef = useRef(false);
+
+  // Drag-to-create time block state
+  const [dragCreate, setDragCreate] = useState<{
+    iso: string;
+    startMin: number;
+    currentMin: number;
+  } | null>(null);
+
+  const potentialCreateRef = useRef<{
+    iso: string;
+    slotMin: number;
+    startY: number;
+    startX: number;
+  } | null>(null);
+
+  const [quickBlockModal, setQuickBlockModal] = useState<{
+    open: boolean;
+    date: string;
+    time: string;
+    durationMin: number;
+  } | null>(null);
+
+  const timelineScrollerRef = useRef<HTMLDivElement>(null);
 
   const today = todayIso();
   const [nowMin, setNowMin] = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
@@ -178,19 +208,40 @@ export function CalendarView() {
     return () => clearInterval(t);
   }, []);
 
-  // Google Calendar interactive bottom-edge duration resizing handler
-  const handleResizeStart = (e: React.MouseEvent | React.TouchEvent, b: CalendarItem) => {
+  // Auto-scroll timeline to current morning/active hour on mount
+  useEffect(() => {
+    if (timelineScrollerRef.current) {
+      const targetHour = Math.max(0, Math.min(20, Math.floor(nowMin / 60) - 1));
+      timelineScrollerRef.current.scrollTop = targetHour * HOUR_H;
+    }
+  }, [view]);
+
+  // Dual-edge duration resizing handler
+  const handleResizeStart = (
+    e: React.MouseEvent | React.TouchEvent,
+    b: CalendarItem,
+    edge: "top" | "bottom"
+  ) => {
     e.stopPropagation();
     e.preventDefault();
+    mouseResizeActiveRef.current = true;
+    if (mouseResizeClearTimerRef.current) clearTimeout(mouseResizeClearTimerRef.current);
+
     const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
+    const startMin = timeToMin(b.time || "09:00");
+    const dur = b.durationMin || 60;
+
     setResizing({
       targetItemId: b.id,
       taskId: b.taskId,
       blockId: b.blockId,
       isHabit: !!b.isHabit,
+      edge,
       startY: clientY,
-      initialDur: b.durationMin || 60,
-      currentDur: b.durationMin || 60,
+      initialStartMin: startMin,
+      initialDur: dur,
+      currentStartMin: startMin,
+      currentDur: dur,
     });
   };
 
@@ -201,18 +252,33 @@ export function CalendarView() {
       const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
       const deltaY = clientY - resizing.startY;
       const deltaMin = Math.round(((deltaY / HOUR_H) * 60) / 15) * 15;
-      const newDur = Math.max(15, resizing.initialDur + deltaMin);
-      setResizing((r) => (r ? { ...r, currentDur: newDur } : null));
+
+      if (resizing.edge === "bottom") {
+        const newDur = Math.max(15, resizing.initialDur + deltaMin);
+        setResizing((r) => (r ? { ...r, currentDur: newDur } : null));
+      } else {
+        const initialEndMin = resizing.initialStartMin + resizing.initialDur;
+        const newStartMin = Math.max(0, Math.min(initialEndMin - 15, resizing.initialStartMin + deltaMin));
+        const newDur = initialEndMin - newStartMin;
+        setResizing((r) => (r ? { ...r, currentStartMin: newStartMin, currentDur: newDur } : null));
+      }
     };
 
     const handleMouseUp = () => {
       justInteractedRef.current = true;
-      setTimeout(() => {
+      mouseResizeClearTimerRef.current = setTimeout(() => {
+        mouseResizeActiveRef.current = false;
         justInteractedRef.current = false;
-      }, 250);
+      }, 100);
 
-      if (resizing.currentDur !== resizing.initialDur) {
+      const hasChanged =
+        resizing.currentDur !== resizing.initialDur ||
+        resizing.currentStartMin !== resizing.initialStartMin;
+
+      if (hasChanged) {
         const finalDur = resizing.currentDur;
+        const finalTime = minToTime(resizing.currentStartMin);
+
         set((s) => ({
           ...s,
           tasks: s.tasks.map((t) => {
@@ -221,14 +287,20 @@ export function CalendarView() {
               return {
                 ...t,
                 timeBlocks: t.timeBlocks.map((b) =>
-                  b.id === resizing.blockId ? { ...b, durationMin: finalDur } : b
+                  b.id === resizing.blockId
+                    ? { ...b, time: finalTime, durationMin: finalDur }
+                    : b
                 ),
               };
             }
-            return { ...t, durationMin: finalDur };
+            return {
+              ...t,
+              dueTime: finalTime,
+              durationMin: finalDur,
+            };
           }),
         }));
-        toast(`Updated duration to ${fmtDur(finalDur)}`, "ok");
+        toast(`Updated duration to ${fmtDur(finalDur)} (${finalTime})`, "ok");
       }
       setResizing(null);
     };
@@ -246,12 +318,242 @@ export function CalendarView() {
     };
   }, [resizing, set, toast]);
 
+  // Window listeners for drag-to-create time blocking & cleaning hover preview
+  useEffect(() => {
+    const handleWindowMouseMove = (e: MouseEvent) => {
+      if (!potentialCreateRef.current) return;
+      const { iso, slotMin, startY, startX } = potentialCreateRef.current;
+      const dy = e.clientY - startY;
+      const dx = e.clientX - startX;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist >= 6 && !dragCreate) {
+        setDragCreate({
+          iso,
+          startMin: slotMin,
+          currentMin: slotMin + 15,
+        });
+      } else if (dragCreate) {
+        const deltaMin = Math.round(((dy / HOUR_H) * 60) / 15) * 15;
+        const curMin = Math.max(0, Math.min(1440, slotMin + deltaMin));
+        setDragCreate((prev) => (prev ? { ...prev, currentMin: curMin } : null));
+      }
+    };
+
+    const handleWindowMouseUp = (e: MouseEvent) => {
+      if (!potentialCreateRef.current) return;
+      const pot = potentialCreateRef.current;
+      potentialCreateRef.current = null;
+
+      if (dragCreate) {
+        const start = Math.min(dragCreate.startMin, dragCreate.currentMin);
+        const end = Math.max(dragCreate.startMin, dragCreate.currentMin);
+        const dur = Math.max(15, end - start);
+        setQuickBlockModal({
+          open: true,
+          date: dragCreate.iso,
+          time: minToTime(start),
+          durationMin: dur,
+        });
+        setDragCreate(null);
+        justInteractedRef.current = true;
+        setTimeout(() => {
+          justInteractedRef.current = false;
+        }, 100);
+      } else {
+        const dy = Math.abs(e.clientY - pot.startY);
+        const dx = Math.abs(e.clientX - pot.startX);
+        if (dy < 6 && dx < 6) {
+          setQuickBlockModal({
+            open: true,
+            date: pot.iso,
+            time: minToTime(pot.slotMin),
+            durationMin: 60,
+          });
+        }
+      }
+    };
+
+    const handleWindowDragEnd = () => {
+      setHover(null);
+      setDragDuration(60);
+    };
+
+    window.addEventListener("mousemove", handleWindowMouseMove);
+    window.addEventListener("mouseup", handleWindowMouseUp);
+    window.addEventListener("dragend", handleWindowDragEnd);
+    return () => {
+      window.removeEventListener("mousemove", handleWindowMouseMove);
+      window.removeEventListener("mouseup", handleWindowMouseUp);
+      window.removeEventListener("dragend", handleWindowDragEnd);
+    };
+  }, [dragCreate]);
+
+  // Quick Block Scheduler handlers
+  const handleAssignBacklogTask = (task: Task) => {
+    if (!quickBlockModal) return;
+    const { date, time, durationMin } = quickBlockModal;
+
+    set((s) => ({
+      ...s,
+      tasks: s.tasks.map((t) =>
+        t.id === task.id
+          ? {
+              ...t,
+              due: date,
+              dueTime: time,
+              durationMin,
+            }
+          : t
+      ),
+    }));
+    toast(`Scheduled “${task.title}” · ${fmtDayShort(date)} at ${time}`, "ok");
+  };
+
+  const handleCreateAndScheduleNewTask = (title: string, projectId: string) => {
+    if (!quickBlockModal) return;
+    const { date, time, durationMin } = quickBlockModal;
+    const newId = `t-${Date.now()}`;
+
+    const newTask: Task = {
+      id: newId,
+      title,
+      projectId,
+      notes: "",
+      emoji: null,
+      priority: "medium",
+      tags: [],
+      estimateMin: durationMin,
+      due: date,
+      dueTime: time,
+      durationMin,
+      snoozedUntil: null,
+      done: false,
+      doneAt: null,
+      createdAt: Date.now(),
+      subtasks: [],
+      recurrence: null,
+      completions: [],
+      privateNote: null,
+    };
+
+    set((s) => ({
+      ...s,
+      tasks: [newTask, ...s.tasks],
+    }));
+    toast(`Created and scheduled “${title}” at ${time}`, "ok");
+  };
+
+  const handleStartFocusFromBlock = (title: string, projectId: string) => {
+    if (!quickBlockModal) return;
+    const { durationMin } = quickBlockModal;
+    const newId = `t-${Date.now()}`;
+    const newTask: Task = {
+      id: newId,
+      title,
+      projectId,
+      notes: "",
+      emoji: null,
+      priority: "high",
+      tags: [],
+      estimateMin: durationMin,
+      due: todayIso(),
+      dueTime: minToTime(new Date().getHours() * 60 + new Date().getMinutes()),
+      durationMin,
+      snoozedUntil: null,
+      done: false,
+      doneAt: null,
+      createdAt: Date.now(),
+      subtasks: [],
+      recurrence: null,
+      completions: [],
+      privateNote: null,
+    };
+
+    set((s) => ({
+      ...s,
+      tasks: [newTask, ...s.tasks],
+    }));
+    requestFocus(newId);
+    toast(`Started focus session for “${title}”! ⚡`, "ok");
+  };
+
+  // Compute view date arrays first so blocksByDay can populate all visible days
+  const days: string[] = useMemo(() => {
+    if (view === "day") return [anchor];
+    if (view === "3day") return listDates(anchor, addDaysIso(anchor, 2));
+    if (view === "week")
+      return listDates(weekStartIso(anchor), addDaysIso(weekStartIso(anchor), 6));
+    return [];
+  }, [view, anchor]);
+
+  const monthCells = useMemo(() => {
+    if (view !== "month") return [];
+    const d = parseIso(anchor);
+    const first = isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
+    const start = weekStartIso(first);
+    return listDates(start, addDaysIso(start, 41));
+  }, [view, anchor]);
+
+  const scheduleDays = useMemo(() => {
+    if (view !== "schedule") return [];
+    return listDates(anchor, addDaysIso(anchor, 13));
+  }, [view, anchor]);
+
+  const allVisibleDates = useMemo(() => {
+    const set = new Set<string>([todayIso(), anchor]);
+    for (const d of days) set.add(d);
+    for (const d of scheduleDays) set.add(d);
+    for (const d of monthCells) set.add(d);
+    return Array.from(set);
+  }, [days, scheduleDays, monthCells, anchor]);
+
   const tracked = useMemo(() => trackedByDay(state.sessions), [state.sessions]);
 
-  // Flatten both standard tasks, multi-blocks, habits, and focus sessions into timed items vs all-day items
+  // Flatten tasks, multi-blocks, habits, and focus sessions into timed items vs all-day items
   const { blocksByDay, allDayByDay } = useMemo(() => {
     const timedMap = new Map<string, CalendarItem[]>();
     const allDayMap = new Map<string, CalendarItem[]>();
+
+    // Split blocks running past midnight (00:00) so they don't overflow the grid
+    const addBlockWithOvernightSplit = (item: CalendarItem) => {
+      const startMin = timeToMin(item.time ?? "09:00");
+      const dur = item.durationMin || 60;
+      const endMin = startMin + dur;
+
+      if (endMin <= 1440) {
+        const arr = timedMap.get(item.date) ?? [];
+        arr.push(item);
+        timedMap.set(item.date, arr);
+      } else {
+        // Clamps at 24:00 today
+        const dur1 = Math.max(15, 1440 - startMin);
+        const part1: CalendarItem = {
+          ...item,
+          durationMin: dur1,
+        };
+        const arr1 = timedMap.get(item.date) ?? [];
+        arr1.push(part1);
+        timedMap.set(item.date, arr1);
+
+        // Starts at 00:00 on the following day with remaining duration
+        const nextDate = addDaysIso(item.date, 1);
+        const dur2 = endMin - 1440;
+        if (dur2 > 0) {
+          const part2: CalendarItem = {
+            ...item,
+            id: `${item.id}-cont`,
+            date: nextDate,
+            time: "00:00",
+            durationMin: dur2,
+            label: item.label ? `${item.label} (cont.)` : "(cont.)",
+          };
+          const arr2 = timedMap.get(nextDate) ?? [];
+          arr2.push(part2);
+          timedMap.set(nextDate, arr2);
+        }
+      }
+    };
 
     // 1. Process tasks
     for (const t of state.tasks) {
@@ -276,9 +578,7 @@ export function CalendarView() {
               snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
               done: isDone,
             };
-            const arr = timedMap.get(b.date) ?? [];
-            arr.push(item);
-            timedMap.set(b.date, arr);
+            addBlockWithOvernightSplit(item);
           } else {
             // All-day multi-block
             const item: CalendarItem = {
@@ -315,9 +615,7 @@ export function CalendarView() {
             snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
             done: !!t.done,
           };
-          const arr = timedMap.get(t.due) ?? [];
-          arr.push(item);
-          timedMap.set(t.due, arr);
+          addBlockWithOvernightSplit(item);
         } else {
           // All-day task
           const item: CalendarItem = {
@@ -338,11 +636,10 @@ export function CalendarView() {
       }
     }
 
-    // 2. Habits (Daily Habits go into allDayMap for clean grid display)
+    // 2. Habits: reliably populate for ALL visible dates in active calendar view
     const sortedHabits = [...state.habits].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
     sortedHabits.forEach((h) => {
-      const habitDays = new Set([...h.completions, todayIso(), anchor]);
-      for (const d of habitDays) {
+      for (const d of allVisibleDates) {
         const isDone = h.completions.includes(d);
         const item: CalendarItem = {
           id: `h-${h.id}-${d}`,
@@ -391,6 +688,7 @@ export function CalendarView() {
 
       const arr = timedMap.get(sDate) ?? [];
       const sEndMin = sStartMin + sDurationMin;
+      // Deduplicate with pre-scheduled task on that day
       const matchIdx = arr.findIndex(
         (existing) =>
           !existing.isFocusSession &&
@@ -402,42 +700,22 @@ export function CalendarView() {
       if (matchIdx >= 0) {
         arr[matchIdx] = item;
       } else {
-        arr.push(item);
+        addBlockWithOvernightSplit(item);
       }
-      timedMap.set(sDate, arr);
     }
 
     for (const arr of timedMap.values()) {
       arr.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
     }
     return { blocksByDay: timedMap, allDayByDay: allDayMap };
-  }, [state.tasks, state.habits, state.sessions, state.settings.showLifeLogProject, anchor]);
-
-  const days: string[] = useMemo(() => {
-    if (view === "day") return [anchor];
-    if (view === "3day") return listDates(anchor, addDaysIso(anchor, 2));
-    if (view === "week")
-      return listDates(weekStartIso(anchor), addDaysIso(weekStartIso(anchor), 6));
-    return [];
-  }, [view, anchor]);
-
-  const monthCells = useMemo(() => {
-    if (view !== "month") return [];
-    const d = parseIso(anchor);
-    const first = isoDate(new Date(d.getFullYear(), d.getMonth(), 1));
-    const start = weekStartIso(first);
-    return listDates(start, addDaysIso(start, 41));
-  }, [view, anchor]);
-
-  const scheduleDays = useMemo(() => {
-    if (view !== "schedule") return [];
-    return listDates(anchor, addDaysIso(anchor, 13));
-  }, [view, anchor]);
+  }, [state.tasks, state.habits, state.sessions, state.settings.showLifeLogProject, allVisibleDates]);
 
   const navigate = (dir: -1 | 1) => {
     if (view === "month") {
       const d = parseIso(anchor);
-      setAnchor(isoDate(new Date(d.getFullYear(), d.getMonth() + dir, 1)));
+      const newAnchor = isoDate(new Date(d.getFullYear(), d.getMonth() + dir, 1));
+      setAnchor(newAnchor);
+      setSelectedDay(newAnchor);
     } else if (view === "schedule") {
       setAnchor(addDaysIso(anchor, dir * 7));
     } else if (view === "3day") {
@@ -467,6 +745,8 @@ export function CalendarView() {
       const [y, m, d] = s.split("-").map(Number);
       return new Date(y, m - 1, d);
     };
+    const weekdaysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+    const daysFull = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
     const months = [
       "January", "February", "March", "April", "May", "June",
       "July", "August", "September", "October", "November", "December"
@@ -482,39 +762,32 @@ export function CalendarView() {
     }
     if (view === "day") {
       const d = parse(anchor);
-      const daysFull = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      return `${daysFull[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+      return `${daysFull[d.getDay()]}, ${d.getDate()} ${monthsShort[d.getMonth()]} ${d.getFullYear()}`;
     }
     if (view === "3day") {
       const start = parse(anchor);
       const end = parse(addDaysIso(anchor, 2));
       if (start.getFullYear() !== end.getFullYear()) {
-        return `${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
+        return `${weekdaysShort[start.getDay()]} ${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} — ${weekdaysShort[end.getDay()]} ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
       }
-      if (start.getMonth() !== end.getMonth()) {
-        return `${start.getDate()} ${monthsShort[start.getMonth()]} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
-      }
-      return `${start.getDate()} – ${end.getDate()} ${months[start.getMonth()]} ${start.getFullYear()}`;
+      return `${weekdaysShort[start.getDay()]} ${start.getDate()} ${monthsShort[start.getMonth()]} — ${weekdaysShort[end.getDay()]} ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
     }
     if (view === "week") {
       const startIso = weekStartIso(anchor);
       const start = parse(startIso);
       const end = parse(addDaysIso(startIso, 6));
       if (start.getFullYear() !== end.getFullYear()) {
-        return `${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
+        return `${weekdaysShort[start.getDay()]} ${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} — ${weekdaysShort[end.getDay()]} ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
       }
-      if (start.getMonth() !== end.getMonth()) {
-        return `${start.getDate()} ${monthsShort[start.getMonth()]} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
-      }
-      return `${start.getDate()} – ${end.getDate()} ${months[start.getMonth()]} ${start.getFullYear()}`;
+      return `${weekdaysShort[start.getDay()]} ${start.getDate()} ${monthsShort[start.getMonth()]} — ${weekdaysShort[end.getDay()]} ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
     }
     if (view === "schedule") {
       const start = parse(anchor);
       const end = parse(addDaysIso(anchor, 13));
       if (start.getFullYear() !== end.getFullYear()) {
-        return `${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
+        return `${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} — ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
       }
-      return `${start.getDate()} ${monthsShort[start.getMonth()]} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
+      return `${start.getDate()} ${monthsShort[start.getMonth()]} — ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
     }
     return anchor;
   }, [view, anchor]);
@@ -794,7 +1067,7 @@ export function CalendarView() {
                             borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
                           }}
                         >
-                          {/* 3.5px DayFlow accent bar */}
+                          {/* 3.5px accent bar */}
                           <div
                             className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
                             style={{ backgroundColor: projColor }}
@@ -868,7 +1141,7 @@ export function CalendarView() {
                             borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
                           }}
                         >
-                          {/* 3.5px DayFlow accent bar */}
+                          {/* 3.5px accent bar */}
                           <div
                             className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
                             style={{ backgroundColor: projColor }}
@@ -1149,7 +1422,7 @@ export function CalendarView() {
                       borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
                     }}
                   >
-                    {/* 3.5px DayFlow accent bar */}
+                    {/* 3.5px accent bar */}
                     <div
                       className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
                       style={{ backgroundColor: projColor }}
@@ -1223,7 +1496,7 @@ export function CalendarView() {
                       borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
                     }}
                   >
-                    {/* 3.5px DayFlow accent bar */}
+                    {/* 3.5px accent bar */}
                     <div
                       className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
                       style={{ backgroundColor: projColor }}
@@ -1344,10 +1617,16 @@ export function CalendarView() {
         busyNow={busyNow?.title ?? null}
       />
       <Tray unscheduled={unscheduled} onDragItem={setDragDuration} />
-      <div className={cn("card w-full max-w-full scrollbar-none", view === "day" ? "overflow-x-hidden" : "overflow-x-auto")}>
+      <div
+        ref={timelineScrollerRef}
+        className={cn(
+          "card w-full max-w-full max-h-[calc(100vh-220px)] sm:max-h-[calc(100vh-200px)] overflow-y-auto scrollbar-none",
+          view === "day" ? "overflow-x-hidden" : "overflow-x-auto"
+        )}
+      >
         <div className={cn("flex flex-col w-full", view === "day" ? "min-w-0" : view === "3day" ? "min-w-[480px]" : "min-w-[640px]")}>
           {/* 1. Day headers row */}
-          <div className="flex border-b" style={{ borderColor: "var(--line)" }}>
+          <div className="sticky top-0 z-30 flex border-b bg-[var(--panel)] shadow-sm" style={{ borderColor: "var(--line)" }}>
             <div className="w-[50px] shrink-0 border-r h-[34px] bg-[var(--panel)]" style={{ borderColor: "var(--line)" }} />
             {days.map((iso) => {
               const rawBlocks = blocksByDay.get(iso) ?? [];
@@ -1390,8 +1669,8 @@ export function CalendarView() {
             })}
           </div>
 
-          {/* 2. All-Day Row (DayFlow calendar-3.7.3 inspired) */}
-          <div className="flex border-b bg-[var(--panel2)]/30" style={{ borderColor: "var(--line)" }}>
+          {/* 2. All-Day Row */}
+          <div className="sticky top-[34px] z-20 flex border-b bg-[var(--panel2)]/95 backdrop-blur-sm" style={{ borderColor: "var(--line)" }}>
             <div
               className="w-[50px] shrink-0 border-r flex items-center justify-center text-[9px] font-bold uppercase tracking-wider select-none"
               style={{ borderColor: "var(--line)", color: "var(--mut)" }}
@@ -1576,6 +1855,22 @@ export function CalendarView() {
                   <div
                     className="relative"
                     style={{ height: GRID_H }}
+                    onMouseDown={(e) => {
+                      if (e.button !== 0) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const y = e.clientY - rect.top;
+                      const rawMin = H0 * 60 + (y / HOUR_H) * 60;
+                      const snapped = Math.max(
+                        H0 * 60,
+                        Math.min(H1 * 60 - 15, Math.floor(rawMin / 15) * 15)
+                      );
+                      potentialCreateRef.current = {
+                        iso,
+                        slotMin: snapped,
+                        startY: e.clientY,
+                        startX: e.clientX,
+                      };
+                    }}
                     onDragOver={(e) => {
                       e.preventDefault();
                       const rect = e.currentTarget.getBoundingClientRect();
@@ -1595,22 +1890,11 @@ export function CalendarView() {
                       }
                     }}
                     onDrop={dropOn(iso, hover?.iso === iso ? hover.min : H0 * 60)}
-                    onClick={(e) => {
-                      if (justInteractedRef.current) return;
-                      const rect = e.currentTarget.getBoundingClientRect();
-                      const y = e.clientY - rect.top;
-                      const rawMin = H0 * 60 + (y / HOUR_H) * 60;
-                      const snapped = Math.max(
-                        H0 * 60,
-                        Math.min(H1 * 60 - 30, Math.floor(rawMin / 30) * 30)
-                      );
-                      openTaskDialog({ presetDate: iso, presetTime: minToTime(snapped) });
-                    }}
                   >
                     {Array.from({ length: (H1 - H0) * 2 }, (_, i) => (
                       <div
                         key={i}
-                        className="absolute left-0 right-0 border-t"
+                        className="absolute left-0 right-0 border-t pointer-events-none"
                         style={{
                           top: i * (HOUR_H / 2),
                           borderColor:
@@ -1634,10 +1918,10 @@ export function CalendarView() {
                       </div>
                     )}
 
-                    {/* Duration-aware drag-and-drop hover preview */}
-                    {hover?.iso === iso && (
+                    {/* Drag-and-drop hover preview (only when not resizing and not drag-creating) */}
+                    {hover?.iso === iso && !resizing && !dragCreate && (
                       <div
-                        className="pointer-events-none absolute left-1 right-1 z-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed text-[11px] font-bold shadow-md transition-all"
+                        className="pointer-events-none absolute left-1 right-1 z-20 flex flex-col items-center justify-center rounded-xl border-2 border-dashed text-[11px] font-bold shadow-md transition-all"
                         style={{
                           top: ((hover.min - H0 * 60) / 60) * HOUR_H,
                           height: Math.max(26, ((hover.durationMin || 60) / 60) * HOUR_H),
@@ -1653,15 +1937,42 @@ export function CalendarView() {
                       </div>
                     )}
 
-                    {/* Scheduled and Focus blocks with DayFlow aesthetic */}
+                    {/* Direct Drag-to-Create live translucent block preview */}
+                    {dragCreate && dragCreate.iso === iso && (() => {
+                      const createStart = Math.min(dragCreate.startMin, dragCreate.currentMin);
+                      const createEnd = Math.max(dragCreate.startMin, dragCreate.currentMin);
+                      const createDur = Math.max(15, createEnd - createStart);
+                      const createTop = ((createStart - H0 * 60) / 60) * HOUR_H;
+                      const createH = Math.max(26, (createDur / 60) * HOUR_H);
+
+                      return (
+                        <div
+                          className="pointer-events-none absolute left-1 right-1 z-30 flex flex-col justify-between rounded-xl border-2 border-[var(--accent)] bg-[var(--accent-soft)] p-2 text-[11px] font-bold shadow-xl transition-none"
+                          style={{
+                            top: createTop,
+                            height: createH,
+                            color: "var(--accent)",
+                          }}
+                        >
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs">⚡</span>
+                            <span className="font-bold truncate">New Time Block</span>
+                          </div>
+                          <div className="text-[10px] font-semibold tnum opacity-90 mt-auto">
+                            {minToTime(createStart)} – {minToTime(createStart + createDur)} · {fmtDur(createDur)}
+                          </div>
+                        </div>
+                      );
+                    })()}
+
+                    {/* Scheduled and Focus blocks */}
                     {blocks.map((b) => {
                       const start = timeToMin(b.time ?? "09:00");
-                      const top = ((start - H0 * 60) / 60) * HOUR_H;
-                      const currentDuration =
-                        resizing && resizing.targetItemId === b.id
-                          ? resizing.currentDur
-                          : b.durationMin;
-                      const h = Math.max(26, (currentDuration / 60) * HOUR_H);
+                      const isResizingThis = resizing && resizing.targetItemId === b.id;
+                      const displayStartMin = isResizingThis ? resizing.currentStartMin : start;
+                      const displayDuration = isResizingThis ? resizing.currentDur : b.durationMin;
+                      const top = ((displayStartMin - H0 * 60) / 60) * HOUR_H;
+                      const h = Math.max(26, (displayDuration / 60) * HOUR_H);
                       const p = state.projects.find((x) => x.id === b.projectId);
                       const projColor = b.isFocusSession
                         ? "var(--ok)"
@@ -1700,7 +2011,7 @@ export function CalendarView() {
                           }}
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (justInteractedRef.current) return;
+                            if (mouseResizeActiveRef.current || justInteractedRef.current) return;
                             if (b.isHabit) {
                               const habit = state.habits.find((h) => h.id === b.taskId);
                               if (habit) {
@@ -1758,11 +2069,23 @@ export function CalendarView() {
                             cursor: b.done ? "pointer" : "grab",
                             boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
                           }}
-                          title={`${b.title}${b.label ? ` · ${b.label}` : ""} (${currentDuration}m)${
+                          title={`${b.title}${b.label ? ` · ${b.label}` : ""} (${displayDuration}m)${
                             b.done ? " [COMPLETED]" : ""
-                          } · ${b.time}–${minToTime(start + currentDuration)}`}
+                          } · ${minToTime(displayStartMin)}–${minToTime(displayStartMin + displayDuration)}`}
                         >
-                          {/* DayFlow 3.5px vertical accent pill bar */}
+                          {/* Top resize handle for adjusting start time */}
+                          {!b.done && !b.isFocusSession && (
+                            <div
+                              onMouseDown={(e) => handleResizeStart(e, b, "top")}
+                              onTouchStart={(e) => handleResizeStart(e, b, "top")}
+                              className="absolute top-0 left-0 right-0 h-2.5 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-black/10 dark:hover:bg-white/10"
+                              title="Drag top edge to adjust start time (15m increments)"
+                            >
+                              <div className="w-5 h-0.5 rounded-full bg-white/60 dark:bg-white/40 shadow-sm" />
+                            </div>
+                          )}
+
+                          {/* 3.5px vertical accent pill bar */}
                           <div
                             className="absolute left-1 top-1 bottom-1 w-[3.5px] rounded-full pointer-events-none"
                             style={{
@@ -1807,18 +2130,18 @@ export function CalendarView() {
                                 className="tnum text-[9.5px] font-semibold mt-auto truncate"
                                 style={{ color: "var(--mut)" }}
                               >
-                                {b.time}–{minToTime(start + currentDuration)} · {fmtDur(currentDuration)}
+                                {minToTime(displayStartMin)}–{minToTime(displayStartMin + displayDuration)} · {fmtDur(displayDuration)}
                               </div>
                             )}
                           </div>
 
-                          {/* DayFlow / Google Calendar interactive bottom resize handle */}
+                          {/* Bottom resize handle for adjusting duration */}
                           {!b.done && !b.isFocusSession && (
                             <div
-                              onMouseDown={(e) => handleResizeStart(e, b)}
-                              onTouchStart={(e) => handleResizeStart(e, b)}
+                              onMouseDown={(e) => handleResizeStart(e, b, "bottom")}
+                              onTouchStart={(e) => handleResizeStart(e, b, "bottom")}
                               className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-black/10 dark:hover:bg-white/10"
-                              title="Drag to resize duration (15m increments)"
+                              title="Drag bottom edge to adjust duration (15m increments)"
                             >
                               <div className="w-5 h-1 rounded-full bg-white/60 dark:bg-white/40 shadow-sm" />
                             </div>
@@ -1888,6 +2211,21 @@ export function CalendarView() {
           onClose={() => setEditingSession(null)}
         />
       )}
+
+      {quickBlockModal && (
+        <QuickBlockSchedulerModal
+          open={quickBlockModal.open}
+          date={quickBlockModal.date}
+          time={quickBlockModal.time}
+          durationMin={quickBlockModal.durationMin}
+          onClose={() => setQuickBlockModal(null)}
+          onAssignTask={handleAssignBacklogTask}
+          onCreateAndSchedule={handleCreateAndScheduleNewTask}
+          onStartFocusNow={handleStartFocusFromBlock}
+          tasks={state.tasks}
+          projects={state.projects}
+        />
+      )}
     </div>
   );
 }
@@ -1912,35 +2250,40 @@ function Header({
 }) {
   return (
     <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
-      <div className="flex items-center gap-3 flex-wrap">
-        {/* DayFlow inspired navigation group */}
-        <div className="flex items-center gap-1 bg-[var(--panel2)] p-1 rounded-xl border border-[var(--line)] shadow-sm">
+      <div className="flex items-center gap-2.5 flex-wrap">
+        {/* Dedicated standalone Today button */}
+        <button
+          type="button"
+          onClick={onToday}
+          className={cn(
+            "px-3 py-1.5 rounded-xl text-[12.5px] font-bold border transition-all active:scale-95 shadow-sm",
+            isTodayActive
+              ? "bg-[var(--accent)] text-[var(--on-accent)] border-[var(--accent)] shadow-sm"
+              : "bg-[var(--panel2)] hover:bg-[var(--panel)] text-[var(--text)] border-[var(--line)]"
+          )}
+          title="Jump to Today"
+        >
+          Today
+        </button>
+
+        {/* Navigation cluster with date range/title between arrows */}
+        <div className="flex items-center gap-1.5 bg-[var(--panel2)] px-2 py-1 rounded-xl border border-[var(--line)] shadow-sm">
           <button
             type="button"
             onClick={() => navigate(-1)}
-            className="p-1.5 rounded-lg hover:bg-[var(--panel)] text-mut hover:text-[var(--text)] transition-colors active:scale-95"
+            className="p-1 rounded-lg hover:bg-[var(--panel)] text-mut hover:text-[var(--text)] transition-colors active:scale-95"
             title="Previous"
             aria-label="Previous"
           >
             <ChevronLeft size={16} />
           </button>
-          <button
-            type="button"
-            onClick={onToday}
-            className={cn(
-              "px-3 py-1 rounded-lg text-[12px] font-bold transition-all active:scale-95",
-              isTodayActive
-                ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-sm"
-                : "hover:bg-[var(--panel)] text-[var(--text)]"
-            )}
-            title="Go to Today"
-          >
-            Today
-          </button>
+          <h2 className="text-[13.5px] sm:text-[14.5px] font-bold tracking-tight text-[var(--text)] px-1 sm:px-2 select-none min-w-0 truncate text-center">
+            {label}
+          </h2>
           <button
             type="button"
             onClick={() => navigate(1)}
-            className="p-1.5 rounded-lg hover:bg-[var(--panel)] text-mut hover:text-[var(--text)] transition-colors active:scale-95"
+            className="p-1 rounded-lg hover:bg-[var(--panel)] text-mut hover:text-[var(--text)] transition-colors active:scale-95"
             title="Next"
             aria-label="Next"
           >
@@ -1948,23 +2291,24 @@ function Header({
           </button>
         </div>
 
-        <div>
-          <h2 className="text-[17px] sm:text-[19px] font-bold tracking-tight text-[var(--text)] flex items-center gap-2">
-            <span>{label}</span>
-          </h2>
-          <div className="flex items-center gap-2 text-[11px] font-medium" style={{ color: "var(--mut)" }}>
+        {/* Live Free / Busy status pill */}
+        <div className="flex items-center gap-2 text-[11px] font-medium" style={{ color: "var(--mut)" }}>
+          <span
+            className={cn(
+              "inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10.5px] font-bold tracking-wide",
+              busyNow
+                ? "bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25"
+                : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+            )}
+          >
             <span
               className={cn(
-                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold tracking-wide",
-                busyNow
-                  ? "bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25"
-                  : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+                "w-1.5 h-1.5 rounded-full shrink-0",
+                busyNow ? "bg-red-500 animate-pulse" : "bg-emerald-500"
               )}
-            >
-              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", busyNow ? "bg-red-500 animate-pulse" : "bg-emerald-500")} />
-              {busyNow ? `Busy · ${busyNow}` : "Free now"}
-            </span>
-          </div>
+            />
+            {busyNow ? `Busy · ${busyNow}` : "Free now"}
+          </span>
         </div>
       </div>
 

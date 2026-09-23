@@ -34,17 +34,6 @@ export function DiffConflictModal({
 
   useBodyScrollLock(open);
 
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [open, onClose]);
-
-  if (!open || typeof document === "undefined") return null;
-
   const localDeviceName = state.settings.profileName || "This Device";
   const tasksCount = state.tasks.length;
   const notesCount = state.notes.length;
@@ -64,6 +53,16 @@ export function DiffConflictModal({
     }
     onClose();
   };
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "Enter") handleApply();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose, selectedResolution, onResolve]);
 
   const modalContent = (
     <div

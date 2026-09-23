@@ -108,37 +108,36 @@ export function autoBlockUnscheduledSession(
     if (t.id !== workedTask.id) return t;
 
     // Check if task already has a matching single block on this date
-    if (t.due === sDate && t.dueTime) {
-      const existingStart = timeToMin(t.dueTime);
-      const existingEnd = existingStart + (t.durationMin || 60);
-      const sStart = timeToMin(startHM);
-      const sEnd = sStart + durationMin;
-      if (sStart < existingEnd && sEnd > existingStart) {
-        return {
-          ...t,
-          due: sDate,
-          dueTime: startHM,
-          durationMin,
-        };
-      }
+    if (t.due === sDate) {
+      return {
+        ...t,
+        due: sDate,
+        dueTime: startHM,
+        durationMin: Math.max(t.durationMin || 0, durationMin),
+      };
     }
 
     // Check if task has timeBlocks
     if (t.timeBlocks && t.timeBlocks.length > 0) {
       const sStart = timeToMin(startHM);
       const sEnd = sStart + durationMin;
-      const existingIdx = t.timeBlocks.findIndex((b) => {
+      // Match block on same date (preferably overlapping)
+      let matchIdx = t.timeBlocks.findIndex((b) => {
         if (b.date !== sDate || !b.time) return false;
         const bStart = timeToMin(b.time);
         const bEnd = bStart + (b.durationMin || 60);
         return sStart < bEnd && sEnd > bStart;
       });
 
-      if (existingIdx >= 0) {
+      if (matchIdx < 0) {
+        matchIdx = t.timeBlocks.findIndex((b) => b.date === sDate);
+      }
+
+      if (matchIdx >= 0) {
         return {
           ...t,
           timeBlocks: t.timeBlocks.map((b, idx) =>
-            idx === existingIdx ? { ...b, time: startHM, durationMin, done: true } : b
+            idx === matchIdx ? { ...b, time: startHM, durationMin, done: true } : b
           ),
         };
       }
@@ -154,11 +153,10 @@ export function autoBlockUnscheduledSession(
         due: sDate,
         dueTime: startHM,
         durationMin,
-        timeBlocks: [newBlock],
       };
     }
 
-    // Has single block on a different date/time: convert to multi-block
+    // Has single block on a completely different date: convert to multi-block
     return {
       ...t,
       timeBlocks: [

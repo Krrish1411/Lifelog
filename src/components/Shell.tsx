@@ -1943,6 +1943,18 @@ function Overlays({
   /* Global keyboard shortcuts (Space, Ctrl+N, etc.) */
   useEffect(() => {
     const h = (e: KeyboardEvent) => {
+      if (confirmReq?.open) {
+        if (e.key === "Enter" && !blocked) {
+          e.preventDefault();
+          resolveConfirm(true);
+          return;
+        }
+        if (e.key === "Escape") {
+          e.preventDefault();
+          resolveConfirm(false);
+          return;
+        }
+      }
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault();
         setPaletteOpen((prev) => !prev);
@@ -2044,7 +2056,7 @@ function Overlays({
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
-  }, [state.settings.shortcuts, state.sessions, openTaskDialog, setPaletteOpen, setView, toast, set]);
+  }, [state.settings.shortcuts, state.sessions, openTaskDialog, setPaletteOpen, setView, toast, set, confirmReq, blocked, resolveConfirm]);
 
   const quote = useMemo(() => {
     const pool = [...QUOTES, ...state.settings.customQuotes.filter((q) => q.trim())];

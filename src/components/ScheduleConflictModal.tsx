@@ -46,7 +46,15 @@ export function ScheduleConflictModal({
 
   return (
     <Modal open title="Schedule Alignment" onClose={onClose} width={520}>
-      <div className="flex flex-col gap-4 text-xs">
+      <div
+        className="flex flex-col gap-4 text-xs"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !showCustomInput) {
+            e.preventDefault();
+            onResolve({ type: "push_forward" });
+          }
+        }}
+      >
         {/* Context description */}
         <div className="p-3 rounded-2xl border" style={{ borderColor: "var(--line)", background: "var(--panel2)" }}>
           <div className="text-[12.5px] font-bold text-[var(--text)] mb-1">
@@ -169,6 +177,7 @@ export function ScheduleConflictModal({
                   type="time"
                   value={customTime}
                   onChange={(e) => setCustomTime(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && onResolve({ type: "custom_time", customTime })}
                   className="rounded-lg border px-2 py-1 font-mono text-xs bg-[var(--bg)] border-[var(--line)] text-[var(--text)] outline-none"
                 />
               </div>
