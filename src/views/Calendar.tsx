@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronLeft, ChevronRight, Clock3, Inbox, Layers, Plus, Sparkles } from "lucide-react";
 import { LIFE_LOG_PROJECT_ID, type Task, type TaskTimeBlock, type Session } from "../types";
 import { useApp } from "../store";
@@ -156,6 +156,7 @@ export function CalendarView() {
   const [hover, setHover] = useState<{ iso: string; min: number; durationMin: number } | null>(null);
   const [dragDuration, setDragDuration] = useState<number>(60);
   const [resizing, setResizing] = useState<{
+    targetItemId: string;
     taskId: string;
     blockId?: string;
     isHabit?: boolean;
@@ -164,6 +165,7 @@ export function CalendarView() {
     currentDur: number;
   } | null>(null);
   const [editingSession, setEditingSession] = useState<Session | null>(null);
+  const justInteractedRef = useRef(false);
 
   const today = todayIso();
   const [nowMin, setNowMin] = useState(() => new Date().getHours() * 60 + new Date().getMinutes());
@@ -179,8 +181,10 @@ export function CalendarView() {
   // Google Calendar interactive bottom-edge duration resizing handler
   const handleResizeStart = (e: React.MouseEvent | React.TouchEvent, b: CalendarItem) => {
     e.stopPropagation();
+    e.preventDefault();
     const clientY = "touches" in e ? e.touches[0].clientY : e.clientY;
     setResizing({
+      targetItemId: b.id,
       taskId: b.taskId,
       blockId: b.blockId,
       isHabit: !!b.isHabit,
@@ -202,6 +206,11 @@ export function CalendarView() {
     };
 
     const handleMouseUp = () => {
+      justInteractedRef.current = true;
+      setTimeout(() => {
+        justInteractedRef.current = false;
+      }, 250);
+
       if (resizing.currentDur !== resizing.initialDur) {
         const finalDur = resizing.currentDur;
         set((s) => ({
@@ -239,84 +248,122 @@ export function CalendarView() {
 
   const tracked = useMemo(() => trackedByDay(state.sessions), [state.sessions]);
 
-  // Flatten both standard tasks, multi-blocks, habits, and focus sessions into CalendarItems
-  const blocksByDay = useMemo(() => {
-    const m = new Map<string, CalendarItem[]>();
+  // Flatten both standard tasks, multi-blocks, habits, and focus sessions into timed items vs all-day items
+  const { blocksByDay, allDayByDay } = useMemo(() => {
+    const timedMap = new Map<string, CalendarItem[]>();
+    const allDayMap = new Map<string, CalendarItem[]>();
 
+    // 1. Process tasks
     for (const t of state.tasks) {
       if (state.settings.showLifeLogProject === false && t.projectId === LIFE_LOG_PROJECT_ID) continue;
       if (t.timeBlocks && t.timeBlocks.length > 0) {
         // Multi-block task
         for (const b of t.timeBlocks) {
-          if (!b.date || !b.time) continue;
+          if (!b.date) continue;
           const isDone = !!b.done || !!t.done;
-          const item: CalendarItem = {
-            id: `b-${b.id}`,
-            taskId: t.id,
-            blockId: b.id,
-            title: t.title,
-            label: b.label || "Block",
-            emoji: t.emoji,
-            projectId: t.projectId,
-            date: b.date,
-            time: b.time,
-            durationMin: b.durationMin || 60,
-            snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
-            done: isDone,
-          };
-          const arr = m.get(b.date) ?? [];
-          arr.push(item);
-          m.set(b.date, arr);
+          if (b.time) {
+            const item: CalendarItem = {
+              id: `b-${b.id}`,
+              taskId: t.id,
+              blockId: b.id,
+              title: t.title,
+              label: b.label || "Block",
+              emoji: t.emoji,
+              projectId: t.projectId,
+              date: b.date,
+              time: b.time,
+              durationMin: b.durationMin || 60,
+              snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
+              done: isDone,
+            };
+            const arr = timedMap.get(b.date) ?? [];
+            arr.push(item);
+            timedMap.set(b.date, arr);
+          } else {
+            // All-day multi-block
+            const item: CalendarItem = {
+              id: `b-${b.id}`,
+              taskId: t.id,
+              blockId: b.id,
+              title: t.title,
+              label: b.label || "All Day",
+              emoji: t.emoji,
+              projectId: t.projectId,
+              date: b.date,
+              time: "",
+              durationMin: 0,
+              done: isDone,
+            };
+            const arr = allDayMap.get(b.date) ?? [];
+            arr.push(item);
+            allDayMap.set(b.date, arr);
+          }
         }
       } else {
         // Single block task
-        if (!t.due || !t.dueTime) continue;
-        const item: CalendarItem = {
-          id: `t-${t.id}`,
-          taskId: t.id,
-          title: t.title,
-          emoji: t.emoji,
-          projectId: t.projectId,
-          date: t.due,
-          time: t.dueTime,
-          durationMin: t.durationMin || 60,
-          snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
-          done: !!t.done,
-        };
-        const arr = m.get(t.due) ?? [];
-        arr.push(item);
-        m.set(t.due, arr);
+        if (!t.due) continue;
+        if (t.dueTime) {
+          const item: CalendarItem = {
+            id: `t-${t.id}`,
+            taskId: t.id,
+            title: t.title,
+            emoji: t.emoji,
+            projectId: t.projectId,
+            date: t.due,
+            time: t.dueTime,
+            durationMin: t.durationMin || 60,
+            snoozed: !!t.snoozedUntil && t.snoozedUntil > Date.now(),
+            done: !!t.done,
+          };
+          const arr = timedMap.get(t.due) ?? [];
+          arr.push(item);
+          timedMap.set(t.due, arr);
+        } else {
+          // All-day task
+          const item: CalendarItem = {
+            id: `t-${t.id}`,
+            taskId: t.id,
+            title: t.title,
+            emoji: t.emoji,
+            projectId: t.projectId,
+            date: t.due,
+            time: "",
+            durationMin: 0,
+            done: !!t.done,
+          };
+          const arr = allDayMap.get(t.due) ?? [];
+          arr.push(item);
+          allDayMap.set(t.due, arr);
+        }
       }
     }
 
-    // Project daily habits onto Calendar as reminder blocks (Feature 1.3)
+    // 2. Habits (Daily Habits go into allDayMap for clean grid display)
     const sortedHabits = [...state.habits].sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-    sortedHabits.forEach((h, hIdx) => {
-      const habitDays = new Set([...h.completions, todayIso()]);
-      const defaultMin = 7 * 60 + 30 + (hIdx * 25);
-      const habitTime = h.time || minToTime(defaultMin);
+    sortedHabits.forEach((h) => {
+      const habitDays = new Set([...h.completions, todayIso(), anchor]);
       for (const d of habitDays) {
         const isDone = h.completions.includes(d);
         const item: CalendarItem = {
           id: `h-${h.id}-${d}`,
           taskId: h.id,
           title: h.name,
-          label: "Daily Habit",
+          label: "Habit",
           emoji: h.emoji,
           projectId: "habits-stream",
           date: d,
-          time: habitTime,
-          durationMin: 20,
+          time: "",
+          durationMin: 0,
           done: isDone,
           isHabit: true,
         };
-        const arr = m.get(d) ?? [];
+        const arr = allDayMap.get(d) ?? [];
         arr.push(item);
-        m.set(d, arr);
+        allDayMap.set(d, arr);
       }
     });
 
-    // Project Executed Focus Sessions & Pauses onto Calendar Timeline
+    // 3. Executed Focus Sessions & Pauses onto Timeline
     for (const sess of state.sessions) {
       if (sess.mode === "break" || !sess.startedAt) continue;
       const sDate = isoDate(new Date(sess.startedAt));
@@ -342,9 +389,7 @@ export function CalendarView() {
         pauses: sess.pauses,
       };
 
-      const arr = m.get(sDate) ?? [];
-      // If there is an existing scheduled item for the SAME task overlapping this session,
-      // replace it so the task is not duplicated on the calendar!
+      const arr = timedMap.get(sDate) ?? [];
       const sEndMin = sStartMin + sDurationMin;
       const matchIdx = arr.findIndex(
         (existing) =>
@@ -359,14 +404,14 @@ export function CalendarView() {
       } else {
         arr.push(item);
       }
-      m.set(sDate, arr);
+      timedMap.set(sDate, arr);
     }
 
-    for (const arr of m.values()) {
+    for (const arr of timedMap.values()) {
       arr.sort((a, b) => (a.time ?? "").localeCompare(b.time ?? ""));
     }
-    return m;
-  }, [state.tasks, state.habits, state.sessions, state.settings.showLifeLogProject]);
+    return { blocksByDay: timedMap, allDayByDay: allDayMap };
+  }, [state.tasks, state.habits, state.sessions, state.settings.showLifeLogProject, anchor]);
 
   const days: string[] = useMemo(() => {
     if (view === "day") return [anchor];
@@ -392,42 +437,87 @@ export function CalendarView() {
   const navigate = (dir: -1 | 1) => {
     if (view === "month") {
       const d = parseIso(anchor);
-      setAnchor(isoDate(new Date(d.getFullYear(), d.getMonth() + dir, Math.min(d.getDate(), 28))));
+      setAnchor(isoDate(new Date(d.getFullYear(), d.getMonth() + dir, 1)));
     } else if (view === "schedule") {
       setAnchor(addDaysIso(anchor, dir * 7));
     } else if (view === "3day") {
       setAnchor(addDaysIso(anchor, dir * 3));
+    } else if (view === "week") {
+      setAnchor(addDaysIso(anchor, dir * 7));
     } else {
-      setAnchor(addDaysIso(anchor, dir * (view === "week" ? 7 : 1)));
+      setAnchor(addDaysIso(anchor, dir));
     }
   };
 
-  const label = useMemo(() => {
+  const isTodayActive = useMemo(() => {
+    if (view === "day") return anchor === today;
+    if (view === "3day") return days.includes(today);
+    if (view === "week") return days.includes(today);
     if (view === "month") {
-      const d = parseIso(anchor);
-      return `${
-        [
-          "January",
-          "February",
-          "March",
-          "April",
-          "May",
-          "June",
-          "July",
-          "August",
-          "September",
-          "October",
-          "November",
-          "December",
-        ][d.getMonth()]
-      } ${d.getFullYear()}`;
+      const [ay, am] = anchor.split("-").map(Number);
+      const [ty, tm] = today.split("-").map(Number);
+      return ay === ty && am === tm;
+    }
+    if (view === "schedule") return scheduleDays.includes(today);
+    return false;
+  }, [view, anchor, today, days, scheduleDays]);
+
+  const label = useMemo(() => {
+    const parse = (s: string) => {
+      const [y, m, d] = s.split("-").map(Number);
+      return new Date(y, m - 1, d);
+    };
+    const months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
+    const monthsShort = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    if (view === "month") {
+      const d = parse(anchor);
+      return `${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+    if (view === "day") {
+      const d = parse(anchor);
+      const daysFull = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+      return `${daysFull[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+    }
+    if (view === "3day") {
+      const start = parse(anchor);
+      const end = parse(addDaysIso(anchor, 2));
+      if (start.getFullYear() !== end.getFullYear()) {
+        return `${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
+      }
+      if (start.getMonth() !== end.getMonth()) {
+        return `${start.getDate()} ${monthsShort[start.getMonth()]} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
+      }
+      return `${start.getDate()} – ${end.getDate()} ${months[start.getMonth()]} ${start.getFullYear()}`;
+    }
+    if (view === "week") {
+      const startIso = weekStartIso(anchor);
+      const start = parse(startIso);
+      const end = parse(addDaysIso(startIso, 6));
+      if (start.getFullYear() !== end.getFullYear()) {
+        return `${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
+      }
+      if (start.getMonth() !== end.getMonth()) {
+        return `${start.getDate()} ${monthsShort[start.getMonth()]} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
+      }
+      return `${start.getDate()} – ${end.getDate()} ${months[start.getMonth()]} ${start.getFullYear()}`;
     }
     if (view === "schedule") {
-      return `${fmtDayShort(anchor)} — ${fmtDayShort(addDaysIso(anchor, 13))}`;
+      const start = parse(anchor);
+      const end = parse(addDaysIso(anchor, 13));
+      if (start.getFullYear() !== end.getFullYear()) {
+        return `${start.getDate()} ${monthsShort[start.getMonth()]} ${start.getFullYear()} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${end.getFullYear()}`;
+      }
+      return `${start.getDate()} ${monthsShort[start.getMonth()]} – ${end.getDate()} ${monthsShort[end.getMonth()]} ${start.getFullYear()}`;
     }
-    if (days.length === 1) return fmtDayShort(days[0]);
-    return `${fmtDayShort(days[0])} — ${fmtDayShort(days[days.length - 1])}`;
-  }, [view, anchor, days]);
+    return anchor;
+  }, [view, anchor]);
 
   // Unscheduled items for the Tray
   const unscheduled = useMemo<UnscheduledItem[]>(() => {
@@ -471,6 +561,11 @@ export function CalendarView() {
   // Drag and drop handler
   const dropOn = (iso: string, min: number | null) => (e: React.DragEvent) => {
     e.preventDefault();
+    justInteractedRef.current = true;
+    setTimeout(() => {
+      justInteractedRef.current = false;
+    }, 250);
+
     const rawData = e.dataTransfer.getData("lifelog/drag");
     const taskIdFallback = e.dataTransfer.getData("lifelog/task");
 
@@ -497,7 +592,7 @@ export function CalendarView() {
     // Check if it's a habit
     const habit = state.habits.find((h) => h.id === taskId);
     if (isHabit || habit) {
-      const newTime = min !== null ? minToTime(min) : "08:00";
+      const newTime = min !== null ? minToTime(min) : undefined;
       set((s) => ({
         ...s,
         habits: s.habits.map((h) => {
@@ -508,7 +603,12 @@ export function CalendarView() {
           };
         }),
       }));
-      toast(`Rescheduled habit “${habit?.name ?? "habit"}” to ${newTime}`, "ok");
+      toast(
+        newTime
+          ? `Rescheduled habit “${habit?.name ?? "habit"}” to ${newTime}`
+          : `Moved habit “${habit?.name ?? "habit"}” to All-Day`,
+        "ok"
+      );
       setHover(null);
       setDragDuration(60);
       return;
@@ -529,7 +629,7 @@ export function CalendarView() {
                 ? {
                     ...b,
                     date: iso,
-                    time: min !== null ? minToTime(min) : b.time || "09:00",
+                    time: min !== null ? minToTime(min) : null,
                     durationMin: b.durationMin || effectiveDur,
                   }
                 : b
@@ -540,7 +640,7 @@ export function CalendarView() {
         return {
           ...t,
           due: iso,
-          dueTime: min !== null ? minToTime(min) : t.due === iso ? t.dueTime : "09:00",
+          dueTime: min !== null ? minToTime(min) : null,
           durationMin: effectiveDur,
         };
       }),
@@ -549,7 +649,7 @@ export function CalendarView() {
     const task = state.tasks.find((x) => x.id === taskId);
     toast(
       `Scheduled “${task?.title ?? "task"}” · ${fmtDayShort(iso)}${
-        min !== null ? ` at ${minToTime(min)}` : ""
+        min !== null ? ` at ${minToTime(min)}` : " (All Day)"
       }`,
       "ok"
     );
@@ -578,16 +678,19 @@ export function CalendarView() {
             setAnchor(todayIso());
             setSelectedDay(todayIso());
           }}
+          isTodayActive={isTodayActive}
           busyNow={busyNow?.title ?? null}
         />
         <Tray unscheduled={unscheduled} onDragItem={setDragDuration} />
         <div className="flex flex-col gap-3 w-full min-w-0">
           {scheduleDays.map((iso) => {
             const blocks = blocksByDay.get(iso) ?? [];
+            const allDayItems = allDayByDay.get(iso) ?? [];
             const isToday = iso === today;
             const minTracked = tracked.get(iso) ?? 0;
             const d = parseIso(iso);
             const dayNum = d.getDate();
+            const totalCount = blocks.length + allDayItems.length;
 
             return (
               <div
@@ -624,7 +727,7 @@ export function CalendarView() {
                         )}
                       </div>
                       <div className="text-[10.5px]" style={{ color: "var(--mut)" }}>
-                        {blocks.length} {blocks.length === 1 ? "block" : "blocks"}{" "}
+                        {totalCount} {totalCount === 1 ? "item" : "items"}{" "}
                         {minTracked > 0 && `· ${fmtDur(minTracked)} tracked`}
                       </div>
                     </div>
@@ -640,26 +743,137 @@ export function CalendarView() {
                   </Btn>
                 </div>
 
-                {blocks.length === 0 ? (
+                {totalCount === 0 ? (
                   <div className="py-2 text-center text-[11.5px] italic" style={{ color: "var(--mut)" }}>
                     No events scheduled
                   </div>
                 ) : (
                   <div className="flex flex-col gap-1.5 w-full min-w-0">
+                    {/* All-day items */}
+                    {allDayItems.map((item) => {
+                      const p = state.projects.find((x) => x.id === item.projectId);
+                      const projColor = p?.color ?? (item.isHabit ? "var(--ok)" : "var(--accent)");
+                      return (
+                        <div
+                          key={item.id}
+                          onClick={() => {
+                            if (justInteractedRef.current) return;
+                            if (item.isHabit) {
+                              const habit = state.habits.find((h) => h.id === item.taskId);
+                              if (habit) {
+                                const has = habit.completions.includes(item.date);
+                                set((s) => ({
+                                  ...s,
+                                  habits: s.habits.map((h) =>
+                                    h.id === habit.id
+                                      ? {
+                                          ...h,
+                                          completions: has
+                                            ? h.completions.filter((d) => d !== item.date)
+                                            : [...h.completions, item.date],
+                                        }
+                                      : h
+                                  ),
+                                }));
+                                toast(
+                                  has
+                                    ? `Unchecked habit “${habit.name}”`
+                                    : `Completed habit “${habit.name}”! 🎉`,
+                                  "ok"
+                                );
+                              }
+                              return;
+                            }
+                            openTaskDialog({ taskId: item.taskId });
+                          }}
+                          className={cn(
+                            "relative flex items-center gap-2.5 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border",
+                            item.done && "opacity-60 bg-[var(--panel)]"
+                          )}
+                          style={{
+                            borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
+                          }}
+                        >
+                          {/* 3.5px DayFlow accent bar */}
+                          <div
+                            className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
+                            style={{ backgroundColor: projColor }}
+                          />
+                          <div className="flex flex-col shrink-0 min-w-[50px] pl-2">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-mut">
+                              All Day
+                            </span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-1.5 truncate">
+                              {item.done ? (
+                                <Check size={12} className="text-emerald-500 font-bold shrink-0" />
+                              ) : item.isHabit ? (
+                                <span className="text-[11px] shrink-0">🔁</span>
+                              ) : item.emoji ? (
+                                <span className="text-[12px] shrink-0">{item.emoji}</span>
+                              ) : null}
+                              <span className={cn("text-[12.5px] font-semibold truncate", item.done && "line-through opacity-75")}>
+                                {item.title}
+                              </span>
+                              {item.label && (
+                                <span className="chip !text-[9.5px] !py-0 !px-1 shrink-0">
+                                  {item.label}
+                                </span>
+                              )}
+                            </div>
+                            {p && (
+                              <div
+                                className="text-[10.5px] flex items-center gap-1 mt-0.5"
+                                style={{ color: p.color }}
+                              >
+                                <span
+                                  className="w-1.5 h-1.5 rounded-full shrink-0"
+                                  style={{ background: p.color }}
+                                />
+                                <span className="truncate">{p.name}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+
+                    {/* Timed blocks */}
                     {blocks.map((b) => {
                       const p = state.projects.find((x) => x.id === b.projectId);
                       const task = state.tasks.find((x) => x.id === b.taskId);
+                      const projColor = b.isFocusSession
+                        ? "var(--ok)"
+                        : b.done
+                        ? "var(--ok)"
+                        : (p?.color ?? "var(--accent)");
                       return (
                         <div
                           key={b.id}
-                          onClick={() => openTaskDialog({ taskId: b.taskId })}
+                          onClick={() => {
+                            if (justInteractedRef.current) return;
+                            if (b.isFocusSession && b.sessionId) {
+                              const sess = state.sessions.find((s) => s.id === b.sessionId);
+                              if (sess) setEditingSession(sess);
+                              return;
+                            }
+                            openTaskDialog({ taskId: b.taskId });
+                          }}
                           className={cn(
-                            "flex items-center gap-2 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border-l-4",
+                            "relative flex items-center gap-2.5 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border",
                             b.done && "opacity-60 bg-[var(--panel)]"
                           )}
-                          style={{ borderLeftColor: b.done ? "var(--ok)" : (p?.color ?? "var(--accent)") }}
+                          style={{
+                            borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
+                          }}
                         >
-                          <div className="flex flex-col shrink-0 min-w-[50px]">
+                          {/* 3.5px DayFlow accent bar */}
+                          <div
+                            className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
+                            style={{ backgroundColor: projColor }}
+                          />
+                          <div className="flex flex-col shrink-0 min-w-[50px] pl-2">
                             <span className="text-[11.5px] font-bold tnum">{b.time}</span>
                             <span className="text-[10px]" style={{ color: "var(--mut)" }}>
                               {b.durationMin}m
@@ -667,8 +881,13 @@ export function CalendarView() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-1.5 truncate">
-                              {b.done && <Check size={12} className="text-emerald-500 font-bold shrink-0" />}
-                              {b.emoji && <span className="text-[12px]">{b.emoji}</span>}
+                              {b.done ? (
+                                <Check size={12} className="text-emerald-500 font-bold shrink-0" />
+                              ) : b.isFocusSession ? (
+                                <span className="text-[10px] shrink-0">⚡</span>
+                              ) : b.emoji ? (
+                                <span className="text-[12px]">{b.emoji}</span>
+                              ) : null}
                               <span className={cn("text-[12.5px] font-semibold truncate", b.done && "line-through opacity-75")}>
                                 {b.title}
                               </span>
@@ -728,6 +947,8 @@ export function CalendarView() {
   /* ---------------- month view (Google Calendar mobile style: dots + agenda) ---------------- */
   if (view === "month") {
     const selectedDayBlocks = blocksByDay.get(selectedDay) ?? [];
+    const selectedDayAllDay = allDayByDay.get(selectedDay) ?? [];
+    const totalSelected = selectedDayBlocks.length + selectedDayAllDay.length;
     const selectedDayTracked = tracked.get(selectedDay) ?? 0;
 
     return (
@@ -741,6 +962,7 @@ export function CalendarView() {
             setAnchor(todayIso());
             setSelectedDay(todayIso());
           }}
+          isTodayActive={isTodayActive}
           busyNow={busyNow?.title ?? null}
         />
         <Tray unscheduled={unscheduled} onDragItem={setDragDuration} />
@@ -765,6 +987,8 @@ export function CalendarView() {
             {monthCells.map((iso) => {
               const inMonth = parseIso(iso).getMonth() === parseIso(anchor).getMonth();
               const blocks = blocksByDay.get(iso) ?? [];
+              const allDay = allDayByDay.get(iso) ?? [];
+              const combined = [...allDay, ...blocks];
               const isToday = iso === today;
               const isSelected = iso === selectedDay;
               const cellDate = parseIso(iso).getDate();
@@ -807,19 +1031,20 @@ export function CalendarView() {
 
                   {/* Dot indicators for tasks/blocks */}
                   <div className="flex items-center justify-center gap-0.5 mt-1 max-w-full flex-wrap px-0.5">
-                    {blocks.slice(0, 3).map((b, i) => {
+                    {combined.slice(0, 3).map((b, i) => {
                       const p = state.projects.find((x) => x.id === b.projectId);
+                      const dotColor = p?.color ?? (b.isHabit ? "var(--ok)" : "var(--accent)");
                       return (
                         <span
                           key={b.id || i}
                           className="w-1.5 h-1.5 rounded-full shrink-0"
-                          style={{ background: p?.color ?? "var(--accent)" }}
+                          style={{ background: dotColor }}
                         />
                       );
                     })}
-                    {blocks.length > 3 && (
+                    {combined.length > 3 && (
                       <span className="text-[8px] font-bold leading-none text-mut">
-                        +{blocks.length - 3}
+                        +{combined.length - 3}
                       </span>
                     )}
                   </div>
@@ -847,8 +1072,8 @@ export function CalendarView() {
                 )}
               </div>
               <p className="text-[11px] font-medium mt-0.5" style={{ color: "var(--mut)" }}>
-                {selectedDayBlocks.length}{" "}
-                {selectedDayBlocks.length === 1 ? "block" : "blocks"}
+                {totalSelected}{" "}
+                {totalSelected === 1 ? "item" : "items"}
                 {selectedDayTracked > 0 && ` · ${fmtDur(selectedDayTracked)} tracked`}
               </p>
             </div>
@@ -862,7 +1087,7 @@ export function CalendarView() {
             </Btn>
           </div>
 
-          {selectedDayBlocks.length === 0 ? (
+          {totalSelected === 0 ? (
             <div className="py-6 text-center flex flex-col items-center justify-center gap-2">
               <Clock3 size={24} className="opacity-30 text-mut" />
               <p className="text-[12.5px] font-semibold text-mut">
@@ -879,17 +1104,131 @@ export function CalendarView() {
             </div>
           ) : (
             <div className="flex flex-col gap-1.5 w-full min-w-0">
+              {/* All-day items for selected day */}
+              {selectedDayAllDay.map((item) => {
+                const p = state.projects.find((x) => x.id === item.projectId);
+                const projColor = p?.color ?? (item.isHabit ? "var(--ok)" : "var(--accent)");
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      if (justInteractedRef.current) return;
+                      if (item.isHabit) {
+                        const habit = state.habits.find((h) => h.id === item.taskId);
+                        if (habit) {
+                          const has = habit.completions.includes(item.date);
+                          set((s) => ({
+                            ...s,
+                            habits: s.habits.map((h) =>
+                              h.id === habit.id
+                                ? {
+                                    ...h,
+                                    completions: has
+                                      ? h.completions.filter((d) => d !== item.date)
+                                      : [...h.completions, item.date],
+                                  }
+                                : h
+                            ),
+                          }));
+                          toast(
+                            has
+                              ? `Unchecked habit “${habit.name}”`
+                              : `Completed habit “${habit.name}”! 🎉`,
+                            "ok"
+                          );
+                        }
+                        return;
+                      }
+                      openTaskDialog({ taskId: item.taskId });
+                    }}
+                    className={cn(
+                      "relative flex items-center gap-2.5 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border",
+                      item.done && "opacity-60 bg-[var(--panel)]"
+                    )}
+                    style={{
+                      borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
+                    }}
+                  >
+                    {/* 3.5px DayFlow accent bar */}
+                    <div
+                      className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
+                      style={{ backgroundColor: projColor }}
+                    />
+                    <div className="flex flex-col shrink-0 min-w-[50px] pl-2">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-mut">
+                        All Day
+                      </span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 truncate">
+                        {item.done ? (
+                          <Check size={12} className="text-emerald-500 font-bold shrink-0" />
+                        ) : item.isHabit ? (
+                          <span className="text-[11px] shrink-0">🔁</span>
+                        ) : item.emoji ? (
+                          <span className="text-[12px]">{item.emoji}</span>
+                        ) : null}
+                        <span className={cn("text-[12.5px] font-semibold truncate", item.done && "line-through opacity-75")}>
+                          {item.title}
+                        </span>
+                        {item.label && (
+                          <span className="chip !text-[9.5px] !py-0 !px-1 shrink-0">
+                            {item.label}
+                          </span>
+                        )}
+                      </div>
+                      {p && (
+                        <div
+                          className="text-[10.5px] flex items-center gap-1 mt-0.5"
+                          style={{ color: p.color }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full shrink-0"
+                            style={{ background: p.color }}
+                          />
+                          <span className="truncate">{p.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Timed blocks for selected day */}
               {selectedDayBlocks.map((b) => {
                 const p = state.projects.find((x) => x.id === b.projectId);
                 const task = state.tasks.find((x) => x.id === b.taskId);
+                const projColor = b.isFocusSession
+                  ? "var(--ok)"
+                  : b.done
+                  ? "var(--ok)"
+                  : (p?.color ?? "var(--accent)");
                 return (
                   <div
                     key={b.id}
-                    onClick={() => openTaskDialog({ taskId: b.taskId })}
-                    className="flex items-center gap-2.5 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border-l-4"
-                    style={{ borderLeftColor: p?.color ?? "var(--accent)" }}
+                    onClick={() => {
+                      if (justInteractedRef.current) return;
+                      if (b.isFocusSession && b.sessionId) {
+                        const sess = state.sessions.find((s) => s.id === b.sessionId);
+                        if (sess) setEditingSession(sess);
+                        return;
+                      }
+                      openTaskDialog({ taskId: b.taskId });
+                    }}
+                    className={cn(
+                      "relative flex items-center gap-2.5 p-2 rounded-lg bg-[var(--panel2)] hover:bg-[var(--panel)] cursor-pointer transition-colors w-full min-w-0 border",
+                      b.done && "opacity-60 bg-[var(--panel)]"
+                    )}
+                    style={{
+                      borderColor: `color-mix(in srgb, ${projColor} 30%, transparent)`,
+                    }}
                   >
-                    <div className="flex flex-col shrink-0 min-w-[50px]">
+                    {/* 3.5px DayFlow accent bar */}
+                    <div
+                      className="absolute left-1.5 top-1.5 bottom-1.5 w-[3.5px] rounded-full pointer-events-none"
+                      style={{ backgroundColor: projColor }}
+                    />
+                    <div className="flex flex-col shrink-0 min-w-[50px] pl-2">
                       <span className="text-[12px] font-bold tnum">{b.time}</span>
                       <span className="text-[10px]" style={{ color: "var(--mut)" }}>
                         {b.durationMin}m
@@ -897,8 +1236,16 @@ export function CalendarView() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-1.5 truncate">
-                        {b.emoji && <span className="text-[12px]">{b.emoji}</span>}
-                        <span className="text-[12.5px] font-semibold truncate">{b.title}</span>
+                        {b.done ? (
+                          <Check size={12} className="text-emerald-500 font-bold shrink-0" />
+                        ) : b.isFocusSession ? (
+                          <span className="text-[10px] shrink-0">⚡</span>
+                        ) : b.emoji ? (
+                          <span className="text-[12px]">{b.emoji}</span>
+                        ) : null}
+                        <span className={cn("text-[12.5px] font-semibold truncate", b.done && "line-through opacity-75")}>
+                          {b.title}
+                        </span>
                         {b.label && (
                           <span className="chip !text-[9.5px] !py-0 !px-1 shrink-0">
                             {b.label}
@@ -989,56 +1336,31 @@ export function CalendarView() {
         setView={setView}
         label={label}
         navigate={navigate}
-        onToday={() => setAnchor(todayIso())}
+        onToday={() => {
+          setAnchor(todayIso());
+          setSelectedDay(todayIso());
+        }}
+        isTodayActive={isTodayActive}
         busyNow={busyNow?.title ?? null}
       />
       <Tray unscheduled={unscheduled} onDragItem={setDragDuration} />
       <div className={cn("card w-full max-w-full scrollbar-none", view === "day" ? "overflow-x-hidden" : "overflow-x-auto")}>
-        <div className={cn("flex w-full", view === "day" ? "min-w-0" : view === "3day" ? "min-w-[480px]" : "min-w-[640px]")}>
-          {/* gutter */}
-          <div
-            className="relative w-[50px] shrink-0 border-r"
-            style={{ borderColor: "var(--line)", height: GRID_H + 34 }}
-          >
-            <div className="h-[34px]" />
-            {Array.from({ length: H1 - H0 }, (_, i) => (
-              <div
-                key={i}
-                className="absolute right-1.5 text-[10px] font-bold tnum"
-                style={{ top: 34 + i * HOUR_H - 6, color: "var(--mut)" }}
-              >
-                {String(H0 + i).padStart(2, "0")}:00
-              </div>
-            ))}
-            {/* Live time gutter indicator */}
-            {nowMin >= H0 * 60 && nowMin <= H1 * 60 && (
-              <div
-                className="absolute right-1 z-30 px-1 py-0.5 rounded text-[9px] font-bold text-white bg-red-500 shadow-sm font-mono leading-none"
-                style={{ top: 34 + ((nowMin - H0 * 60) / 60) * HOUR_H - 7 }}
-              >
-                {minToTime(nowMin)}
-              </div>
-            )}
-          </div>
-
-          {days.map((iso) => {
-            const rawBlocks = blocksByDay.get(iso) ?? [];
-            const blocks = layoutOverlappingBlocks(rawBlocks);
-            const busyMin = rawBlocks.reduce((a, b) => a + b.durationMin, 0);
-            const isToday = iso === today;
-            const wk = (parseIso(iso).getDay() + 6) % 7;
-            return (
-              <div
-                key={iso}
-                className={cn(
-                  "relative flex-1 border-r last:border-r-0",
-                  view === "day" ? "min-w-0 w-full" : "min-w-[150px]"
-                )}
-                style={{ borderColor: "var(--line)" }}
-              >
-                {/* day header */}
+        <div className={cn("flex flex-col w-full", view === "day" ? "min-w-0" : view === "3day" ? "min-w-[480px]" : "min-w-[640px]")}>
+          {/* 1. Day headers row */}
+          <div className="flex border-b" style={{ borderColor: "var(--line)" }}>
+            <div className="w-[50px] shrink-0 border-r h-[34px] bg-[var(--panel)]" style={{ borderColor: "var(--line)" }} />
+            {days.map((iso) => {
+              const rawBlocks = blocksByDay.get(iso) ?? [];
+              const busyMin = rawBlocks.reduce((a, b) => a + b.durationMin, 0);
+              const isToday = iso === today;
+              const wk = (parseIso(iso).getDay() + 6) % 7;
+              return (
                 <div
-                  className="sticky top-0 z-10 flex h-[34px] items-center justify-between border-b px-2"
+                  key={iso}
+                  className={cn(
+                    "flex-1 border-r last:border-r-0 flex h-[34px] items-center justify-between px-2",
+                    view === "day" ? "min-w-0" : "min-w-[150px]"
+                  )}
                   style={{
                     borderColor: "var(--line)",
                     background: isToday ? "var(--accent-soft)" : "var(--panel)",
@@ -1064,119 +1386,87 @@ export function CalendarView() {
                     {busyMin > 0 ? `busy ${fmtDur(busyMin)}` : "free"}
                   </span>
                 </div>
+              );
+            })}
+          </div>
 
-                {/* grid */}
+          {/* 2. All-Day Row (DayFlow calendar-3.7.3 inspired) */}
+          <div className="flex border-b bg-[var(--panel2)]/30" style={{ borderColor: "var(--line)" }}>
+            <div
+              className="w-[50px] shrink-0 border-r flex items-center justify-center text-[9px] font-bold uppercase tracking-wider select-none"
+              style={{ borderColor: "var(--line)", color: "var(--mut)" }}
+            >
+              all-day
+            </div>
+            {days.map((iso) => {
+              const allDayItems = allDayByDay.get(iso) ?? [];
+              return (
                 <div
-                  className="relative"
-                  style={{ height: GRID_H }}
+                  key={iso}
+                  className={cn(
+                    "flex-1 border-r last:border-r-0 p-1 flex flex-col gap-1 min-h-[34px] justify-center transition-colors",
+                    view === "day" ? "min-w-0" : "min-w-[150px]"
+                  )}
+                  style={{ borderColor: "var(--line)" }}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const raw = ((e.clientY - rect.top) / HOUR_H) * 60 + H0 * 60;
-                    const dur = dragDuration || 60;
-                    const snapped = Math.max(
-                      H0 * 60,
-                      Math.min(H1 * 60 - dur, Math.floor(raw / 15) * 15)
-                    );
-                    if (!hover || hover.iso !== iso || hover.min !== snapped || hover.durationMin !== dur)
-                      setHover({ iso, min: snapped, durationMin: dur });
+                    e.currentTarget.classList.add("bg-[var(--accent-soft)]");
                   }}
-                  onDrop={dropOn(iso, hover?.iso === iso ? hover.min : H0 * 60)}
-                  onClick={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
-                    const y = e.clientY - rect.top;
-                    const rawMin = H0 * 60 + (y / HOUR_H) * 60;
-                    const snapped = Math.max(
-                      H0 * 60,
-                      Math.min(H1 * 60 - 30, Math.floor(rawMin / 30) * 30)
-                    );
-                    openTaskDialog({ presetDate: iso, presetTime: minToTime(snapped) });
+                  onDragLeave={(e) => {
+                    e.currentTarget.classList.remove("bg-[var(--accent-soft)]");
                   }}
+                  onDrop={(e) => {
+                    e.currentTarget.classList.remove("bg-[var(--accent-soft)]");
+                    dropOn(iso, null)(e);
+                  }}
+                  onClick={() => {
+                    if (justInteractedRef.current) return;
+                    openTaskDialog({ presetDate: iso });
+                  }}
+                  title="Click to add all-day task · drop tasks here"
                 >
-                  {Array.from({ length: (H1 - H0) * 2 }, (_, i) => (
-                    <div
-                      key={i}
-                      className="absolute left-0 right-0 border-t"
-                      style={{
-                        top: i * (HOUR_H / 2),
-                        borderColor:
-                          i % 2 === 0
-                            ? "var(--line)"
-                            : "color-mix(in srgb, var(--line) 45%, transparent)",
-                      }}
-                    />
-                  ))}
-
-                  {/* Live current time red indicator line */}
-                  {isToday && nowMin >= H0 * 60 && nowMin <= H1 * 60 && (
-                    <div
-                      className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
-                      style={{
-                        top: ((nowMin - H0 * 60) / 60) * HOUR_H,
-                      }}
-                    >
-                      <div className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-md -ml-1.5 ring-2 ring-red-400/40 shrink-0" />
-                      <div className="h-[2px] flex-1 bg-red-500 shadow-sm" />
+                  {allDayItems.length === 0 && (
+                    <div className="h-full w-full flex items-center justify-center opacity-0 hover:opacity-100 text-[10px] font-semibold text-mut pointer-events-none select-none">
+                      + All-day
                     </div>
                   )}
-
-                  {/* Duration-aware drag-and-drop hover preview */}
-                  {hover?.iso === iso && (
-                    <div
-                      className="pointer-events-none absolute left-1 right-1 z-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed text-[11px] font-bold shadow-md transition-all"
-                      style={{
-                        top: ((hover.min - H0 * 60) / 60) * HOUR_H,
-                        height: Math.max(26, ((hover.durationMin || 60) / 60) * HOUR_H),
-                        borderColor: "var(--accent)",
-                        background: "var(--accent-soft)",
-                        color: "var(--accent)",
-                      }}
-                    >
-                      <span>{minToTime(hover.min)} – {minToTime(hover.min + (hover.durationMin || 60))}</span>
-                      <span className="text-[9.5px] font-normal opacity-85">
-                        {fmtDur(hover.durationMin || 60)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Scheduled and Focus blocks with Google Calendar overlapping split */}
-                  {blocks.map((b) => {
-                    const start = timeToMin(b.time ?? "09:00");
-                    const top = ((start - H0 * 60) / 60) * HOUR_H;
-                    const currentDuration =
-                      resizing && resizing.taskId === b.taskId && resizing.blockId === b.blockId
-                        ? resizing.currentDur
-                        : b.durationMin;
-                    const h = Math.max(26, (currentDuration / 60) * HOUR_H);
-                    const p = state.projects.find((x) => x.id === b.projectId);
-                    const leftPct = (b.colIndex / b.numCols) * 100;
-                    const widthPct = 100 / b.numCols;
-
+                  {allDayItems.map((item) => {
+                    const p = state.projects.find((x) => x.id === item.projectId);
+                    const projColor = p?.color ?? (item.isHabit ? "var(--ok)" : "var(--accent)");
                     return (
                       <div
-                        key={b.id}
-                        draggable={!b.done && !b.isFocusSession}
+                        key={item.id}
+                        draggable={!item.done}
                         onDragStart={(e) => {
-                          if (b.done || b.isFocusSession) return;
-                          setDragDuration(b.durationMin || 60);
+                          if (item.done) return;
+                          setDragDuration(60);
                           e.dataTransfer.setData(
                             "lifelog/drag",
                             JSON.stringify({
-                              taskId: b.taskId,
-                              blockId: b.blockId,
-                              isHabit: !!b.isHabit,
-                              durationMin: b.durationMin || 60,
+                              taskId: item.taskId,
+                              blockId: item.blockId,
+                              isHabit: !!item.isHabit,
+                              durationMin: 60,
                             })
                           );
-                          e.dataTransfer.setData("lifelog/task", b.taskId);
+                          e.dataTransfer.setData("lifelog/task", item.taskId);
                           e.stopPropagation();
+                        }}
+                        onDragEnd={() => {
+                          setHover(null);
+                          setDragDuration(60);
+                          justInteractedRef.current = true;
+                          setTimeout(() => {
+                            justInteractedRef.current = false;
+                          }, 250);
                         }}
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (b.isHabit) {
-                            const habit = state.habits.find((h) => h.id === b.taskId);
+                          if (justInteractedRef.current) return;
+                          if (item.isHabit) {
+                            const habit = state.habits.find((h) => h.id === item.taskId);
                             if (habit) {
-                              const has = habit.completions.includes(b.date);
+                              const has = habit.completions.includes(item.date);
                               set((s) => ({
                                 ...s,
                                 habits: s.habits.map((h) =>
@@ -1184,8 +1474,8 @@ export function CalendarView() {
                                     ? {
                                         ...h,
                                         completions: has
-                                          ? h.completions.filter((d) => d !== b.date)
-                                          : [...h.completions, b.date],
+                                          ? h.completions.filter((d) => d !== item.date)
+                                          : [...h.completions, item.date],
                                       }
                                     : h
                                 ),
@@ -1193,121 +1483,382 @@ export function CalendarView() {
                               toast(
                                 has
                                   ? `Unchecked habit “${habit.name}”`
-                                  : `Completed habit “${habit.name}! 🎉`,
+                                  : `Completed habit “${habit.name}”! 🎉`,
                                 "ok"
                               );
                             }
                             return;
                           }
-                          if (!b.isFocusSession) {
-                            openTaskDialog({ taskId: b.taskId });
-                          } else if (b.sessionId) {
-                            const sess = state.sessions.find((s) => s.id === b.sessionId);
-                            if (sess) setEditingSession(sess);
-                          }
+                          openTaskDialog({ taskId: item.taskId });
                         }}
                         className={cn(
-                          "absolute z-[5] overflow-hidden rounded-lg border-l-[3px] px-2 py-1 transition-transform hover:scale-[1.015]",
-                          b.done && "opacity-75"
+                          "group relative flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-semibold border transition-all select-none cursor-pointer truncate",
+                          item.done ? "opacity-60 bg-[var(--panel)]" : "hover:scale-[1.01]"
                         )}
                         style={{
-                          top,
-                          height: h,
-                          left: `calc(${leftPct}% + 2px)`,
-                          width: `calc(${widthPct}% - 4px)`,
-                          background: b.isFocusSession
-                            ? "color-mix(in srgb, var(--ok) 16%, var(--panel2))"
-                            : b.done
-                            ? "color-mix(in srgb, var(--ok) 14%, var(--panel2))"
-                            : `color-mix(in srgb, ${p?.color ?? "#888"} ${
-                                b.snoozed ? 10 : 22
-                              }%, var(--panel2))`,
-                          borderLeftColor: b.isFocusSession
-                            ? "var(--ok)"
-                            : b.done
-                            ? "var(--ok)"
-                            : p?.color,
-                          cursor: b.done ? "pointer" : "grab",
-                          boxShadow: "0 2px 8px rgba(0,0,0,0.18)",
+                          backgroundColor: item.done
+                            ? "var(--panel2)"
+                            : `color-mix(in srgb, ${projColor} 16%, var(--panel2))`,
+                          borderColor: `color-mix(in srgb, ${projColor} 38%, transparent)`,
+                          color: "var(--text)",
                         }}
-                        title={`${b.title}${b.label ? ` · ${b.label}` : ""} (${currentDuration}m)${
-                          b.done ? " [COMPLETED]" : ""
-                        } · ${b.time}–${minToTime(start + currentDuration)}`}
+                        title={`${item.title}${item.isHabit ? " (Habit)" : " (All Day)"}${item.done ? " [DONE]" : ""}`}
                       >
-                        <div className="flex items-center gap-1 leading-tight">
-                          {b.done ? (
-                            <Check size={11} className="text-emerald-500 font-bold shrink-0" />
-                          ) : b.isFocusSession ? (
-                            <span className="text-[10px] shrink-0">⚡</span>
-                          ) : b.blockId ? (
-                            <Layers size={10} className="text-accent shrink-0" />
-                          ) : null}
-                          <span
-                            className={cn(
-                              "truncate text-[11px] font-bold",
-                              b.done && "line-through opacity-70"
-                            )}
-                          >
-                            {b.emoji ? `${b.emoji} ` : ""}
-                            {b.title}
+                        <div
+                          className="w-[3px] self-stretch rounded-full shrink-0 -my-0.5 -ml-1"
+                          style={{ backgroundColor: projColor }}
+                        />
+                        {item.done ? (
+                          <Check size={11} className="text-emerald-500 font-bold shrink-0" />
+                        ) : item.isHabit ? (
+                          <span className="text-[10px] shrink-0">🔁</span>
+                        ) : item.emoji ? (
+                          <span className="text-[11px] shrink-0">{item.emoji}</span>
+                        ) : null}
+                        <span className={cn("truncate flex-1 min-w-0", item.done && "line-through opacity-70")}>
+                          {item.title}
+                        </span>
+                        {item.label && (
+                          <span className="chip !text-[8.5px] !py-0 !px-1 shrink-0 opacity-80">
+                            {item.label}
                           </span>
-                        </div>
-                        {b.label && (
-                          <div
-                            className={cn(
-                              "text-[9.5px] font-medium text-accent truncate",
-                              b.done && "opacity-60"
-                            )}
-                          >
-                            {b.label}
-                            {b.pauses && b.pauses.length > 0 && (
-                              <span className="ml-1 text-[9px] text-[var(--warn)]">
-                                ({b.pauses.length} {b.pauses.length === 1 ? "pause" : "pauses"})
-                              </span>
-                            )}
-                          </div>
-                        )}
-                        {h >= 36 && (
-                          <div
-                            className="tnum text-[9.5px] font-bold mt-0.5"
-                            style={{ color: "var(--mut)" }}
-                          >
-                            {b.time}–{minToTime(start + currentDuration)} · {currentDuration}m
-                          </div>
-                        )}
-
-                        {/* Google Calendar bottom resize handle */}
-                        {!b.done && !b.isFocusSession && (
-                          <div
-                            onMouseDown={(e) => handleResizeStart(e, b)}
-                            onTouchStart={(e) => handleResizeStart(e, b)}
-                            className="absolute bottom-0 left-0 right-0 h-2.5 cursor-ns-resize flex items-center justify-center hover:bg-white/20 transition-colors group z-20"
-                            title="Drag to resize duration (15m increments)"
-                          >
-                            <div className="w-5 h-0.5 rounded-full bg-white/40 group-hover:bg-white/90" />
-                          </div>
                         )}
                       </div>
                     );
                   })}
                 </div>
+              );
+            })}
+          </div>
 
-                {/* worked time footer */}
+          {/* 3. Hourly Grid */}
+          <div className="flex w-full">
+            {/* gutter */}
+            <div
+              className="relative w-[50px] shrink-0 border-r"
+              style={{ borderColor: "var(--line)", height: GRID_H }}
+            >
+              {Array.from({ length: H1 - H0 }, (_, i) => (
                 <div
-                  className="flex h-[26px] items-center justify-between border-t px-2 text-[10px] font-bold"
-                  style={{ borderColor: "var(--line)", color: "var(--mut)" }}
+                  key={i}
+                  className="absolute right-1.5 text-[10px] font-bold tnum"
+                  style={{ top: i * HOUR_H - 6, color: "var(--mut)" }}
                 >
-                  <span>worked</span>
-                  <span
-                    className="tnum"
-                    style={{ color: (tracked.get(iso) ?? 0) > 0 ? "var(--ok)" : "var(--mut)" }}
-                  >
-                    {fmtDur(tracked.get(iso) ?? 0)}
-                  </span>
+                  {String(H0 + i).padStart(2, "0")}:00
                 </div>
+              ))}
+              {/* Live time gutter indicator */}
+              {nowMin >= H0 * 60 && nowMin <= H1 * 60 && (
+                <div
+                  className="absolute right-1 z-30 px-1 py-0.5 rounded text-[9px] font-bold text-white bg-red-500 shadow-sm font-mono leading-none"
+                  style={{ top: ((nowMin - H0 * 60) / 60) * HOUR_H - 7 }}
+                >
+                  {minToTime(nowMin)}
+                </div>
+              )}
+            </div>
+
+            {/* Day columns */}
+            {days.map((iso) => {
+              const rawBlocks = blocksByDay.get(iso) ?? [];
+              const blocks = layoutOverlappingBlocks(rawBlocks);
+              const isToday = iso === today;
+              return (
+                <div
+                  key={iso}
+                  className={cn(
+                    "relative flex-1 border-r last:border-r-0",
+                    view === "day" ? "min-w-0 w-full" : "min-w-[150px]"
+                  )}
+                  style={{ borderColor: "var(--line)" }}
+                >
+                  {/* grid */}
+                  <div
+                    className="relative"
+                    style={{ height: GRID_H }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const raw = ((e.clientY - rect.top) / HOUR_H) * 60 + H0 * 60;
+                      const dur = dragDuration || 60;
+                      const snapped = Math.max(
+                        H0 * 60,
+                        Math.min(H1 * 60 - dur, Math.floor(raw / 15) * 15)
+                      );
+                      if (!hover || hover.iso !== iso || hover.min !== snapped || hover.durationMin !== dur) {
+                        setHover({ iso, min: snapped, durationMin: dur });
+                      }
+                    }}
+                    onDragLeave={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                        setHover((curr) => (curr?.iso === iso ? null : curr));
+                      }
+                    }}
+                    onDrop={dropOn(iso, hover?.iso === iso ? hover.min : H0 * 60)}
+                    onClick={(e) => {
+                      if (justInteractedRef.current) return;
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const y = e.clientY - rect.top;
+                      const rawMin = H0 * 60 + (y / HOUR_H) * 60;
+                      const snapped = Math.max(
+                        H0 * 60,
+                        Math.min(H1 * 60 - 30, Math.floor(rawMin / 30) * 30)
+                      );
+                      openTaskDialog({ presetDate: iso, presetTime: minToTime(snapped) });
+                    }}
+                  >
+                    {Array.from({ length: (H1 - H0) * 2 }, (_, i) => (
+                      <div
+                        key={i}
+                        className="absolute left-0 right-0 border-t"
+                        style={{
+                          top: i * (HOUR_H / 2),
+                          borderColor:
+                            i % 2 === 0
+                              ? "var(--line)"
+                              : "color-mix(in srgb, var(--line) 45%, transparent)",
+                        }}
+                      />
+                    ))}
+
+                    {/* Live current time red indicator line */}
+                    {isToday && nowMin >= H0 * 60 && nowMin <= H1 * 60 && (
+                      <div
+                        className="pointer-events-none absolute left-0 right-0 z-30 flex items-center"
+                        style={{
+                          top: ((nowMin - H0 * 60) / 60) * HOUR_H,
+                        }}
+                      >
+                        <div className="h-2.5 w-2.5 rounded-full bg-red-500 shadow-md -ml-1.5 ring-2 ring-red-400/40 shrink-0" />
+                        <div className="h-[2px] flex-1 bg-red-500 shadow-sm" />
+                      </div>
+                    )}
+
+                    {/* Duration-aware drag-and-drop hover preview */}
+                    {hover?.iso === iso && (
+                      <div
+                        className="pointer-events-none absolute left-1 right-1 z-20 flex flex-col items-center justify-center rounded-lg border-2 border-dashed text-[11px] font-bold shadow-md transition-all"
+                        style={{
+                          top: ((hover.min - H0 * 60) / 60) * HOUR_H,
+                          height: Math.max(26, ((hover.durationMin || 60) / 60) * HOUR_H),
+                          borderColor: "var(--accent)",
+                          background: "var(--accent-soft)",
+                          color: "var(--accent)",
+                        }}
+                      >
+                        <span>{minToTime(hover.min)} – {minToTime(hover.min + (hover.durationMin || 60))}</span>
+                        <span className="text-[9.5px] font-normal opacity-85">
+                          {fmtDur(hover.durationMin || 60)}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Scheduled and Focus blocks with DayFlow aesthetic */}
+                    {blocks.map((b) => {
+                      const start = timeToMin(b.time ?? "09:00");
+                      const top = ((start - H0 * 60) / 60) * HOUR_H;
+                      const currentDuration =
+                        resizing && resizing.targetItemId === b.id
+                          ? resizing.currentDur
+                          : b.durationMin;
+                      const h = Math.max(26, (currentDuration / 60) * HOUR_H);
+                      const p = state.projects.find((x) => x.id === b.projectId);
+                      const projColor = b.isFocusSession
+                        ? "var(--ok)"
+                        : b.done
+                        ? "var(--ok)"
+                        : (p?.color ?? "var(--accent)");
+                      const leftPct = (b.colIndex / b.numCols) * 100;
+                      const widthPct = 100 / b.numCols;
+
+                      return (
+                        <div
+                          key={b.id}
+                          draggable={!b.done && !b.isFocusSession}
+                          onDragStart={(e) => {
+                            if (b.done || b.isFocusSession) return;
+                            setDragDuration(b.durationMin || 60);
+                            e.dataTransfer.setData(
+                              "lifelog/drag",
+                              JSON.stringify({
+                                taskId: b.taskId,
+                                blockId: b.blockId,
+                                isHabit: !!b.isHabit,
+                                durationMin: b.durationMin || 60,
+                              })
+                            );
+                            e.dataTransfer.setData("lifelog/task", b.taskId);
+                            e.stopPropagation();
+                          }}
+                          onDragEnd={() => {
+                            setHover(null);
+                            setDragDuration(60);
+                            justInteractedRef.current = true;
+                            setTimeout(() => {
+                              justInteractedRef.current = false;
+                            }, 250);
+                          }}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (justInteractedRef.current) return;
+                            if (b.isHabit) {
+                              const habit = state.habits.find((h) => h.id === b.taskId);
+                              if (habit) {
+                                const has = habit.completions.includes(b.date);
+                                set((s) => ({
+                                  ...s,
+                                  habits: s.habits.map((h) =>
+                                    h.id === habit.id
+                                      ? {
+                                          ...h,
+                                          completions: has
+                                            ? h.completions.filter((d) => d !== b.date)
+                                            : [...h.completions, b.date],
+                                        }
+                                      : h
+                                  ),
+                                }));
+                                toast(
+                                  has
+                                    ? `Unchecked habit “${habit.name}”`
+                                    : `Completed habit “${habit.name}”! 🎉`,
+                                  "ok"
+                                );
+                              }
+                              return;
+                            }
+                            if (!b.isFocusSession) {
+                              openTaskDialog({ taskId: b.taskId });
+                            } else if (b.sessionId) {
+                              const sess = state.sessions.find((s) => s.id === b.sessionId);
+                              if (sess) setEditingSession(sess);
+                            }
+                          }}
+                          className={cn(
+                            "group absolute z-[5] overflow-hidden rounded-md border text-[11px] transition-all select-none",
+                            b.done && "opacity-75"
+                          )}
+                          style={{
+                            top,
+                            height: h,
+                            left: `calc(${leftPct}% + 2px)`,
+                            width: `calc(${widthPct}% - 4px)`,
+                            backgroundColor: b.isFocusSession
+                              ? "color-mix(in srgb, var(--ok) 14%, var(--panel2))"
+                              : b.done
+                              ? "color-mix(in srgb, var(--ok) 10%, var(--panel2))"
+                              : `color-mix(in srgb, ${projColor} ${
+                                  b.snoozed ? 10 : 18
+                                }%, var(--panel2))`,
+                            borderColor: b.isFocusSession
+                              ? "color-mix(in srgb, var(--ok) 35%, transparent)"
+                              : b.done
+                              ? "color-mix(in srgb, var(--ok) 30%, transparent)"
+                              : `color-mix(in srgb, ${projColor} 32%, transparent)`,
+                            cursor: b.done ? "pointer" : "grab",
+                            boxShadow: "0 1px 4px rgba(0,0,0,0.12)",
+                          }}
+                          title={`${b.title}${b.label ? ` · ${b.label}` : ""} (${currentDuration}m)${
+                            b.done ? " [COMPLETED]" : ""
+                          } · ${b.time}–${minToTime(start + currentDuration)}`}
+                        >
+                          {/* DayFlow 3.5px vertical accent pill bar */}
+                          <div
+                            className="absolute left-1 top-1 bottom-1 w-[3.5px] rounded-full pointer-events-none"
+                            style={{
+                              backgroundColor: projColor,
+                            }}
+                          />
+
+                          {/* Content area padded to clear the 3px pill bar */}
+                          <div className="flex flex-col h-full pl-3 pr-1 py-0.5 overflow-hidden leading-tight">
+                            <div className="flex items-center gap-1 min-w-0">
+                              {b.done ? (
+                                <Check size={11} className="text-emerald-500 font-bold shrink-0" />
+                              ) : b.isFocusSession ? (
+                                <span className="text-[10px] shrink-0">⚡</span>
+                              ) : b.blockId ? (
+                                <Layers size={10} className="text-accent shrink-0" />
+                              ) : null}
+                              <span
+                                className={cn(
+                                  "truncate font-bold text-[11px] text-[var(--text)]",
+                                  b.done && "line-through opacity-70"
+                                )}
+                              >
+                                {b.emoji ? `${b.emoji} ` : ""}
+                                {b.title}
+                              </span>
+                            </div>
+
+                            {b.label && (
+                              <div className="text-[9.5px] font-medium text-accent truncate opacity-90">
+                                {b.label}
+                                {b.pauses && b.pauses.length > 0 && (
+                                  <span className="ml-1 text-[9px] text-[var(--warn)]">
+                                    ({b.pauses.length} {b.pauses.length === 1 ? "pause" : "pauses"})
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
+                            {h >= 34 && (
+                              <div
+                                className="tnum text-[9.5px] font-semibold mt-auto truncate"
+                                style={{ color: "var(--mut)" }}
+                              >
+                                {b.time}–{minToTime(start + currentDuration)} · {fmtDur(currentDuration)}
+                              </div>
+                            )}
+                          </div>
+
+                          {/* DayFlow / Google Calendar interactive bottom resize handle */}
+                          {!b.done && !b.isFocusSession && (
+                            <div
+                              onMouseDown={(e) => handleResizeStart(e, b)}
+                              onTouchStart={(e) => handleResizeStart(e, b)}
+                              className="absolute bottom-0 left-0 right-0 h-3 cursor-ns-resize flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity z-20 hover:bg-black/10 dark:hover:bg-white/10"
+                              title="Drag to resize duration (15m increments)"
+                            >
+                              <div className="w-5 h-1 rounded-full bg-white/60 dark:bg-white/40 shadow-sm" />
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* 4. Worked time footer */}
+          <div className="flex border-t" style={{ borderColor: "var(--line)" }}>
+            <div
+              className="w-[50px] shrink-0 border-r h-[26px] flex items-center justify-end pr-1 text-[9px] font-bold uppercase text-mut"
+              style={{ borderColor: "var(--line)" }}
+            >
+              worked
+            </div>
+            {days.map((iso) => (
+              <div
+                key={iso}
+                className={cn(
+                  "flex-1 border-r last:border-r-0 flex h-[26px] items-center justify-between px-2 text-[10px] font-bold",
+                  view === "day" ? "min-w-0" : "min-w-[150px]"
+                )}
+                style={{ borderColor: "var(--line)", color: "var(--mut)" }}
+              >
+                <span>total</span>
+                <span
+                  className="tnum"
+                  style={{ color: (tracked.get(iso) ?? 0) > 0 ? "var(--ok)" : "var(--mut)" }}
+                >
+                  {fmtDur(tracked.get(iso) ?? 0)}
+                </span>
               </div>
-            );
-          })}
+            ))}
+          </div>
         </div>
       </div>
       <div className="text-[11.5px] font-semibold" style={{ color: "var(--mut)" }}>
@@ -1348,6 +1899,7 @@ function Header({
   label,
   navigate,
   onToday,
+  isTodayActive,
   busyNow,
 }: {
   view: CalView;
@@ -1355,49 +1907,79 @@ function Header({
   label: string;
   navigate: (d: -1 | 1) => void;
   onToday: () => void;
+  isTodayActive: boolean;
   busyNow: string | null;
 }) {
   return (
-    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 w-full">
-      <div>
-        <h1 className="font-display text-[22px] sm:text-[24px] font-bold tracking-tight">Calendar</h1>
-        <p
-          className="flex items-center gap-2 text-[12.5px] font-semibold"
-          style={{ color: "var(--mut)" }}
-        >
-          <Clock3 size={13} className="shrink-0" />
-          <span className="truncate">{label}</span>
-          <span
-            className="chip !py-0 text-[10px] max-w-[170px] truncate"
-            style={{ color: busyNow ? "var(--danger)" : "var(--ok)" }}
+    <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 w-full">
+      <div className="flex items-center gap-3 flex-wrap">
+        {/* DayFlow inspired navigation group */}
+        <div className="flex items-center gap-1 bg-[var(--panel2)] p-1 rounded-xl border border-[var(--line)] shadow-sm">
+          <button
+            type="button"
+            onClick={() => navigate(-1)}
+            className="p-1.5 rounded-lg hover:bg-[var(--panel)] text-mut hover:text-[var(--text)] transition-colors active:scale-95"
+            title="Previous"
+            aria-label="Previous"
           >
-            now: {busyNow ? `busy · ${busyNow}` : "free"}
-          </span>
-        </p>
-      </div>
-      <div className="flex items-center gap-1.5 flex-wrap w-full sm:w-auto">
-        <Btn variant="soft" size="sm" onClick={() => navigate(-1)} aria-label="Previous">
-          <ChevronLeft size={14} />
-        </Btn>
-        <Btn variant="outline" size="sm" onClick={onToday}>
-          Today
-        </Btn>
-        <Btn variant="soft" size="sm" onClick={() => navigate(1)} aria-label="Next">
-          <ChevronRight size={14} />
-        </Btn>
-        <div className="ml-auto sm:ml-0">
-          <Seg
-            options={[
-              { value: "schedule", label: "Schedule" },
-              { value: "day", label: "Day" },
-              { value: "3day", label: "3D" },
-              { value: "week", label: "Week" },
-              { value: "month", label: "Month" },
-            ]}
-            value={view}
-            onChange={setView}
-          />
+            <ChevronLeft size={16} />
+          </button>
+          <button
+            type="button"
+            onClick={onToday}
+            className={cn(
+              "px-3 py-1 rounded-lg text-[12px] font-bold transition-all active:scale-95",
+              isTodayActive
+                ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-sm"
+                : "hover:bg-[var(--panel)] text-[var(--text)]"
+            )}
+            title="Go to Today"
+          >
+            Today
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate(1)}
+            className="p-1.5 rounded-lg hover:bg-[var(--panel)] text-mut hover:text-[var(--text)] transition-colors active:scale-95"
+            title="Next"
+            aria-label="Next"
+          >
+            <ChevronRight size={16} />
+          </button>
         </div>
+
+        <div>
+          <h2 className="text-[17px] sm:text-[19px] font-bold tracking-tight text-[var(--text)] flex items-center gap-2">
+            <span>{label}</span>
+          </h2>
+          <div className="flex items-center gap-2 text-[11px] font-medium" style={{ color: "var(--mut)" }}>
+            <span
+              className={cn(
+                "inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10.5px] font-bold tracking-wide",
+                busyNow
+                  ? "bg-red-500/15 text-red-600 dark:text-red-400 border border-red-500/25"
+                  : "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/25"
+              )}
+            >
+              <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", busyNow ? "bg-red-500 animate-pulse" : "bg-emerald-500")} />
+              {busyNow ? `Busy · ${busyNow}` : "Free now"}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-2 ml-auto sm:ml-0">
+        <Seg
+          options={[
+            { value: "schedule", label: "Schedule" },
+            { value: "day", label: "Day" },
+            { value: "3day", label: "3D" },
+            { value: "week", label: "Week" },
+            { value: "month", label: "Month" },
+          ]}
+          value={view}
+          onChange={setView}
+        />
       </div>
     </div>
   );

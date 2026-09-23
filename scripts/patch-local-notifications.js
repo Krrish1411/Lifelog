@@ -63,12 +63,12 @@ try {
     modified = true;
   }
 
-  // 4. Silence running timer channels completely (prevent ringing/vibration loops)
-  const silentPatchMarker = '/* LifeLog Silent Channel Guard v2 */';
+  // 4. Sound & Alert Guard (1-time alert for active channels with setOnlyAlertOnce, silent for explicit silent channels)
+  const silentPatchMarker = '/* LifeLog Active Channel Guard v3 */';
   const silentReplacement = `${silentPatchMarker}
         val chId = localNotification.channelId
-        val isRunningTimer = localNotification.ongoing || (chId != null && chId.contains("running"))
-        if (isRunningTimer || localNotification.sound == null) {
+        val isExplicitSilent = chId != null && chId.contains("silent")
+        if (isExplicitSilent) {
             mBuilder.setSound(null)
             mBuilder.setDefaults(0)
             mBuilder.setVibrate(null)
@@ -77,14 +77,14 @@ try {
             if (soundUri != null) {
                 context.grantUriPermission("com.android.systemui", soundUri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
                 mBuilder.setSound(soundUri)
-                mBuilder.setDefaults(Notification.DEFAULT_VIBRATE or Notification.DEFAULT_LIGHTS)
+                mBuilder.setDefaults(Notification.DEFAULT_LIGHTS)
             } else {
-                mBuilder.setDefaults(Notification.DEFAULT_ALL)
+                mBuilder.setDefaults(Notification.DEFAULT_LIGHTS)
             }
         }`;
 
-  if (content.includes('/* LifeLog Silent Channel Guard */')) {
-    const oldSilentRegex = /\/\* LifeLog Silent Channel Guard \*\/[\s\S]*?mBuilder\.setDefaults\(Notification\.DEFAULT_ALL\)\s*\}\s*\}/;
+  if (content.includes('/* LifeLog Silent Channel Guard v2 */') || content.includes('/* LifeLog Silent Channel Guard */')) {
+    const oldSilentRegex = /\/\* LifeLog Silent Channel Guard(?: v2)? \*\/[\s\S]*?mBuilder\.setDefaults\(Notification\.DEFAULT_ALL\)\s*\}\s*\}/;
     content = content.replace(oldSilentRegex, silentReplacement);
     modified = true;
   } else if (!content.includes(silentPatchMarker)) {

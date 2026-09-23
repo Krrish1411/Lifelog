@@ -268,12 +268,12 @@ export async function initNotificationChannels(): Promise<void> {
       vibration: true,
     });
 
-    // 2. 100% Silent Running Timer Channel for Shade & Lock Screen (Zero sound, zero vibration, public)
+    // 2. Active Running Timer Channel for Shade & Lock Screen (1-time sound on start, active/non-silent, public on lock screen)
     await LocalNotifications.createChannel({
-      id: "focus-running-silent-v5",
-      name: "Active Focus Timer & Status",
-      description: "Shows live countdown, task name, and pause/resume controls silently on lock screen and notification shade",
-      importance: 2, // Low priority (Zero sound, zero vibration, purely visual)
+      id: "focus-running-active-v6",
+      name: "Active Focus Session",
+      description: "Shows live countdown, task name, and pause/resume controls on lock screen and notification shade",
+      importance: 3, // IMPORTANCE_DEFAULT (Active, not silent, displayed on lock screen, 1-time alert sound)
       visibility: 1, // VISIBILITY_PUBLIC (Guarantees display on lock screen even if sensitive notifications are hidden)
       vibration: false,
     });
@@ -597,7 +597,7 @@ export async function showRunningTimerNotification(
       extra.usesChronometer = false;
     }
 
-    // Immediate 0ms dispatch to focus-running-silent-v5 channel (no largeBody to preserve system progress bar)
+    // Immediate 0ms dispatch to focus-running-active-v6 channel (Active, 1-time sound, lock screen visible, non-removable)
     await LocalNotifications.schedule({
       notifications: [
         {
@@ -605,9 +605,9 @@ export async function showRunningTimerNotification(
           title,
           body,
           summaryText: isBreak ? "Break" : "Focus",
-          channelId: "focus-running-silent-v5",
-          ongoing: false, // Swipeable: allows user to dismiss notification from tray at will
-          autoCancel: true,
+          channelId: "focus-running-active-v6",
+          ongoing: true, // Non-removable: stays pinned in notification shade while timer is active
+          autoCancel: false,
           actionTypeId: isPaused ? "TIMER_PAUSED_ACTIONS" : "TIMER_RUNNING_ACTIONS",
           extra,
         },
