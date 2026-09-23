@@ -9,7 +9,6 @@
  * 2. Prevent premature notification dismissal when "Pause" or "Resume" actions are tapped.
  * 3. Enforce 100% silent updates (no repetitive chime or vibration loops) on running timer channels.
  * 4. Support native Android Progress Bar (mBuilder.setProgress) and Chronometer count-up / count-down.
- * 5. Ensure ongoing timer notifications are sticky and unswipeable (FLAG_ONGOING_EVENT | FLAG_NO_CLEAR).
  */
 
 import fs from 'fs';
@@ -58,18 +57,21 @@ try {
     modified = true;
   }
 
-  // 3. Silence running timer channels completely (prevent ringing/vibration loops)
-  const soundBlockAnchor = 'val soundUri = SoundResolver.resolveUri(context, localNotification.sound) ?: getDefaultSoundUrl(context)';
-  if (content.includes(soundBlockAnchor) && !content.includes('/* LifeLog Silent Channel Guard */')) {
-    const soundBlockRegex = /val soundUri = SoundResolver\.resolveUri\(context, localNotification\.sound\) \?: getDefaultSoundUrl\(context\)[\s\S]*?mBuilder\.setDefaults\(Notification\.DEFAULT_ALL\)\s*\}/;
-    const silentReplacement = `/* LifeLog Silent Channel Guard */
-        val isRunningTimer = localNotification.ongoing || (localNotification.channelId != null && localNotification.channelId.contains("running"))
+  // 3. Clean up any previous sticky flags patch
+  if (content.includes('/* LifeLog Sticky Flags */')) {
+    content = content.replace(/\/\* LifeLog Sticky Flags \*\/[\s\S]*?buildNotification\.flags or Notification\.FLAG_ONGOING_EVENT or Notification\.FLAG_NO_CLEAR\s*\}/g, '');
+    modified = true;
+  }
+
+  // 4. Silence running timer channels completely (prevent ringing/vibration loops)
+  const silentPatchMarker = '/* LifeLog Silent Channel Guard v2 */';
+  const silentReplacement = `${silentPatchMarker}
+        val chId = localNotification.channelId
+        val isRunningTimer = localNotification.ongoing || (chId != null && chId.contains("running"))
         if (isRunningTimer || localNotification.sound == null) {
             mBuilder.setSound(null)
             mBuilder.setDefaults(0)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                mBuilder.setNotificationSilent()
-            }
+            mBuilder.setVibrate(null)
         } else {
             val soundUri = SoundResolver.resolveUri(context, localNotification.sound) ?: getDefaultSoundUrl(context)
             if (soundUri != null) {
@@ -80,45 +82,57 @@ try {
                 mBuilder.setDefaults(Notification.DEFAULT_ALL)
             }
         }`;
-    content = content.replace(soundBlockRegex, silentReplacement);
+
+  if (content.includes('/* LifeLog Silent Channel Guard */')) {
+    const oldSilentRegex = /\/\* LifeLog Silent Channel Guard \*\/[\s\S]*?mBuilder\.setDefaults\(Notification\.DEFAULT_ALL\)\s*\}\s*\}/;
+    content = content.replace(oldSilentRegex, silentReplacement);
     modified = true;
+  } else if (!content.includes(silentPatchMarker)) {
+    const soundBlockRegex = /val soundUri = SoundResolver\.resolveUri\(context, localNotification\.sound\) \?: getDefaultSoundUrl\(context\)[\s\S]*?mBuilder\.setDefaults\(Notification\.DEFAULT_ALL\)\s*\}/;
+    if (soundBlockRegex.test(content)) {
+      content = content.replace(soundBlockRegex, silentReplacement);
+      modified = true;
+    }
   }
 
-  // 4. Do NOT apply BigTextStyle if running timer (prevents overriding native progress bar)
-  const bigTextAnchor = 'if (localNotification.largeBody != null) {';
-  if (content.includes(bigTextAnchor)) {
+  // 5. Do NOT apply BigTextStyle if running timer (prevents overriding native progress bar)
+  if (content.includes('if (localNotification.largeBody != null && (localNotification.channelId == null || !localNotification.channelId.contains("running"))) {')) {
+    content = content.replace(
+      'if (localNotification.largeBody != null && (localNotification.channelId == null || !localNotification.channelId.contains("running"))) {',
+      'val chIdForBigText = localNotification.channelId\n        if (localNotification.largeBody != null && (chIdForBigText == null || !chIdForBigText.contains("running"))) {'
+    );
+    modified = true;
+  } else if (content.includes('if (localNotification.largeBody != null) {') && !content.includes('chIdForBigText')) {
     content = content.replace(
       'if (localNotification.largeBody != null) {',
-      'if (localNotification.largeBody != null && (localNotification.channelId == null || !localNotification.channelId.contains("running"))) {'
+      'val chIdForBigText = localNotification.channelId\n        if (localNotification.largeBody != null && (chIdForBigText == null || !chIdForBigText.contains("running"))) {'
     );
     modified = true;
   }
 
-  // 5. Add native Android Progress Bar, Chronometer, and unswipeable Ongoing flags
-  const progressHookMarker = '/* LifeLog Native Progress & Chronometer Hook v2 */';
-  if (!content.includes(progressHookMarker)) {
-    // Remove old marker if present
-    content = content.replace(/\/\* LifeLog Native Progress & Chronometer Hook \*\/[\s\S]*?catch \(e: Exception\) \{\}/g, '');
-
-    const targetAnchor = 'mBuilder.setOnlyAlertOnce(true)';
-    if (content.includes(targetAnchor)) {
-      const progressPatch = `${targetAnchor}
-        ${progressHookMarker}
+  // 6. Native Progress and Chronometer
+  const progressHookMarker = '/* LifeLog Native Progress & Chronometer Hook v3 */';
+  const progressPatchCode = `${progressHookMarker}
         try {
             val extraVal = localNotification.extra
-            if (extraVal is JSONObject) {
-                if (extraVal.has("maxProgress") && extraVal.has("progress")) {
-                    val maxP = extraVal.getInt("maxProgress")
-                    val curP = extraVal.getInt("progress")
+            val extraJson = when (extraVal) {
+                is JSONObject -> extraVal
+                is String -> try { JSONObject(extraVal) } catch (e: Exception) { null }
+                else -> null
+            }
+            if (extraJson != null) {
+                if (extraJson.has("maxProgress") && extraJson.has("progress")) {
+                    val maxP = extraJson.optInt("maxProgress", 100)
+                    val curP = extraJson.optInt("progress", 0)
                     mBuilder.setProgress(maxP, curP, false)
                 }
-                if (extraVal.optBoolean("usesChronometer", false)) {
-                    val base = extraVal.optLong("chronometerBase", System.currentTimeMillis())
+                if (extraJson.optBoolean("usesChronometer", false)) {
+                    val base = extraJson.optLong("chronometerBase", System.currentTimeMillis())
                     mBuilder.setUsesChronometer(true)
                     mBuilder.setWhen(base)
-                    val isCountDown = extraVal.optBoolean("chronometerCountDown", false)
+                    val isCountDown = extraJson.optBoolean("chronometerCountDown", false)
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                        mBuilder.setChronometerCountDown(isCountDown)
+                        mBuilder.extras.putBoolean("android.chronometerCountDown", isCountDown)
                     }
                 }
             }
@@ -127,26 +141,21 @@ try {
             }
         } catch (e: Exception) {}`;
 
-      content = content.replace(targetAnchor, progressPatch);
+  if (content.includes('/* LifeLog Native Progress & Chronometer Hook v2 */') || content.includes('/* LifeLog Native Progress & Chronometer Hook */')) {
+    const oldHookRegex = /\/\* LifeLog Native Progress & Chronometer Hook(?: v2)? \*\/[\s\S]*?catch \(e: Exception\) \{\}/;
+    content = content.replace(oldHookRegex, progressPatchCode);
+    modified = true;
+  } else if (!content.includes(progressHookMarker)) {
+    const targetAnchor = 'mBuilder.setOnlyAlertOnce(true)';
+    if (content.includes(targetAnchor)) {
+      content = content.replace(targetAnchor, `${targetAnchor}\n        ${progressPatchCode}`);
       modified = true;
     }
   }
 
-  // 6. Ensure unswipeable notification flags on build
-  const buildAnchor = 'val buildNotification = mBuilder.build()';
-  if (content.includes(buildAnchor) && !content.includes('/* LifeLog Sticky Flags */')) {
-    const stickyFlags = `val buildNotification = mBuilder.build()
-        /* LifeLog Sticky Flags */
-        if (localNotification.ongoing) {
-            buildNotification.flags = buildNotification.flags or Notification.FLAG_ONGOING_EVENT or Notification.FLAG_NO_CLEAR
-        }`;
-    content = content.replace(buildAnchor, stickyFlags);
-    modified = true;
-  }
-
   if (modified) {
     fs.writeFileSync(targetFile, content, 'utf8');
-    console.log('[LifeLog Patch] Successfully updated LocalNotificationManager.kt with silent channels, native progress, chronometer, and sticky ongoing flags.');
+    console.log('[LifeLog Patch] Successfully updated LocalNotificationManager.kt with silent channels, safe smart casts, and native progress.');
   } else {
     console.log('[LifeLog Patch] LocalNotificationManager.kt already contains all required patches.');
   }
